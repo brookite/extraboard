@@ -8,8 +8,9 @@
 # npm
 node_modules
 
-# Don't include the compiled main.js file in the repo.
-# They should be uploaded to GitHub releases instead.
+# Build output: the assembled plugin (main.js + copied manifest/styles).
+# These should be uploaded to GitHub releases instead of committed.
+dist/
 main.js
 
 # Exclude sourcemaps
