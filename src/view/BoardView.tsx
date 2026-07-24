@@ -82,10 +82,13 @@ export class BoardView extends TextFileView {
 		render(<KanbanView board={this.board} />, el);
 	}
 
-	private openAsMarkdown(): void {
+	private async openAsMarkdown(): Promise<void> {
 		const file = this.file;
 		if (!file) return;
 		this.plugin.suppressAutoOpen(file.path);
-		void this.leaf.setViewState({ type: 'markdown', state: { file: file.path } });
+		await this.leaf.setViewState({ type: 'markdown', state: { file: file.path } });
+		// Changing the view type does not re-fire file-open, so add the switch
+		// back to the board directly on the freshly created Markdown view.
+		this.plugin.showBoardSwitch(this.leaf);
 	}
 }

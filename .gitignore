@@ -21,3 +21,6 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# Local Obsidian test vault (see CLAUDE.md → Testing). Never commit vault data.
+.testvault/

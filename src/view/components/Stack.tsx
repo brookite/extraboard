@@ -1,6 +1,7 @@
 import type { BoardConfig, Stack as StackModel } from '../../model/types';
 import { CardTile } from './Card';
 import { DividerRow } from './Divider';
+import { Icon } from './Icon';
 
 function cardCount(stack: StackModel): number {
 	return stack.items.filter((i) => i.kind === 'card').length;
@@ -10,7 +11,10 @@ export function StackColumn({ stack, config }: { stack: StackModel; config: Boar
 	return (
 		<div class="eb-stack">
 			<div class="eb-stack-header">
-				<span class={`eb-chevron${stack.collapsed ? ' is-collapsed' : ''}`} />
+				<Icon
+					name="chevron-down"
+					class={`eb-chevron${stack.collapsed ? ' is-collapsed' : ''}`}
+				/>
 				<span class="eb-stack-name">{stack.name}</span>
 				<span class="eb-stack-count">{cardCount(stack)}</span>
 			</div>

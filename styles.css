@@ -65,17 +65,19 @@
 
 .eb-chevron {
 	flex: 0 0 auto;
-	width: 0;
-	height: 0;
-	border-left: 5px solid var(--text-muted);
-	border-top: 4px solid transparent;
-	border-bottom: 4px solid transparent;
-	transform: rotate(90deg);
+	display: inline-flex;
+	align-items: center;
+	color: var(--text-muted);
 	transition: transform 120ms ease;
 }
 
+.eb-chevron .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
 .eb-chevron.is-collapsed {
-	transform: rotate(0deg);
+	transform: rotate(-90deg);
 }
 
 .eb-stack-body {
