@@ -26,10 +26,13 @@ npm install       # install dependencies
 npm run dev       # watch build
 npm run build     # production build (tsc type-check + esbuild bundle)
 npm run lint      # eslint
+npm test          # run the unit tests
 ```
 
-Build output (`main.js`) plus `manifest.json` and `styles.css` go into
-`<Vault>/.obsidian/plugins/extraboard/` for manual testing.
+The build assembles the complete plugin into **`dist/`** (`main.js`,
+`manifest.json`, `styles.css`). For manual testing, copy or symlink `dist/` to
+`<Vault>/.obsidian/plugins/extraboard/`, then reload Obsidian and enable the
+plugin under **Settings → Community plugins**.
 
 ## License
 
