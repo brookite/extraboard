@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "obsidian-extraboard",
+	"version": "0.1.0",
+	"description": "Markdown-backed Kanban and calendar boards for Obsidian, mobile-friendly.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
@@ -12,9 +12,14 @@
 	},
 	"keywords": [],
 	"license": "0-BSD",
+	"dependencies": {
+		"preact": "^10.24.3",
+		"sortablejs": "^1.15.6"
+	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.4",
 		"@types/node": "^22.15.17",
+		"@types/sortablejs": "^1.15.8",
 		"esbuild": "0.25.5",
 		"eslint": "^9.39.4",
 		"eslint-plugin-obsidianmd": "^0.4.0",
