@@ -8,13 +8,16 @@
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
-		"lint": "eslint ."
+		"lint": "eslint .",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"keywords": [],
 	"license": "0-BSD",
 	"dependencies": {
 		"preact": "^10.24.3",
-		"sortablejs": "^1.15.6"
+		"sortablejs": "^1.15.6",
+		"yaml": "^2.9.0"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.4",
@@ -27,6 +30,7 @@
 		"jiti": "^2.6.1",
 		"obsidian": "latest",
 		"typescript": "^5.8.3",
-		"typescript-eslint": "^8.59.1"
+		"typescript-eslint": "^8.59.1",
+		"vitest": "^2.1.9"
 	}
 }
