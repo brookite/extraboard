@@ -1,8 +1,198 @@
-/*
+/* Extraboard — board view styles. Uses Obsidian theme variables so light and
+   dark themes both work. All classes are prefixed `eb-`. */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.eb-root {
+	height: 100%;
+	overflow: hidden;
+}
 
-If your plugin does not need CSS, delete this file.
+.eb-empty {
+	padding: 2em;
+	color: var(--text-muted);
+	text-align: center;
+}
 
-*/
+/* Horizontal, scrollable row of stacks. */
+.eb-board {
+	display: flex;
+	gap: var(--size-4-3, 12px);
+	align-items: flex-start;
+	height: 100%;
+	padding: var(--size-4-3, 12px);
+	overflow-x: auto;
+	overflow-y: hidden;
+}
+
+.eb-stack {
+	display: flex;
+	flex-direction: column;
+	flex: 0 0 auto;
+	width: 272px;
+	max-width: 85vw;
+	max-height: 100%;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+}
+
+.eb-stack-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 10px;
+	font-weight: var(--font-semibold, 600);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.eb-stack-name {
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.eb-stack-count {
+	flex: 0 0 auto;
+	min-width: 1.4em;
+	padding: 0 6px;
+	font-size: var(--font-smaller, 0.8em);
+	font-weight: var(--font-normal, 400);
+	color: var(--text-muted);
+	text-align: center;
+	background: var(--background-modifier-hover);
+	border-radius: var(--radius-s, 4px);
+}
+
+.eb-chevron {
+	flex: 0 0 auto;
+	width: 0;
+	height: 0;
+	border-left: 5px solid var(--text-muted);
+	border-top: 4px solid transparent;
+	border-bottom: 4px solid transparent;
+	transform: rotate(90deg);
+	transition: transform 120ms ease;
+}
+
+.eb-chevron.is-collapsed {
+	transform: rotate(0deg);
+}
+
+.eb-stack-body {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px;
+	overflow-y: auto;
+}
+
+/* Cards */
+.eb-card {
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+	padding: 8px 10px;
+	box-shadow: var(--shadow-s, 0 1px 2px rgba(0, 0, 0, 0.08));
+}
+
+.eb-card-title {
+	color: var(--text-normal);
+	line-height: 1.35;
+	word-break: break-word;
+}
+
+.eb-card-props,
+.eb-card-tags {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+	margin-top: 6px;
+}
+
+.eb-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 1px 7px;
+	font-size: var(--font-smaller, 0.8em);
+	line-height: 1.5;
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+	border-radius: 10px;
+	white-space: nowrap;
+}
+
+.eb-badge-muted {
+	color: var(--text-muted);
+}
+
+.eb-tag {
+	display: inline-flex;
+	padding: 1px 7px;
+	font-size: var(--font-smaller, 0.8em);
+	color: var(--text-accent);
+	background: var(--background-modifier-hover);
+	border-radius: 10px;
+	white-space: nowrap;
+}
+
+.eb-swatch {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	border: 1px solid var(--background-modifier-border);
+	vertical-align: middle;
+}
+
+/* Progress ring */
+.eb-ring {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.eb-ring-track {
+	stroke: var(--background-modifier-border);
+}
+
+.eb-ring-fill {
+	stroke: var(--interactive-accent);
+}
+
+.eb-ring-label {
+	position: absolute;
+	font-size: 8px;
+	color: var(--text-muted);
+}
+
+/* Dividers */
+.eb-divider {
+	margin: 2px 0;
+	border: none;
+	border-top: 1px dashed var(--background-modifier-border);
+}
+
+.eb-divider-named {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 4px 0 2px;
+}
+
+.eb-divider-label {
+	font-size: var(--font-smaller, 0.8em);
+	font-weight: var(--font-semibold, 600);
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.eb-collapsed-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--text-faint);
+}
