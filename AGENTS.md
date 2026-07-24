@@ -85,6 +85,21 @@ npm run build
     ```
 - Reload Obsidian and enable the plugin in **Settings → Community plugins**.
 
+### Local test vault (`.testvault/`)
+
+- A working Obsidian vault lives at `.testvault/` in the repo root. It is
+  **git-ignored** — never commit it.
+- The plugin is wired in via a symlink, so it always reflects the latest build:
+    ```
+    .testvault/.obsidian/plugins/kanban -> ./dist
+    ```
+  (The vault folder name is `kanban`; the manifest `id` is `extraboard`.)
+- Workflow: run `npm run build` (or `npm run dev`), then in Obsidian reload the
+  plugin — **Settings → Community plugins**, toggle Extraboard off/on, or run
+  **Reload app without saving** from the command palette.
+- `.testvault/Demo board.md` is a filled sample board that exercises every
+  property type, tag colors, named/plain dividers, and a collapsed stack.
+
 ## Commands & settings
 
 - Any user-facing commands should be added via `this.addCommand(...)`.
