@@ -181,6 +181,15 @@
 	background: var(--background-modifier-hover);
 	border-radius: 10px;
 	white-space: nowrap;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.eb-tag:hover,
+.eb-tag:focus-visible {
+	text-decoration: none;
+	filter: brightness(1.1);
+	box-shadow: 0 0 0 1px var(--background-modifier-border-hover, var(--background-modifier-border));
 }
 
 .eb-swatch {
