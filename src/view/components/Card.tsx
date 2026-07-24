@@ -99,7 +99,7 @@ export function CardTile({ board, stackIndex, index, api }: Props) {
 			{card.tags.length > 0 ? (
 				<div class="eb-card-tags">
 					{card.tags.map((t) => (
-						<Tag key={t} tag={t} config={board.config} />
+						<Tag key={t} tag={t} config={board.config} api={api} />
 					))}
 				</div>
 			) : null}

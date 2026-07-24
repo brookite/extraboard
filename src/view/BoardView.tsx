@@ -9,7 +9,7 @@ import type { Board } from '../model/types';
 import { parseBoard } from '../model/parse';
 import { serializeBoard } from '../model/serialize';
 import { ICONS, VIEW_TYPE_BOARD } from '../util/constants';
-import { BoardApi, confirmDestructive } from './api';
+import { BoardApi, confirmDestructive, searchTag } from './api';
 import { KanbanView } from './KanbanView';
 
 export class BoardView extends TextFileView {
@@ -24,6 +24,7 @@ export class BoardView extends TextFileView {
 		this.api = {
 			update: (mutate) => this.applyEdit(mutate),
 			confirm: (title, message, cta) => confirmDestructive(this.app, title, message, cta),
+			searchTag: (tag) => searchTag(this.app, tag),
 		};
 	}
 

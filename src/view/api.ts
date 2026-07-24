@@ -2,7 +2,7 @@
 // the save path; components only describe *what* changed via a pure op from
 // `model/ops.ts`. Spec: docs/specs/kanban-view.md §6.
 
-import { App, Modal } from 'obsidian';
+import { App, Modal, Notice } from 'obsidian';
 import type { Board } from '../model/types';
 
 export interface BoardApi {
@@ -10,6 +10,29 @@ export interface BoardApi {
 	update(mutate: (board: Board) => Board): void;
 	/** Ask before something destructive. Resolves false when dismissed. */
 	confirm(title: string, message: string, cta: string): Promise<boolean>;
+	/** Open the vault search for a tag, as clicking a tag elsewhere does. */
+	searchTag(tag: string): void;
+}
+
+/**
+ * The global search plugin is a core plugin but is not part of the public API,
+ * so it is reached through a narrow structural type and every step is checked:
+ * a user can disable it, and then the tag click just explains itself.
+ */
+interface SearchCapableApp {
+	internalPlugins?: {
+		getPluginById(id: string): { instance?: { openGlobalSearch?: (query: string) => void } } | null;
+	};
+}
+
+export function searchTag(app: App, tag: string): void {
+	const search = (app as App & SearchCapableApp).internalPlugins?.getPluginById('global-search');
+	const open = search?.instance?.openGlobalSearch;
+	if (!open) {
+		new Notice('Search is disabled — enable it to search by tag.');
+		return;
+	}
+	open.call(search.instance, `tag:#${tag}`);
 }
 
 class ConfirmModal extends Modal {
