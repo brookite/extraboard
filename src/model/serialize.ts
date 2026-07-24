@@ -7,7 +7,12 @@ import { Board, BoardConfig, Card, Divider, Stack } from './types';
 
 const COLLAPSE = '%%collapsed%%';
 
-function serializeCard(card: Card, config: BoardConfig): string[] {
+/**
+ * The text of a card's `- ` line without the marker: title, property tokens in
+ * config order, then tags. This is also what the inline card editor shows, so
+ * `parseCardContent(cardLineContent(card, config), config)` is a fixed point.
+ */
+export function cardLineContent(card: Card, config: BoardConfig): string {
 	const order = new Map(config.properties.map((p, i) => [p.name, i]));
 	const decorated = card.properties.map((pv, idx) => ({
 		pv,
@@ -21,7 +26,12 @@ function serializeCard(card: Card, config: BoardConfig): string[] {
 	for (const d of decorated) segments.push(formatToken(d.pv));
 	for (const tag of card.tags) segments.push(`#${tag}`);
 
-	const line = segments.length ? `- ${segments.join(' ')}` : '-';
+	return segments.join(' ');
+}
+
+function serializeCard(card: Card, config: BoardConfig): string[] {
+	const content = cardLineContent(card, config);
+	const line = content ? `- ${content}` : '-';
 	return [line, ...card.trailing];
 }
 

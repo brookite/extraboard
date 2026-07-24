@@ -38,10 +38,11 @@
 .eb-stack-header {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 8px 10px;
+	gap: 4px;
+	padding: 6px 8px;
 	font-weight: var(--font-semibold, 600);
 	border-bottom: 1px solid var(--background-modifier-border);
+	cursor: grab;
 }
 
 .eb-stack-name {
@@ -49,6 +50,25 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	cursor: text;
+}
+
+/* Collapsed stacks shrink to a vertical spine. */
+.eb-stack.is-collapsed {
+	width: auto;
+	min-width: 0;
+}
+
+.eb-stack.is-collapsed .eb-stack-header {
+	flex-direction: column;
+	align-items: center;
+	max-height: 100%;
+	border-bottom: none;
+}
+
+.eb-stack.is-collapsed .eb-stack-name {
+	writing-mode: vertical-rl;
+	max-height: 60vh;
 }
 
 .eb-stack-count {
@@ -84,8 +104,19 @@
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
-	padding: 10px;
+	padding: 10px 10px 4px;
+	/* Keep an empty stack a usable drop target. */
+	min-height: 24px;
 	overflow-y: auto;
+}
+
+/* `display: flex` would otherwise beat the browser default for [hidden]. */
+.eb-stack-body[hidden] {
+	display: none;
+}
+
+.eb-stack-footer {
+	padding: 0 10px 10px;
 }
 
 /* Cards */
@@ -95,12 +126,25 @@
 	border-radius: var(--radius-s, 6px);
 	padding: 8px 10px;
 	box-shadow: var(--shadow-s, 0 1px 2px rgba(0, 0, 0, 0.08));
+	cursor: pointer;
+}
+
+.eb-card-head {
+	display: flex;
+	align-items: flex-start;
+	gap: 4px;
 }
 
 .eb-card-title {
+	flex: 1 1 auto;
 	color: var(--text-normal);
 	line-height: 1.35;
 	word-break: break-word;
+}
+
+.eb-placeholder {
+	color: var(--text-faint);
+	font-style: italic;
 }
 
 .eb-card-props,
@@ -171,30 +215,144 @@
 }
 
 /* Dividers */
-.eb-divider {
-	margin: 2px 0;
-	border: none;
-	border-top: 1px dashed var(--background-modifier-border);
-}
-
-.eb-divider-named {
+.eb-divider-row {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	margin: 4px 0 2px;
+	gap: 4px;
+	margin: 2px 0;
+	cursor: grab;
 }
 
 .eb-divider-label {
+	flex: 0 0 auto;
 	font-size: var(--font-smaller, 0.8em);
 	font-weight: var(--font-semibold, 600);
 	color: var(--text-muted);
 	text-transform: uppercase;
 	letter-spacing: 0.03em;
+	cursor: text;
 }
 
-.eb-collapsed-dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: var(--text-faint);
+.eb-divider-line {
+	flex: 1 1 auto;
+	height: 0;
+	border-top: 1px dashed var(--background-modifier-border);
+}
+
+/* Editing */
+.eb-editor {
+	width: 100%;
+	/* Autosized from the content by InlineEditor. */
+	height: var(--eb-editor-height, auto);
+	min-height: 2em;
+	padding: 6px 8px;
+	font-family: inherit;
+	font-size: inherit;
+	line-height: 1.35;
+	color: var(--text-normal);
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border-focus, var(--interactive-accent));
+	border-radius: var(--radius-s, 6px);
+	resize: none;
+	overflow: hidden;
+}
+
+.eb-card.is-editing {
+	padding: 0;
+	border: none;
+	box-shadow: none;
+	background: none;
+}
+
+.eb-stack-name-editor {
+	min-height: 0;
+	padding: 2px 6px;
+	font-weight: var(--font-normal, 400);
+}
+
+.eb-icon-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	color: var(--text-muted);
+	background: none;
+	border: none;
+	border-radius: var(--radius-s, 4px);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.eb-icon-button:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.eb-icon-button .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+/* Hover-only affordances stay reachable on touch devices. */
+.eb-hover-only {
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.eb-card:hover .eb-hover-only,
+.eb-divider-row:hover .eb-hover-only,
+.eb-hover-only:focus-visible {
+	opacity: 1;
+}
+
+body.is-mobile .eb-hover-only {
+	opacity: 1;
+}
+
+.eb-add-card,
+.eb-add-stack-button {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 6px 8px;
+	color: var(--text-muted);
+	background: none;
+	border: none;
+	box-shadow: none;
+	text-align: left;
+	cursor: pointer;
+}
+
+.eb-add-card:hover,
+.eb-add-stack-button:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.eb-add-card .svg-icon,
+.eb-add-stack-button .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.eb-add-stack {
+	flex: 0 0 auto;
+	width: 200px;
+	padding: 6px;
+	background: var(--background-secondary);
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+}
+
+/* Drag & drop */
+.eb-drag-ghost {
+	opacity: 0.4;
+}
+
+.eb-drag-item {
+	cursor: grabbing;
 }
