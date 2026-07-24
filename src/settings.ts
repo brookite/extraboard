@@ -1,38 +1,11 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
-import MyPlugin from './main';
-
-export interface MyPluginSettings {
-	mySetting: string;
+// Plugin-global settings. Per-board configuration (views, properties, paths)
+// lives in each board file's YAML frontmatter, not here.
+//
+// No global settings are defined yet; this module is the scaffold they will
+// attach to. The optional `never` field keeps the type non-empty without
+// declaring a real setting prematurely.
+export interface ExtraboardSettings {
+	readonly _reserved?: never;
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default',
-};
-
-export class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const { containerEl } = this;
-
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName('Settings #1')
-			.setDesc("It's a secret")
-			.addText((text) =>
-				text
-					.setPlaceholder('Enter your secret')
-					.setValue(this.plugin.settings.mySetting)
-					.onChange(async (value) => {
-						this.plugin.settings.mySetting = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-	}
-}
+export const DEFAULT_SETTINGS: ExtraboardSettings = {};
