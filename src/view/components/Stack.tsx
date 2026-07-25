@@ -128,6 +128,11 @@ export function StackColumn({ board, index, api, settings }: Props) {
 			}}
 		>
 			<div class="eb-stack-header">
+				{/* The only drag zone for the stack (`handle` in KanbanView), so the
+				    rest of the header keeps its click targets. */}
+				<span class="eb-stack-grip" title="Drag to reorder" aria-hidden="true">
+					<Icon name="grip-vertical" />
+				</span>
 				<button
 					type="button"
 					class="eb-icon-button"
@@ -157,11 +162,29 @@ export function StackColumn({ board, index, api, settings }: Props) {
 					</span>
 				)}
 				<span class="eb-stack-count">{ops.cardCount(stack)}</span>
-				{collapsed ? null : (
-					<IconButton icon="plus" label="Add card" onClick={() => setComposing(true)} />
-				)}
 				<IconButton icon="more-vertical" label="Stack options" onClick={openMenu} />
 			</div>
+
+			{collapsed ? null : (
+				<div class="eb-stack-compose">
+					{composing ? (
+						<InlineEditor
+							placeholder="Card text, @{property|value}, #tag"
+							keepOpen
+							onSubmit={(text, again) => {
+								if (!again) setComposing(false);
+								api.update((b) => ops.addCard(b, index, text, 0));
+							}}
+							onCancel={() => setComposing(false)}
+						/>
+					) : (
+						<button type="button" class="eb-add-card" onClick={() => setComposing(true)}>
+							<Icon name="plus" />
+							<span>Add card</span>
+						</button>
+					)}
+				</div>
+			)}
 
 			<div class="eb-stack-body" ref={bodyRef} data-list={index} hidden={collapsed}>
 				{stack.items.map((item, i) =>
@@ -186,27 +209,6 @@ export function StackColumn({ board, index, api, settings }: Props) {
 					),
 				)}
 			</div>
-
-			{collapsed ? null : (
-				<div class="eb-stack-footer">
-					{composing ? (
-						<InlineEditor
-							placeholder="Card text, @{property|value}, #tag"
-							keepOpen
-							onSubmit={(text, again) => {
-								if (!again) setComposing(false);
-								api.update((b) => ops.addCard(b, index, text));
-							}}
-							onCancel={() => setComposing(false)}
-						/>
-					) : (
-						<button type="button" class="eb-add-card" onClick={() => setComposing(true)}>
-							<Icon name="plus" />
-							<span>Add card</span>
-						</button>
-					)}
-				</div>
-			)}
 		</div>
 	);
 }

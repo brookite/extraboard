@@ -11,6 +11,11 @@ export interface ExtraboardSettings {
 	 */
 	defaultProperties: PropertyDef[];
 	/**
+	 * Vault-relative folder for card notes of boards that do not set their own
+	 * `cardContentDir`. Empty = the vault root (settings.md).
+	 */
+	cardNoteFolder: string;
+	/**
 	 * `false` — the card `color` property paints a left-edge stripe;
 	 * `true` — it also tints the whole card (kanban-view.md §5.2).
 	 */
@@ -19,5 +24,6 @@ export interface ExtraboardSettings {
 
 export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	defaultProperties: [],
+	cardNoteFolder: '',
 	fillCardWithColor: false,
 };

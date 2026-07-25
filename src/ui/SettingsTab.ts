@@ -1,7 +1,7 @@
 // Plugin settings tab (Settings → Community plugins → Extraboard).
 // Spec: docs/specs/settings.md.
 
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 import type ExtraboardPlugin from '../main';
 import { PropertyDefsEditor } from './PropertyDefsEditor';
 
@@ -27,6 +27,23 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+
+		new Setting(containerEl)
+			.setName('Card note folder')
+			.setDesc(
+				'Where card notes are created for boards that do not set a folder of their own. Empty uses the vault root.',
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder('Vault root')
+					.setValue(this.plugin.settings.cardNoteFolder)
+					.onChange((value) => {
+						const dir = value.trim();
+						// Vault-relative and normalized: the plugin never writes outside the vault.
+						this.plugin.settings.cardNoteFolder = dir ? normalizePath(dir) : '';
+						void this.plugin.saveSettings();
+					}),
+			);
 
 		new Setting(containerEl)
 			.setName('Fill cards with color')
