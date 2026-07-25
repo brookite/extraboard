@@ -21,10 +21,38 @@ const TAB_WIDTH = 4;
 
 const ITEM_RE = /^([ \t]+)- \[(.)\](?: (.*))?$/;
 
-function indentWidth(indent: string): number {
+export function indentWidth(indent: string): number {
 	let width = 0;
 	for (const ch of indent) width += ch === '\t' ? TAB_WIDTH - (width % TAB_WIDTH) : 1;
 	return width;
+}
+
+/** One parsed task line, before it is nested into a tree. */
+export interface ChecklistRow {
+	indent: number;
+	marker: string;
+	text: string;
+}
+
+/**
+ * Nest flat task lines by indent: an item's parent is the nearest preceding
+ * item with a strictly smaller indent, so an over-indented item is one level
+ * deeper than its parent and never a gap. Shared by the file parser and the
+ * card text processor, which see the same shapes with different indentation.
+ */
+export function buildChecklist(rows: ChecklistRow[]): ChecklistItem[] {
+	const roots: ChecklistItem[] = [];
+	// Open ancestors, outermost first; each entry is the indent it was found at.
+	const open: { width: number; item: ChecklistItem }[] = [];
+	for (const row of rows) {
+		const item: ChecklistItem = { marker: row.marker, text: row.text, children: [] };
+		while (open.length && open[open.length - 1]!.width >= row.indent) open.pop();
+		const parent = open[open.length - 1];
+		if (parent) parent.item.children.push(item);
+		else roots.push(item);
+		open.push({ width: row.indent, item });
+	}
+	return roots;
 }
 
 /** True iff an item's marker means "done" — the same rule as a card's (§4.0). */
@@ -41,27 +69,16 @@ export function splitChecklist(lines: string[]): {
 	checklist: ChecklistItem[];
 	trailing: string[];
 } {
-	const roots: ChecklistItem[] = [];
-	// Open ancestors, outermost first; each entry is the indent it was found at.
-	const open: { width: number; item: ChecklistItem }[] = [];
-	let consumed = 0;
-
+	const rows: ChecklistRow[] = [];
 	for (const line of lines) {
 		const m = ITEM_RE.exec(line);
 		if (!m) break;
-		const width = indentWidth(m[1]!);
-		const item: ChecklistItem = { marker: m[2]!, text: m[3] ?? '', children: [] };
-
-		// An over-indented item is one level deeper than its parent, never a gap.
-		while (open.length && open[open.length - 1]!.width >= width) open.pop();
-		const parent = open[open.length - 1];
-		if (parent) parent.item.children.push(item);
-		else roots.push(item);
-		open.push({ width, item });
-		consumed++;
+		rows.push({ indent: indentWidth(m[1]!), marker: m[2]!, text: m[3] ?? '' });
 	}
-
-	return { checklist: roots, trailing: consumed ? lines.slice(consumed) : lines };
+	return {
+		checklist: buildChecklist(rows),
+		trailing: rows.length ? lines.slice(rows.length) : lines,
+	};
 }
 
 /** Canonical output: one tab per level, `- [<marker>] <text>`. */

@@ -7,6 +7,7 @@
 // lines stay canonical (see `normalizeStack`).
 
 import { ChecklistItem, cloneChecklist, progress } from './checklist';
+import { processCardText } from './cardText';
 import { configToDoc, writeConfig } from './frontmatter';
 import { parseCardLink, unlinkedTitle } from './link';
 import { parseCardContent } from './parse';
@@ -113,8 +114,15 @@ export function emptyStack(name: string): Stack {
 	return { name, collapsed: false, lead: [''], items: [] };
 }
 
+/**
+ * A card from editor text. The text goes through the card text processor first
+ * (`cardText.ts`), so a typed task list becomes the card's checklist and block
+ * constructs a card cannot hold are dropped.
+ */
 export function newCard(text: string, board: Board): Card {
-	return parseCardContent(text, board.config);
+	const processed = processCardText(text);
+	const card = parseCardContent(processed.text, board.config);
+	return processed.checklist.length ? { ...card, checklist: processed.checklist } : card;
 }
 
 // --- stack operations -------------------------------------------------------
@@ -206,6 +214,10 @@ function replaceCard(board: Board, ref: ItemRef, card: Card): Board {
  * (card-content-and-checklists.md §3). A token the user typed anyway is still
  * honoured — it overrides the carried-over value of the same name — so hiding
  * the tokens can never lose a property, whichever way the user edits.
+ *
+ * Task lines typed into the field are lifted out by the text processor and
+ * **prepended** to the card's existing checklist (§3.2), so writing a checklist
+ * in the editor adds to it rather than replacing it.
  */
 export function setCardText(
 	board: Board,
@@ -220,11 +232,14 @@ export function setCardText(
 	const properties = options.keepProperties
 		? mergeProperties(entry.card.properties, parsed.properties)
 		: parsed.properties;
+	const checklist = parsed.checklist.length
+		? [...parsed.checklist, ...entry.card.checklist]
+		: entry.card.checklist;
 	const card: Card = {
 		...parsed,
 		properties,
 		...(task !== undefined && { task }),
-		checklist: entry.card.checklist,
+		checklist,
 		trailing: entry.card.trailing,
 	};
 	return replaceCard(board, ref, card);
