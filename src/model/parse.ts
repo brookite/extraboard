@@ -92,8 +92,14 @@ export function extractTags(s: string): { tags: string[]; rest: string } {
 	return { tags, rest };
 }
 
+/**
+ * Newlines collapse like any other whitespace. A card is one list item, and the
+ * inline editor lets the user type Shift+Enter, so the model folds that back
+ * into a single line (kanban-view.md §6.6) — otherwise a re-serialized card
+ * would split into several cards. File parsing never sees a newline here.
+ */
 function collapseWhitespace(s: string): string {
-	return s.replace(/[ \t]+/g, ' ').trim();
+	return s.replace(/\s+/g, ' ').trim();
 }
 
 function findDef(config: BoardConfig, name: string): PropertyDef | undefined {
