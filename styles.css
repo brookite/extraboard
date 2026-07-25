@@ -304,9 +304,10 @@
 	display: inline-flex;
 	align-items: center;
 	flex: 0 0 auto;
-	padding: 0;
+	padding: 2px 4px;
 	background: none;
 	border: none;
+	border-radius: 10px;
 	box-shadow: none;
 	cursor: pointer;
 }
