@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { noteFileName } from '../src/model/link';
 import * as ops from '../src/model/ops';
 import { parseBody } from '../src/model/parse';
+import { serializeBody } from '../src/model/serialize';
 import type { Board, BoardConfig, Card } from '../src/model/types';
 
 const config: BoardConfig = {
@@ -74,6 +75,19 @@ describe('card text editing with hidden property tokens', () => {
 	it('lets the text own everything when the tokens were shown', () => {
 		const next = ops.setCardText(board(), ref, 'Renamed @{priority|9}');
 		expect(cardAt(next, 0, 0).properties).toEqual([{ name: 'priority', type: 'integer', value: 9 }]);
+	});
+
+	// The field accepts Shift+Enter, but a card is one list item: without the
+	// fold a re-serialized card would split into several cards.
+	it('folds a multi-line field back into one line', () => {
+		const typed = 'Title line\n- [ ] step one\n\n- [x] step two';
+		const next = ops.setCardText(board(), ref, typed, { keepProperties: true });
+		const card = cardAt(next, 0, 0);
+		expect(card.title).toBe('Title line - [ ] step one - [x] step two');
+
+		const stack = next.stacks[0];
+		expect(stack?.items).toHaveLength(1);
+		expect(serializeBody(next).split('\n').filter((l) => l.startsWith('- '))).toHaveLength(1);
 	});
 });
 
