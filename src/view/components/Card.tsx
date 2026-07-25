@@ -1,5 +1,5 @@
 import { Menu } from 'obsidian';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { parseCardLink } from '../../model/link';
 import * as ops from '../../model/ops';
 import type { Board, Card } from '../../model/types';
@@ -22,6 +22,10 @@ interface Props {
 	index: number;
 	api: BoardApi;
 	settings: ExtraboardSettings;
+	/** Open this card for editing as soon as it mounts (a freshly created card). */
+	forceEdit?: boolean;
+	/** Called once `forceEdit` has been acted on, so the caller can clear it. */
+	onForceEditConsumed?: () => void;
 }
 
 /** The board's single `color` property paints the card instead of a badge. */
@@ -30,8 +34,23 @@ function cardColor(card: Card): string {
 	return pv?.type === 'color' ? pv.value : '';
 }
 
-export function CardTile({ board, stackIndex, index, api, settings }: Props) {
+export function CardTile({
+	board,
+	stackIndex,
+	index,
+	api,
+	settings,
+	forceEdit,
+	onForceEditConsumed,
+}: Props) {
 	const [editing, setEditing] = useState(false);
+
+	useEffect(() => {
+		if (!forceEdit) return;
+		setEditing(true);
+		onForceEditConsumed?.();
+	}, [forceEdit]);
+
 	const entry = board.stacks[stackIndex]?.items[index];
 	if (entry?.kind !== 'card') return null;
 
@@ -238,7 +257,7 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 						>
 							{link.display}
 						</a>
-					) : card.title ? (
+					) : !ops.isCardUntitled(card) ? (
 						// Any other title is one line of inline Markdown (§2).
 						hasMarkdown(card.title) ? (
 							<MarkdownText markdown={card.title} api={api} />

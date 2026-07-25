@@ -140,6 +140,11 @@ export class BoardView extends TextFileView {
 		}).open();
 	}
 
+	/** Remove every untitled card from the board (file-menu item added in main.ts). */
+	deleteUntitledCards(): void {
+		this.applyEdit((b) => ops.deleteUntitledCards(b));
+	}
+
 	// --- internals ---
 
 	private ensureMount(): HTMLElement {

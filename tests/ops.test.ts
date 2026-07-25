@@ -86,6 +86,32 @@ describe('ops: cards', () => {
 		expect(text(next).endsWith('## Done %%collapsed%%\n')).toBe(true);
 		expect(text(next)).not.toContain('Shipped');
 	});
+
+	it('treats a blank or whitespace-only title as untitled', () => {
+		const card = (title: string) => ({
+			title,
+			properties: [],
+			tags: [],
+			checklist: [],
+			trailing: [],
+		});
+		expect(ops.isCardUntitled(card(''))).toBe(true);
+		expect(ops.isCardUntitled(card('   \t '))).toBe(true);
+		expect(ops.isCardUntitled(card('First card'))).toBe(false);
+	});
+
+	it('deletes every untitled card across the board', () => {
+		const b = ops.addCard(board(), 1, '   ', 0);
+		const next = ops.deleteUntitledCards(b);
+		const doing = next.stacks[1]!.items;
+		expect(doing.some((item) => item.kind === 'card' && item.card.title === '')).toBe(false);
+		expect(text(next)).toContain('## To do\n\n- First card #work\n- Second card');
+	});
+
+	it('is a no-op on a board with no untitled cards', () => {
+		const b = board();
+		expect(ops.deleteUntitledCards(b)).toBe(b);
+	});
 });
 
 describe('ops: moving items', () => {

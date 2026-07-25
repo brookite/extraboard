@@ -9,10 +9,12 @@ interface Props {
 	placeholder?: string;
 	/** Let Enter commit and keep editing, for the add-card composer. */
 	keepOpen?: boolean;
+	/** Empty input submits an empty string instead of cancelling (a card may be untitled). */
+	allowEmpty?: boolean;
 	/**
-	 * Called with the trimmed text; empty input cancels instead. `again` is true
-	 * when the editor stays open for the next entry, so the caller knows whether
-	 * to close its composer.
+	 * Called with the trimmed text; empty input cancels instead, unless
+	 * `allowEmpty`. `again` is true when the editor stays open for the next
+	 * entry, so the caller knows whether to close its composer.
 	 */
 	onSubmit: (text: string, again: boolean) => void;
 	onCancel: () => void;
@@ -29,6 +31,7 @@ export function InlineEditor({
 	value = '',
 	placeholder,
 	keepOpen = false,
+	allowEmpty = false,
 	onSubmit,
 	onCancel,
 	class: cls,
@@ -57,7 +60,7 @@ export function InlineEditor({
 	const submit = (fromKey: boolean): void => {
 		const el = ref.current;
 		const text = el?.value.trim() ?? '';
-		if (!text) {
+		if (!text && !allowEmpty) {
 			cancel();
 			return;
 		}

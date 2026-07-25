@@ -318,13 +318,13 @@
 	font-size: var(--font-smaller, 0.8em);
 	line-height: 1.5;
 	color: var(--text-muted);
-	background: var(--background-modifier-hover);
 	border-radius: 10px;
 	white-space: nowrap;
 }
 
 .eb-progress:hover .eb-chip {
 	color: var(--text-normal);
+	background: var(--background-modifier-hover);
 }
 
 .eb-badge {

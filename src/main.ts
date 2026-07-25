@@ -86,6 +86,21 @@ export default class ExtraboardPlugin extends Plugin {
 			}),
 		);
 
+		// Add board-wide actions to the view's own "more options" menu instead of a
+		// dedicated header icon.
+		this.registerEvent(
+			this.app.workspace.on('file-menu', (menu, file, _source, leaf) => {
+				const view = leaf?.view;
+				if (!(view instanceof BoardView) || !view.board || view.file !== file) return;
+				menu.addItem((item) =>
+					item
+						.setTitle('Delete untitled cards')
+						.setIcon('eraser')
+						.onClick(() => view.deleteUntitledCards()),
+				);
+			}),
+		);
+
 		// On startup the workspace may restore board files before the metadata
 		// cache is warm, so the patch cannot detect them; reconcile once ready.
 		this.app.workspace.onLayoutReady(() => {

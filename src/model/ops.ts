@@ -319,6 +319,21 @@ export function isCardDone(card: Card): boolean {
 	return card.task === 'x' || card.task === 'X';
 }
 
+/** True for a card with no text at all — its title is blank or only whitespace. */
+export function isCardUntitled(card: Card): boolean {
+	return card.title.trim() === '';
+}
+
+/** Remove every untitled card from every stack on the board. */
+export function deleteUntitledCards(board: Board): Board {
+	let next = board;
+	board.stacks.forEach((stack, i) => {
+		const items = stack.items.filter((item) => !(item.kind === 'card' && isCardUntitled(item.card)));
+		if (items.length !== stack.items.length) next = withItems(next, i, items);
+	});
+	return next;
+}
+
 /**
  * Set a card's task marker; `undefined` turns it back into a plain list item.
  */

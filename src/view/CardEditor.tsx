@@ -34,6 +34,12 @@ interface FieldProps {
 	placeholder: string;
 	/** The whole editor: focus may move to the badges without closing the field. */
 	scope: RefObject<HTMLElement>;
+	/**
+	 * Reports a way to read the field's current text synchronously, or `null`
+	 * while no such reader is mounted. Lets a caller flush the live text on its
+	 * own schedule instead of waiting on the field's internal blur handling.
+	 */
+	onReady: (getValue: (() => string) | null) => void;
 	onSubmit: (text: string) => void;
 	onCommit: (text: string) => void;
 	onCancel: () => void;
@@ -44,14 +50,14 @@ interface FieldProps {
  * does not expose it (docs/NOTICES.md). A card must always be editable, so the
  * fallback is a normal render path, not an error case.
  */
-function RichField({ app, value, placeholder, scope, onSubmit, onCommit, onCancel }: FieldProps) {
+function RichField({ app, value, placeholder, scope, onReady, onSubmit, onCommit, onCancel }: FieldProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const [fallback, setFallback] = useState(false);
 	// The callbacks change identity on every render; the editor is mounted once
 	// and owns its text until it closes, so it reads them through a ref rather
 	// than being torn down and rebuilt under the user's cursor.
-	const handlers = useRef({ onSubmit, onCommit, onCancel });
-	handlers.current = { onSubmit, onCommit, onCancel };
+	const handlers = useRef({ onReady, onSubmit, onCommit, onCancel });
+	handlers.current = { onReady, onSubmit, onCommit, onCancel };
 	const initial = useRef(value);
 
 	useLayoutEffect(() => {
@@ -69,7 +75,11 @@ function RichField({ app, value, placeholder, scope, onSubmit, onCommit, onCance
 			return;
 		}
 		handle.focus();
-		return () => handle.destroy();
+		handlers.current.onReady(() => handle.getValue());
+		return () => {
+			handlers.current.onReady(null);
+			handle.destroy();
+		};
 	}, [app, fallback, scope]);
 
 	if (fallback) {
@@ -77,6 +87,7 @@ function RichField({ app, value, placeholder, scope, onSubmit, onCommit, onCance
 			<InlineEditor
 				value={value}
 				placeholder={placeholder}
+				allowEmpty
 				onSubmit={(text) => onSubmit(text)}
 				onCancel={onCancel}
 			/>
@@ -107,16 +118,28 @@ export function CardEditor({ board, card, target, api, settings, onClose }: Prop
 		if (notice) new Notice(notice);
 		api.update((b) => ops.setCardText(b, target, text, { keepProperties: !showRaw }));
 	};
+	// `save` closes over `card`/`target`, both of which are stable for the life
+	// of one editor instance, but read through a ref anyway so the pointerdown
+	// handler below never needs to re-bind.
+	const saveRef = useRef(save);
+	saveRef.current = save;
+	// Set while the field is mounted, so its current text can be read
+	// synchronously — see the pointerdown handler below.
+	const fieldValue = useRef<(() => string) | null>(null);
 
-	// Pointing anywhere outside the editor closes it. The field's own blur has
-	// already saved the text by then; this is what closes the editor when focus
-	// sits on a property badge instead.
+	// Pointing anywhere outside the editor closes it. The field's own blur
+	// commits asynchronously (it defers to let a completion click land first),
+	// which races the unmount this triggers: closing first can tear the field
+	// down before its deferred commit runs, silently dropping the last edit.
+	// Reading the live text here and saving it before closing removes the race.
 	useEffect(() => {
 		const onPointerDown = (evt: Event): void => {
 			const target = evt.target;
 			if (!(target instanceof Node)) return;
 			if (rootRef.current?.contains(target)) return;
 			if (target.instanceOf(Element) && target.closest(FLOATING)) return;
+			const getValue = fieldValue.current;
+			if (getValue) saveRef.current(getValue());
 			onClose();
 		};
 		document.addEventListener('pointerdown', onPointerDown, true);
@@ -130,6 +153,9 @@ export function CardEditor({ board, card, target, api, settings, onClose }: Prop
 				value={cardEditText(card, board, showRaw)}
 				placeholder={showRaw ? PLACEHOLDER_RAW : PLACEHOLDER}
 				scope={rootRef}
+				onReady={(getValue) => {
+					fieldValue.current = getValue;
+				}}
 				onSubmit={(text) => {
 					onClose();
 					save(text);

@@ -26,7 +26,9 @@ function countHiddenAfter(hidden: Set<number>, index: number): number {
 
 export function StackColumn({ board, index, api, settings }: Props) {
 	const [renaming, setRenaming] = useState(false);
-	const [composing, setComposing] = useState(false);
+	// Set right after a fresh card is inserted at the top, so that card's tile
+	// opens itself for editing once, then clears this back.
+	const [pendingNewCard, setPendingNewCard] = useState(false);
 	const bodyRef = useRef<HTMLDivElement>(null);
 
 	useSortable(bodyRef, { group: 'eb-items', draggable: '.eb-item' }, (drop) => {
@@ -44,6 +46,13 @@ export function StackColumn({ board, index, api, settings }: Props) {
 
 	const setCollapsed = (value: boolean): void =>
 		api.update((b) => ops.setStackCollapsed(b, index, value));
+
+	/** Insert a blank card at the top and open it for editing right away. */
+	const addCard = (): void => {
+		setCollapsed(false);
+		api.update((b) => ops.addCard(b, index, '', 0));
+		setPendingNewCard(true);
+	};
 
 	const deleteStack = async (): Promise<void> => {
 		const count = ops.cardCount(stack);
@@ -64,10 +73,7 @@ export function StackColumn({ board, index, api, settings }: Props) {
 			item
 				.setTitle('Add card')
 				.setIcon('plus')
-				.onClick(() => {
-					setCollapsed(false);
-					setComposing(true);
-				}),
+				.onClick(addCard),
 		);
 		menu.addItem((item) =>
 			item
@@ -167,22 +173,10 @@ export function StackColumn({ board, index, api, settings }: Props) {
 
 			{collapsed ? null : (
 				<div class="eb-stack-compose">
-					{composing ? (
-						<InlineEditor
-							placeholder="Card text, @{property|value}, #tag"
-							keepOpen
-							onSubmit={(text, again) => {
-								if (!again) setComposing(false);
-								api.update((b) => ops.addCard(b, index, text, 0));
-							}}
-							onCancel={() => setComposing(false)}
-						/>
-					) : (
-						<button type="button" class="eb-add-card" onClick={() => setComposing(true)}>
-							<Icon name="plus" />
-							<span>Add card</span>
-						</button>
-					)}
+					<button type="button" class="eb-add-card" onClick={addCard}>
+						<Icon name="plus" />
+						<span>Add card</span>
+					</button>
 				</div>
 			)}
 
@@ -190,13 +184,15 @@ export function StackColumn({ board, index, api, settings }: Props) {
 				{stack.items.map((item, i) =>
 					hidden.has(i) ? null : item.kind === 'card' ? (
 						<CardTile
-								key={i}
-								board={board}
-								stackIndex={index}
-								index={i}
-								api={api}
-								settings={settings}
-							/>
+							key={i}
+							board={board}
+							stackIndex={index}
+							index={i}
+							api={api}
+							settings={settings}
+							forceEdit={i === 0 && pendingNewCard}
+							onForceEditConsumed={() => setPendingNewCard(false)}
+						/>
 					) : (
 						<DividerRow
 							key={i}
