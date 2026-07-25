@@ -1,6 +1,7 @@
 // Board -> Markdown. Canonical and round-trip stable.
 // Spec: docs/specs/markdown-format.md §4, §6. Pure; no `obsidian`.
 
+import { serializeChecklist } from './checklist';
 import { serializeFrontmatter } from './frontmatter';
 import { formatToken } from './properties';
 import { Board, BoardConfig, Card, Divider, Stack } from './types';
@@ -35,7 +36,9 @@ function serializeCard(card: Card, config: BoardConfig): string[] {
 	// A task card is an ordinary Markdown task list item (§4.0): `- [x] text`.
 	const marker = card.task !== undefined ? `[${card.task}]` : '';
 	const line = `-${[marker, content].filter(Boolean).map((s) => ` ${s}`).join('')}`;
-	return [line, ...card.trailing];
+	// The checklist sits directly under the card line, before any verbatim
+	// continuation lines (markdown-format.md §4.5).
+	return [line, ...serializeChecklist(card.checklist), ...card.trailing];
 }
 
 function serializeDivider(divider: Divider): string[] {

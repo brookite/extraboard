@@ -1,10 +1,17 @@
 // Renders a single card property value as a badge. Spec: kanban-view.md §3.
 
-import type { BoardConfig, PropertyValue } from '../../model/types';
-import { ProgressRing } from './ProgressRing';
+import type { BoardConfig, ProgressStyle, PropertyValue } from '../../model/types';
+import { PercentValue } from './Progress';
 import { styleFor } from './style';
 
-export function PropertyBadge({ pv, config }: { pv: PropertyValue; config: BoardConfig }) {
+interface Props {
+	pv: PropertyValue;
+	config: BoardConfig;
+	/** Shape of `percent` values on this board (kanban-view.md §5.5). */
+	progress: ProgressStyle;
+}
+
+export function PropertyBadge({ pv, config, progress }: Props) {
 	const def = config.properties.find((p) => p.name === pv.name);
 
 	switch (pv.type) {
@@ -32,7 +39,7 @@ export function PropertyBadge({ pv, config }: { pv: PropertyValue; config: Board
 				</span>
 			);
 		case 'percent':
-			return <ProgressRing value={pv.value} />;
+			return <PercentValue value={pv.value} style={progress} />;
 		case 'color':
 			// Not a badge: the board's single color property paints the card (§5.2).
 			return null;

@@ -3,8 +3,12 @@
 // This module (and all of src/model/**) is pure and must not import `obsidian`.
 
 import type { Document as YamlDocument } from 'yaml';
+import type { ChecklistItem } from './checklist';
 
 export type ViewKind = 'kanban' | 'calendar';
+
+/** Shape of the checklist `N/M` indicator and of `percent` badges. */
+export type ProgressStyle = 'ring' | 'fraction' | 'percent';
 
 export type PropertyType =
 	| 'color'
@@ -53,6 +57,8 @@ export interface BoardConfig {
 	/** Offer a task checkbox on cards that are not task list items yet. */
 	showCardCheckbox?: boolean;
 	cardContentDir?: string;
+	/** Board override for the plugin's `progressStyle`; absent => follow it. */
+	progressStyle?: ProgressStyle;
 	archive?: { file?: string };
 	calendar?: CalendarConfig;
 }
@@ -81,7 +87,12 @@ export interface Card {
 	 * "Done" means `'x'` or `'X'`. Spec: markdown-format.md §4.0.
 	 */
 	task?: string;
-	/** Verbatim continuation/nested lines below the card's `- ` line. */
+	/**
+	 * Nested task list directly under the card's line — the leading contiguous
+	 * block only. Empty when the card has none. Spec: markdown-format.md §4.5.
+	 */
+	checklist: ChecklistItem[];
+	/** Verbatim continuation/nested lines below the card's checklist. */
 	trailing: string[];
 }
 

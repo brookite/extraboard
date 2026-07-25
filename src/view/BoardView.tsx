@@ -2,7 +2,7 @@
 // manages the underlying Markdown file (load/save, tab, rename, delete).
 // Spec: docs/specs/kanban-view.md §1, §6.
 
-import { TextFileView, WorkspaceLeaf } from 'obsidian';
+import { HoverPopover, TextFileView, WorkspaceLeaf } from 'obsidian';
 import { render } from 'preact';
 import type ExtraboardPlugin from '../main';
 import type { Board } from '../model/types';
@@ -11,6 +11,7 @@ import { parseBoard } from '../model/parse';
 import { serializeBoard } from '../model/serialize';
 import { BoardSettingsModal } from '../ui/BoardSettingsModal';
 import { pickColor } from '../ui/ColorPicker';
+import { createCardNote, resolveNoteFolder } from '../util/cardNote';
 import { ICONS, VIEW_TYPE_BOARD } from '../util/constants';
 import { BoardApi, confirmDestructive, searchTag } from './api';
 import { KanbanView } from './KanbanView';
@@ -18,6 +19,8 @@ import { KanbanView } from './KanbanView';
 export class BoardView extends TextFileView {
 	plugin: ExtraboardPlugin;
 	board: Board | null = null;
+	/** Owner of the hover previews raised by card links (`HoverParent`). */
+	hoverPopover: HoverPopover | null = null;
 	private mountEl?: HTMLElement;
 	private api: BoardApi;
 
@@ -25,10 +28,17 @@ export class BoardView extends TextFileView {
 		super(leaf);
 		this.plugin = plugin;
 		this.api = {
+			app: this.app,
+			hoverParent: this,
+			sourcePath: () => this.file?.path ?? '',
 			update: (mutate) => this.applyEdit(mutate),
+			getBoard: () => this.board,
 			confirm: (title, message, cta) => confirmDestructive(this.app, title, message, cta),
 			searchTag: (tag) => searchTag(this.app, tag),
 			pickColor: (options) => pickColor(this.app, options),
+			createCardNote: (ref) => {
+				void this.createCardNote(ref);
+			},
 		};
 	}
 
@@ -95,6 +105,25 @@ export class BoardView extends TextFileView {
 		this.applyEdit((b) => ops.addStack(b, 'New stack'));
 		const board = this.mountEl?.querySelector('.eb-board');
 		if (board instanceof HTMLElement) board.scrollLeft = board.scrollWidth;
+	}
+
+	/**
+	 * Create the card's content note, rewrite its title into a link to it, and
+	 * open it (card-content-and-checklists.md §2). The title is only rewritten
+	 * once the file exists, so a failure changes nothing.
+	 */
+	private async createCardNote(ref: ops.ItemRef): Promise<void> {
+		const board = this.board;
+		const file = this.file;
+		const entry = board?.stacks[ref.stack]?.items[ref.item];
+		if (!board || !file || entry?.kind !== 'card') return;
+
+		const folder = resolveNoteFolder(board.config.cardContentDir, this.plugin.settings.cardNoteFolder);
+		const created = await createCardNote(this.app, entry.card.title, folder, file.path);
+		if (!created) return;
+
+		this.applyEdit((b) => ops.setCardTitle(b, ref, created.link));
+		await this.leaf.openFile(created.file);
 	}
 
 	/** Edit this board's `extraboard` configuration (header action + command). */

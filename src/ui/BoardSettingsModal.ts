@@ -4,7 +4,7 @@
 
 import { App, Modal, Setting } from 'obsidian';
 import { invalidatedValues } from '../model/ops';
-import type { BadgeColor, Board, BoardConfig, PropertyDef } from '../model/types';
+import type { BadgeColor, Board, BoardConfig, ProgressStyle, PropertyDef } from '../model/types';
 import { colorField } from './ColorPicker';
 import { PropertyDefsEditor, cloneDefs } from './PropertyDefsEditor';
 
@@ -77,6 +77,24 @@ export class BoardSettingsModal extends Modal {
 						const dir = value.trim();
 						if (dir) this.config.cardContentDir = dir;
 						else delete this.config.cardContentDir;
+					}),
+			);
+
+		new Setting(contentEl)
+			.setName('Progress style')
+			.setDesc('Shape of the checklist count and percent properties on this board.')
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions({
+						'': 'Follow plugin settings',
+						ring: 'Ring',
+						fraction: 'Fraction (3/7)',
+						percent: 'Percent (43%)',
+					})
+					.setValue(this.config.progressStyle ?? '')
+					.onChange((value) => {
+						if (value) this.config.progressStyle = value as ProgressStyle;
+						else delete this.config.progressStyle;
 					}),
 			);
 
