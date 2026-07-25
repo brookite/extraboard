@@ -157,11 +157,11 @@
 	gap: 4px;
 }
 
-/* The card menu sits in the top-left corner (kanban-view.md §5.3). */
+/* The card menu sits in the top-right corner (kanban-view.md §5.3). */
 .eb-card-menu {
 	width: 20px;
 	height: 20px;
-	margin: -1px -2px 0 -4px;
+	margin: -1px -4px 0 0;
 }
 
 .eb-card-menu .svg-icon {
@@ -169,9 +169,11 @@
 	height: 14px;
 }
 
+/* Flush with the card's padding: nothing indents the checkbox. */
 .eb-card-check {
 	flex: 0 0 auto;
 	margin: 3px 2px 0 0;
+	margin-inline-start: 0;
 	cursor: pointer;
 }
 
@@ -362,8 +364,15 @@
 	opacity: 1;
 }
 
+/* Touch devices have no hover, so these controls are always visible there. */
 body.is-mobile .eb-hover-only {
 	opacity: 1;
+}
+
+@media (hover: none) {
+	.eb-hover-only {
+		opacity: 1;
+	}
 }
 
 .eb-add-card,
@@ -502,8 +511,112 @@ body.is-mobile .eb-hover-only {
 	display: none;
 }
 
+.eb-swatch-button {
+	padding: 0;
+	width: 20px;
+	height: 20px;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.eb-swatch-button:hover {
+	border-color: var(--interactive-accent);
+}
+
 .eb-board-settings {
 	width: min(46rem, 90vw);
+}
+
+/* Color picker */
+
+/* Off-screen element used to resolve a CSS color to rgb() (util/color.ts). */
+.eb-color-probe {
+	display: none;
+}
+
+.eb-cp-modal {
+	width: min(24rem, 92vw);
+}
+
+.eb-cp-preview {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.eb-cp-preview-swatch {
+	width: 32px;
+	height: 32px;
+	flex: 0 0 auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+}
+
+/* "No color" reads as the theme background, not as an invisible box. */
+.eb-cp-preview-swatch.is-empty {
+	background-image: linear-gradient(
+		135deg,
+		transparent 45%,
+		var(--background-modifier-border) 45%,
+		var(--background-modifier-border) 55%,
+		transparent 55%
+	);
+}
+
+.eb-cp-preview-label {
+	color: var(--text-muted);
+	font-size: var(--font-smaller, 0.85em);
+	word-break: break-all;
+}
+
+.eb-cp-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 6px;
+}
+
+/* Touch-sized targets: the palette is the primary control on mobile. */
+.eb-cp-swatch {
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.eb-cp-swatch:hover {
+	transform: scale(1.06);
+}
+
+.eb-cp-swatch.is-selected {
+	box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--interactive-accent);
+}
+
+.eb-cp-custom {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.eb-cp-native {
+	width: 40px;
+	height: 32px;
+	flex: 0 0 auto;
+	padding: 2px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+	cursor: pointer;
+}
+
+.eb-cp-text {
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 /* Drag & drop */

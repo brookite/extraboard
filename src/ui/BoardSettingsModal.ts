@@ -5,6 +5,7 @@
 import { App, Modal, Setting } from 'obsidian';
 import { invalidatedValues } from '../model/ops';
 import type { BadgeColor, Board, BoardConfig, PropertyDef } from '../model/types';
+import { colorField } from './ColorPicker';
 import { PropertyDefsEditor, cloneDefs } from './PropertyDefsEditor';
 
 interface TagRow {
@@ -83,7 +84,7 @@ export class BoardSettingsModal extends Modal {
 			text: 'Property order here is the order of tokens on a card. Changing a definition never rewrites cards.',
 		});
 		const propsEl = contentEl.createDiv();
-		const editor = new PropertyDefsEditor(propsEl, this.properties, (defs) => {
+		const editor = new PropertyDefsEditor(this.app, propsEl, this.properties, (defs) => {
 			this.properties = defs;
 			this.renderImpact();
 		});
@@ -128,12 +129,12 @@ export class BoardSettingsModal extends Modal {
 			name.addEventListener('change', () => {
 				row.tag = name.value.trim().replace(/^#/, '');
 			});
-			this.colorField(line, 'Background', row.color.bg, (value) => {
+			colorField(this.app, line, 'Background', row.color.bg, (value) => {
 				if (value) row.color.bg = value;
 				else delete row.color.bg;
 				this.renderTags(el);
 			});
-			this.colorField(line, 'Text', row.color.fg, (value) => {
+			colorField(this.app, line, 'Text', row.color.fg, (value) => {
 				if (value) row.color.fg = value;
 				else delete row.color.fg;
 				this.renderTags(el);
@@ -152,22 +153,6 @@ export class BoardSettingsModal extends Modal {
 			this.tags.push({ tag: '', color: {} });
 			this.renderTags(el);
 		});
-	}
-
-	private colorField(
-		el: HTMLElement,
-		label: string,
-		value: string | undefined,
-		onChange: (value: string) => void,
-	): void {
-		const wrap = el.createDiv({ cls: 'eb-pe-color' });
-		const swatch = wrap.createSpan({ cls: 'eb-swatch' });
-		swatch.style.background = value ?? 'transparent';
-		const input = wrap.createEl('input', { type: 'text', cls: 'eb-pe-color-input' });
-		input.value = value ?? '';
-		input.placeholder = label;
-		input.setAttribute('aria-label', label);
-		input.addEventListener('change', () => onChange(input.value.trim()));
 	}
 
 	// --- result ---------------------------------------------------------------

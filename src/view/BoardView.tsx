@@ -10,6 +10,7 @@ import * as ops from '../model/ops';
 import { parseBoard } from '../model/parse';
 import { serializeBoard } from '../model/serialize';
 import { BoardSettingsModal } from '../ui/BoardSettingsModal';
+import { pickColor } from '../ui/ColorPicker';
 import { ICONS, VIEW_TYPE_BOARD } from '../util/constants';
 import { BoardApi, confirmDestructive, searchTag } from './api';
 import { KanbanView } from './KanbanView';
@@ -27,6 +28,7 @@ export class BoardView extends TextFileView {
 			update: (mutate) => this.applyEdit(mutate),
 			confirm: (title, message, cta) => confirmDestructive(this.app, title, message, cta),
 			searchTag: (tag) => searchTag(this.app, tag),
+			pickColor: (options) => pickColor(this.app, options),
 		};
 	}
 
