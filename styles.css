@@ -241,6 +241,39 @@
 	cursor: pointer;
 }
 
+/* A title is one line of *inline* Markdown. The renderer can still emit block
+   markup for a hand-written title, so the card flattens it: no block spacing,
+   no heading scale, and nothing that can outgrow the tile. */
+.eb-card-title p,
+.eb-card-title h1,
+.eb-card-title h2,
+.eb-card-title h3,
+.eb-card-title h4,
+.eb-card-title h5,
+.eb-card-title h6 {
+	display: inline;
+	margin: 0;
+	padding: 0;
+	font-size: inherit;
+	font-weight: inherit;
+	line-height: inherit;
+	border: none;
+}
+
+.eb-card-title img,
+.eb-card-title .internal-embed {
+	max-width: 100%;
+	height: auto;
+}
+
+.eb-card-title pre,
+.eb-card-title blockquote {
+	margin: 0;
+	padding: 0;
+	background: none;
+	border: none;
+}
+
 .eb-card-props,
 .eb-card-tags {
 	display: flex;

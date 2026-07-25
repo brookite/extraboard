@@ -2,7 +2,7 @@
 // the save path; components only describe *what* changed via a pure op from
 // `model/ops.ts`. Spec: docs/specs/kanban-view.md §6.
 
-import { App, HoverParent, Modal, Notice } from 'obsidian';
+import { App, Component, HoverParent, Modal, Notice } from 'obsidian';
 import type { ItemRef } from '../model/ops';
 import type { Board } from '../model/types';
 import type { ColorPickerOptions } from '../ui/ColorPicker';
@@ -20,6 +20,11 @@ export interface BoardApi {
 	sourcePath(): string;
 	/** Owner of hover previews raised from cards. */
 	hoverParent: HoverParent;
+	/**
+	 * The view, as the lifecycle owner for anything Obsidian renders into the
+	 * board (Markdown in card titles), so it unloads with the board.
+	 */
+	component: Component;
 	/** Apply a pure op; a no-op op (same reference back) never touches the file. */
 	update(mutate: (board: Board) => Board): void;
 	/**

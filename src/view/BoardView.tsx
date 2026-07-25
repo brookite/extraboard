@@ -30,6 +30,7 @@ export class BoardView extends TextFileView {
 		this.api = {
 			app: this.app,
 			hoverParent: this,
+			component: this,
 			sourcePath: () => this.file?.path ?? '',
 			update: (mutate) => this.applyEdit(mutate),
 			getBoard: () => this.board,

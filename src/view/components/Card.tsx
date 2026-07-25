@@ -7,9 +7,10 @@ import type { ExtraboardSettings } from '../../settings';
 import { ChecklistModal } from '../../ui/ChecklistModal';
 import type { BoardApi } from '../api';
 import { CardEditor } from '../CardEditor';
-import { hoverCardLink, openCardLink, resolveCardLink } from '../links';
+import { hoverLinkText, openLinkText, resolveCardLink } from '../links';
 import { isDragging } from '../useSortable';
 import { IconButton } from './Icon';
+import { MarkdownText, hasMarkdown } from './MarkdownText';
 import { ChecklistProgress, progressStyleFor } from './Progress';
 import { PropertyBadge } from './PropertyBadge';
 import { safeColor } from './style';
@@ -212,8 +213,9 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 				) : null}
 				<div class="eb-card-title">
 					{link ? (
-						// A real internal link, so hover preview, mod-click and the
-						// unresolved style all behave as they do everywhere else (§1.1).
+						// A linked card shows the link's display text (alias, else the
+						// target's basename), which is narrower than what the Markdown
+						// renderer would print, so it keeps its own anchor (§1.1).
 						<a
 							class={`internal-link${resolved ? '' : ' is-unresolved'}`}
 							href={link.linktext}
@@ -222,20 +224,29 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 							onClick={(e) => {
 								e.stopPropagation();
 								e.preventDefault();
-								openCardLink(api.app, link, api.sourcePath(), e);
+								openLinkText(api.app, link.linktext, api.sourcePath(), e);
 							}}
 							onAuxClick={(e) => {
 								if (e.button !== 1) return;
 								e.stopPropagation();
 								e.preventDefault();
-								openCardLink(api.app, link, api.sourcePath(), e);
+								openLinkText(api.app, link.linktext, api.sourcePath(), e);
 							}}
-							onMouseOver={(e) => hoverCardLink(api.app, link, api.sourcePath(), e, api.hoverParent)}
+							onMouseOver={(e) =>
+								hoverLinkText(api.app, link.linktext, api.sourcePath(), e, api.hoverParent)
+							}
 						>
 							{link.display}
 						</a>
+					) : card.title ? (
+						// Any other title is one line of inline Markdown (§2).
+						hasMarkdown(card.title) ? (
+							<MarkdownText markdown={card.title} api={api} />
+						) : (
+							card.title
+						)
 					) : (
-						card.title || <span class="eb-placeholder">Untitled</span>
+						<span class="eb-placeholder">Untitled</span>
 					)}
 				</div>
 				<IconButton
