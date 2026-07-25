@@ -66,7 +66,9 @@ export class BoardSettingsModal extends Modal {
 
 		new Setting(contentEl)
 			.setName('Card note folder')
-			.setDesc('Where this board creates card notes. Empty uses the folder from plugin settings.')
+			.setDesc(
+				'Where this board creates card notes. Empty uses the folder from plugin settings, which defaults to the vault root.',
+			)
 			.addText((text) =>
 				text
 					.setPlaceholder('Cards')

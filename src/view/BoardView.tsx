@@ -46,6 +46,7 @@ export class BoardView extends TextFileView {
 
 	override async onOpen(): Promise<void> {
 		this.ensureMount();
+		this.addAction(ICONS.add, 'Add stack', () => this.addStack());
 		this.addAction(ICONS.settings, 'Board settings', () => this.openBoardSettings());
 		this.addAction(ICONS.markdown, 'Open as Markdown', () => this.openAsMarkdown());
 	}
@@ -83,6 +84,17 @@ export class BoardView extends TextFileView {
 	/** Re-render with the current plugin settings (after the settings tab changes). */
 	refresh(): void {
 		this.renderBoard();
+	}
+
+	/**
+	 * Append a stack from the view header, mirroring the "Add stack" column at
+	 * the right end of the board — which is off-screen on a wide board, hence
+	 * the scroll.
+	 */
+	addStack(): void {
+		this.applyEdit((b) => ops.addStack(b, 'New stack'));
+		const board = this.mountEl?.querySelector('.eb-board');
+		if (board instanceof HTMLElement) board.scrollLeft = board.scrollWidth;
 	}
 
 	/** Edit this board's `extraboard` configuration (header action + command). */

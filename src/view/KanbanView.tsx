@@ -47,8 +47,9 @@ export function KanbanView({ board, api, settings }: BoardProps) {
 		{
 			group: 'eb-stacks',
 			draggable: '.eb-stack',
-			handle: '.eb-stack-header',
-			filter: 'input, textarea, button, .eb-stack-name',
+			// A dedicated grip, so the header stays clickable and the drag zone is
+			// visible instead of guessed (kanban-view.md §6.4).
+			handle: '.eb-stack-grip',
 		},
 		(drop) => {
 			api.update((b) => ops.moveStack(b, drop.fromIndex, drop.before));

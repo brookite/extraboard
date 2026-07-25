@@ -6,6 +6,7 @@ export const VIEW_TYPE_BOARD = 'extraboard-board';
 /** Lucide icon names used across the UI (see docs/plans/bootstrap-kanban.md). */
 export const ICONS = {
 	board: 'square-kanban',
+	add: 'plus',
 	markdown: 'file-text',
 	calendar: 'calendar-days',
 	settings: 'sliders-horizontal',

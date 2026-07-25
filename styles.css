@@ -42,7 +42,34 @@
 	padding: 6px 8px;
 	font-weight: var(--font-semibold, 600);
 	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* The stack's drag zone. */
+.eb-stack-grip {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 16px;
+	height: 24px;
+	margin-left: -2px;
+	color: var(--text-faint);
+	border-radius: var(--radius-s, 4px);
 	cursor: grab;
+}
+
+.eb-stack-grip:hover {
+	color: var(--text-muted);
+	background: var(--background-modifier-hover);
+}
+
+.eb-stack-grip:active {
+	cursor: grabbing;
+}
+
+.eb-stack-grip .svg-icon {
+	width: 14px;
+	height: 14px;
 }
 
 .eb-stack-name {
@@ -66,19 +93,32 @@
 	border-bottom: none;
 }
 
+.eb-stack.is-collapsed .eb-stack-grip {
+	margin-left: 0;
+	width: 24px;
+	height: 16px;
+}
+
 .eb-stack.is-collapsed .eb-stack-name {
 	writing-mode: vertical-rl;
 	max-height: 60vh;
 }
 
+/* Sized like a pill and centred as a flex box: the default line box would let
+   digits sit slightly above the middle of the 24px icon buttons beside it. */
 .eb-stack-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	flex: 0 0 auto;
-	min-width: 1.4em;
+	box-sizing: border-box;
+	min-width: 20px;
+	height: 20px;
 	padding: 0 6px;
 	font-size: var(--font-smaller, 0.8em);
 	font-weight: var(--font-normal, 400);
+	line-height: 1;
 	color: var(--text-muted);
-	text-align: center;
 	background: var(--background-modifier-hover);
 	border-radius: var(--radius-s, 4px);
 }
@@ -100,11 +140,16 @@
 	transform: rotate(-90deg);
 }
 
+/* The add-card affordance sits above the cards; new cards land at the top. */
+.eb-stack-compose {
+	padding: 8px 10px 0;
+}
+
 .eb-stack-body {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
-	padding: 10px 10px 4px;
+	padding: 8px 10px 10px;
 	/* Keep an empty stack a usable drop target. */
 	min-height: 24px;
 	overflow-y: auto;
@@ -113,10 +158,6 @@
 /* `display: flex` would otherwise beat the browser default for [hidden]. */
 .eb-stack-body[hidden] {
 	display: none;
-}
-
-.eb-stack-footer {
-	padding: 0 10px 10px;
 }
 
 /* Cards */
