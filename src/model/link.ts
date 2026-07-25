@@ -13,6 +13,12 @@ export interface CardLink {
 	linktext: string;
 	/** `[[wiki]]` vs `[alias](path.md)`. */
 	wiki: boolean;
+	/** Offset of the link's first character in the title. */
+	start: number;
+	/** Offset just past the link's last character in the title. */
+	end: number;
+	/** True when the title is nothing but this link (bar whitespace). */
+	whole: boolean;
 }
 
 /** A link target that leaves the vault (`https:`, `mailto:`, `//host`). */
@@ -43,57 +49,71 @@ function decode(target: string): string {
 	}
 }
 
-const WIKI_RE = /^\[\[([^[\]]*)\]\]$/;
-const MD_RE = /^\[([^[\]]*)\]\(([^()]*)\)$/;
+/** What a match yields before it is placed in the title. */
+type LinkParts = Omit<CardLink, 'start' | 'end' | 'whole'>;
+
+function fromWiki(inner: string): LinkParts | null {
+	const bar = inner.indexOf('|');
+	const target = (bar === -1 ? inner : inner.slice(0, bar)).trim();
+	const alias = bar === -1 ? '' : inner.slice(bar + 1).trim();
+	if (!target || isExternal(target)) return null;
+	const { path, subpath } = splitSubpath(target);
+	if (!path) return null;
+	return { path, subpath, display: alias || basename(path), linktext: target, wiki: true };
+}
+
+function fromMarkdown(text: string, target: string): LinkParts | null {
+	const alias = text.trim();
+	const raw = target.trim();
+	if (!raw || isExternal(raw)) return null;
+	const { path, subpath } = splitSubpath(decode(raw));
+	if (!path) return null;
+	return {
+		path,
+		subpath,
+		display: alias || basename(path),
+		linktext: path + subpath,
+		wiki: false,
+	};
+}
+
+// The wikilink alternative comes first so `[[Note]](x)` reads as a wikilink,
+// the way Obsidian reads it. A leading `!` is captured rather than excluded, so
+// an embed is *skipped* and the scan carries on to the next link.
+const LINK_RE = /(!?)\[\[([^[\]]*)\]\]|(!?)\[([^[\]]*)\]\(([^()]*)\)/g;
 
 /**
- * The card's content note, or `null` when the title is not *exactly* one
- * internal link. A title that merely contains a link, an embed (`![[…]]`), an
- * external URL, or several links is an ordinary title with no content note.
+ * The card's content note: the **first internal link in the title**, or `null`
+ * when it has none. A title may carry text around the link and further links —
+ * only the first one binds the note, so a card is never rewritten into nested
+ * link syntax. Embeds (`![[…]]`) and external URLs are skipped, not accepted.
  */
 export function parseCardLink(title: string): CardLink | null {
-	const text = title.trim();
-
-	const wiki = WIKI_RE.exec(text);
-	if (wiki) {
-		const inner = wiki[1] ?? '';
-		const bar = inner.indexOf('|');
-		const target = (bar === -1 ? inner : inner.slice(0, bar)).trim();
-		const alias = bar === -1 ? '' : inner.slice(bar + 1).trim();
-		if (!target || isExternal(target)) return null;
-		const { path, subpath } = splitSubpath(target);
-		if (!path) return null;
+	LINK_RE.lastIndex = 0;
+	for (let m = LINK_RE.exec(title); m; m = LINK_RE.exec(title)) {
+		if (m[1] === '!' || m[3] === '!') continue;
+		const parts = m[2] === undefined ? fromMarkdown(m[4] ?? '', m[5] ?? '') : fromWiki(m[2]);
+		if (!parts) continue;
+		const start = m.index;
+		const end = start + m[0].length;
 		return {
-			path,
-			subpath,
-			display: alias || basename(path),
-			linktext: target,
-			wiki: true,
+			...parts,
+			start,
+			end,
+			whole: !title.slice(0, start).trim() && !title.slice(end).trim(),
 		};
 	}
-
-	const md = MD_RE.exec(text);
-	if (md) {
-		const alias = (md[1] ?? '').trim();
-		const raw = (md[2] ?? '').trim();
-		if (!raw || isExternal(raw)) return null;
-		const { path, subpath } = splitSubpath(decode(raw));
-		if (!path) return null;
-		return {
-			path,
-			subpath,
-			display: alias || basename(path),
-			linktext: path + subpath,
-			wiki: false,
-		};
-	}
-
 	return null;
 }
 
-/** The title a linked card falls back to when its note is unlinked (§2). */
+/**
+ * The title a linked card falls back to when its note is unlinked (§2): the
+ * content link replaced by its display text, the rest of the title kept.
+ */
 export function unlinkedTitle(title: string): string {
-	return parseCardLink(title)?.display ?? title;
+	const link = parseCardLink(title);
+	if (!link) return title;
+	return (title.slice(0, link.start) + link.display + title.slice(link.end)).trim();
 }
 
 /** Characters Obsidian forbids in a file name, plus the link-syntax ones. */

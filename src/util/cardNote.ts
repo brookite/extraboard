@@ -27,6 +27,9 @@ async function ensureFolder(app: App, folder: string): Promise<boolean> {
 	}
 }
 
+/** Characters that would break out of the alias of the link being written. */
+const ALIAS_UNSAFE = /[[\]|]/;
+
 /** `<folder>/<name>.md`, with ` 2`, ` 3`… appended until the path is free. */
 function uniquePath(app: App, folder: string, name: string): string {
 	const make = (n: string): string => normalizePath(folder ? `${folder}/${n}.md` : `${n}.md`);
@@ -63,9 +66,11 @@ export async function createCardNote(
 
 	// The shortest unambiguous link, so the board follows the vault's link
 	// format settings. The alias keeps the card reading the way it was written
-	// when the sanitized file name differs from the title.
+	// when the sanitized file name differs from the title — unless the title
+	// carries link syntax of its own (an embed, an external URL), which would
+	// nest inside the new link and stop being valid Markdown.
 	const clean = title.trim();
-	const alias = file.basename === clean ? undefined : clean;
+	const alias = file.basename === clean || ALIAS_UNSAFE.test(clean) ? undefined : clean;
 	const link = app.fileManager.generateMarkdownLink(file, sourcePath, '', alias);
 	return { file, link };
 }

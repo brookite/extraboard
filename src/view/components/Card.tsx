@@ -1,6 +1,6 @@
 import { Menu } from 'obsidian';
 import { useEffect, useState } from 'preact/hooks';
-import { parseCardLink } from '../../model/link';
+import { parseCardLink, unlinkedTitle } from '../../model/link';
 import * as ops from '../../model/ops';
 import type { Board, Card } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
@@ -74,9 +74,13 @@ export function CardTile({
 
 	const rawColor = cardColor(card);
 	const color = safeColor(rawColor);
-	// The content note is derived from the title, never stored (§4.4).
+	// The content note is derived from the title, never stored (§4.4): it is the
+	// first link in it. Only a title that is *nothing but* that link renders as
+	// one anchor; a title that merely contains it is rendered as Markdown, links
+	// and all (§1.1).
 	const link = parseCardLink(card.title);
-	const resolved = link !== null && resolveCardLink(api.app, link, api.sourcePath()) !== null;
+	const linkOnly = link !== null && link.whole;
+	const resolved = linkOnly && resolveCardLink(api.app, link, api.sourcePath()) !== null;
 	const progress = ops.checklistProgress(card);
 
 	const chooseColor = async (): Promise<void> => {
@@ -91,7 +95,8 @@ export function CardTile({
 
 	const openChecklist = (): void => {
 		new ChecklistModal(api.app, {
-			title: link?.display ?? card.title,
+			// The card as it reads, with its content link flattened to its text.
+			title: unlinkedTitle(card.title),
 			// Read through the live board every time: the modal outlives the render
 			// that opened it, and every edit replaces the board object.
 			items: () => {
@@ -231,10 +236,10 @@ export function CardTile({
 					/>
 				) : null}
 				<div class="eb-card-title">
-					{link ? (
-						// A linked card shows the link's display text (alias, else the
-						// target's basename), which is narrower than what the Markdown
-						// renderer would print, so it keeps its own anchor (§1.1).
+					{linkOnly && link ? (
+						// A title that is nothing but the link shows its display text
+						// (alias, else the target's basename), which is narrower than what
+						// the Markdown renderer would print, so it keeps its own anchor.
 						<a
 							class={`internal-link${resolved ? '' : ' is-unresolved'}`}
 							href={link.linktext}

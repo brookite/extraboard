@@ -241,6 +241,78 @@ export function outdent(items: ChecklistItem[], path: ChecklistPath): { items: C
 	return insertAfter(detached, parentPath, item);
 }
 
+export function samePath(a: ChecklistPath, b: ChecklistPath): boolean {
+	return a.length === b.length && a.every((n, i) => n === b[i]);
+}
+
+/** True when `path` addresses `root` itself or anything inside its subtree. */
+function isWithin(root: ChecklistPath, path: ChecklistPath): boolean {
+	return path.length >= root.length && root.every((n, i) => path[i] === n);
+}
+
+/** Remove the item at `path` **with its subtree** (unlike `removeAt`). */
+function detach(items: ChecklistItem[], path: ChecklistPath): ChecklistItem[] {
+	return editSiblings(items, path, (siblings, index) => {
+		if (!siblings[index]) return false;
+		siblings.splice(index, 1);
+		return true;
+	});
+}
+
+/** Insert `item` so that it takes the slot `path` addresses. */
+function insertAt(
+	items: ChecklistItem[],
+	path: ChecklistPath,
+	item: ChecklistItem,
+): ChecklistItem[] {
+	return editSiblings(items, path, (siblings, index) => {
+		siblings.splice(index, 0, item);
+		return true;
+	});
+}
+
+/**
+ * Where a path lands once the subtree at `from` is detached: only siblings
+ * *after* the removed one shift, and only at its own depth.
+ */
+function afterDetach(from: ChecklistPath, path: ChecklistPath): ChecklistPath {
+	const depth = from.length - 1;
+	if (path.length < from.length) return path;
+	for (let i = 0; i < depth; i++) if (path[i] !== from[i]) return path;
+	if (path[depth]! <= from[depth]!) return path;
+	const out = path.slice();
+	out[depth] = path[depth]! - 1;
+	return out;
+}
+
+/**
+ * Drag & drop: move the row at `from`, with its subtree, so that it **takes the
+ * slot** `to` addresses — it becomes the sibling that row was, at that row's
+ * level, and everything from there down shifts. `to === null` appends at the
+ * root. Dropping a row inside its own subtree is not a move and changes
+ * nothing, so the UI never has to check for it.
+ */
+export function moveTo(
+	items: ChecklistItem[],
+	from: ChecklistPath,
+	to: ChecklistPath | null,
+): { items: ChecklistItem[]; path: ChecklistPath } {
+	const item = itemAt(items, from);
+	if (!item || (to !== null && isWithin(from, to))) return { items, path: from };
+
+	const rest = detach(items, from);
+	if (rest === items) return { items, path: from };
+	if (to === null) return { items: [...rest, item], path: [rest.length] };
+
+	// Landing back on its own slot is not a move; saying so keeps the file from
+	// being rewritten with the bytes it already has.
+	const target = afterDetach(from, to);
+	if (samePath(from, target)) return { items, path: from };
+
+	const next = insertAt(rest, target, item);
+	return next === rest ? { items, path: from } : { items: next, path: target };
+}
+
 /** Swap a row (with its subtree) with the sibling above or below it. */
 export function move(
 	items: ChecklistItem[],

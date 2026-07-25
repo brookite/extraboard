@@ -152,6 +152,47 @@ describe('checklist: tree helpers', () => {
 		expect(cl.updateItem(t, [], { text: 'x' })).toBe(t);
 	});
 
+	// `moveTo` is what the modal's drag & drop applies: the row takes the slot
+	// it was dropped into and brings its subtree with it.
+	it('moves a row into the slot it was dropped on', () => {
+		// Drop `c` in front of `a`.
+		const r = cl.moveTo(tree(), [2], [0]);
+		expect(shape(r.items)).toEqual([' :c', [' :a', [' :a1']], ' :b']);
+		expect(r.path).toEqual([0]);
+	});
+
+	it('carries the subtree along and adopts the target level', () => {
+		// Drop `a` (with `a1`) in front of `c`, which is a root row.
+		expect(shape(cl.moveTo(tree(), [0], [2]).items)).toEqual([
+			' :b',
+			[' :a', [' :a1']],
+			' :c',
+		]);
+		// Drop `c` in front of `a1`, which is a child of `a`.
+		expect(shape(cl.moveTo(tree(), [2], [0, 0]).items)).toEqual([
+			[' :a', [' :c', ' :a1']],
+			' :b',
+		]);
+	});
+
+	it('appends at the root when dropped past the last row', () => {
+		const r = cl.moveTo(tree(), [0], null);
+		expect(shape(r.items)).toEqual([' :b', ' :c', [' :a', [' :a1']]]);
+		expect(r.path).toEqual([2]);
+	});
+
+	it('changes nothing when a row lands back on its own slot', () => {
+		const t = tree();
+		expect(cl.moveTo(t, [1], [2])).toMatchObject({ items: t, path: [1] });
+		expect(cl.moveTo(t, [1], [1])).toMatchObject({ items: t });
+	});
+
+	it('refuses to drop a row inside its own subtree, or a stale path', () => {
+		const t = tree();
+		expect(cl.moveTo(t, [0], [0, 0]).items).toBe(t);
+		expect(cl.moveTo(t, [9], [0]).items).toBe(t);
+	});
+
 	it('flattens depth-first with addressable paths', () => {
 		expect(cl.flatten(tree()).map((r) => r.path)).toEqual([[0], [0, 0], [1], [2]]);
 	});

@@ -617,6 +617,34 @@
 	cursor: pointer;
 }
 
+/* The row's drag zone: the same grip the stack header carries. */
+.eb-checklist-grip {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 16px;
+	height: 24px;
+	color: var(--text-faint);
+	border-radius: var(--radius-s, 4px);
+	cursor: grab;
+	touch-action: none;
+}
+
+.eb-checklist-grip:hover {
+	color: var(--text-muted);
+	background: var(--background-modifier-hover);
+}
+
+.eb-checklist-grip:active {
+	cursor: grabbing;
+}
+
+.eb-checklist-grip .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
 .eb-checklist-text {
 	flex: 1 1 auto;
 	min-width: 0;

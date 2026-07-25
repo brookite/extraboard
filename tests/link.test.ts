@@ -59,17 +59,46 @@ describe('content link: recognized forms', () => {
 
 	it('ignores surrounding whitespace', () => {
 		expect(parseCardLink('  [[Note]]  ')?.path).toBe('Note');
+		expect(parseCardLink('  [[Note]]  ')?.whole).toBe(true);
+	});
+});
+
+describe('content link: the first link in the title', () => {
+	it('binds a link that sits inside other text', () => {
+		expect(parseCardLink('Fix [[login]] bug')).toMatchObject({
+			path: 'login',
+			display: 'login',
+			whole: false,
+		});
+	});
+
+	it('takes the first of several links', () => {
+		expect(parseCardLink('[[A]] [[B]]')?.path).toBe('A');
+		expect(parseCardLink('see [A](a.md) and [[B]]')?.path).toBe('a.md');
+	});
+
+	it('skips embeds and external links and keeps looking', () => {
+		expect(parseCardLink('![[Diagram]] [[Real]]')?.path).toBe('Real');
+		expect(parseCardLink('[docs](https://example.com) [[Real]]')?.path).toBe('Real');
+	});
+
+	it('reads a wikilink before a Markdown link that starts at the same place', () => {
+		expect(parseCardLink('[[Note]](x.md)')).toMatchObject({ path: 'Note', wiki: true });
+	});
+
+	it('reports where the link sits in the title', () => {
+		const link = parseCardLink('Fix [[login]] bug');
+		expect('Fix [[login]] bug'.slice(link?.start ?? 0, link?.end ?? 0)).toBe('[[login]]');
 	});
 });
 
 describe('content link: what is not a linked card', () => {
 	const cases = [
-		'Fix [[login]] bug',
 		'![[Target]]',
 		'[docs](https://example.com)',
 		'[mail](mailto:a@b.c)',
-		'[[A]] [[B]]',
 		'[[]]',
+		'[[|alias]]',
 		'plain title',
 		'',
 	];
@@ -100,7 +129,13 @@ describe('content link: cards on a board', () => {
 		expect(ops.unlinkCardNote(b, { stack: 0, item: 1 })).toBe(b);
 	});
 
+	it('unlinks only the content link, keeping the rest of the title', () => {
+		expect(unlinkedTitle('Fix [[login]] bug')).toBe('Fix login bug');
+		expect(unlinkedTitle('[[A]] then [[B]]')).toBe('A then [[B]]');
+	});
+
 	it('falls back to the original title when there is no link', () => {
-		expect(unlinkedTitle('Fix [[login]] bug')).toBe('Fix [[login]] bug');
+		expect(unlinkedTitle('plain title')).toBe('plain title');
+		expect(unlinkedTitle('![[Embedded]]')).toBe('![[Embedded]]');
 	});
 });

@@ -7,6 +7,7 @@
 // nothing.
 
 import { App, Menu, Modal, setIcon } from 'obsidian';
+import Sortable from 'sortablejs';
 import * as cl from '../model/checklist';
 import type { ChecklistItem, ChecklistPath } from '../model/checklist';
 
@@ -19,12 +20,18 @@ export interface ChecklistModalOptions {
 	apply(mutate: (items: ChecklistItem[]) => ChecklistItem[]): void;
 }
 
-const samePath = (a: ChecklistPath, b: ChecklistPath): boolean =>
-	a.length === b.length && a.every((n, i) => n === b[i]);
+/** `data-path` back into a path; `null` when the element carries none. */
+function readPath(el: Element | null): ChecklistPath | null {
+	if (!(el instanceof HTMLElement)) return null;
+	const raw = el.dataset.path;
+	if (raw === undefined || raw === '') return null;
+	return raw.split('.').map(Number);
+}
 
 export class ChecklistModal extends Modal {
 	private listEl!: HTMLElement;
 	private countEl!: HTMLElement;
+	private sortable: Sortable | null = null;
 	/** Row to focus after the next render. */
 	private focusPath: ChecklistPath | null = null;
 	/** True while rows are being torn down, so a stale blur commits nothing. */
@@ -43,6 +50,7 @@ export class ChecklistModal extends Modal {
 		this.countEl = this.titleEl.createSpan({ cls: 'eb-checklist-count' });
 
 		this.listEl = this.contentEl.createDiv({ cls: 'eb-checklist' });
+		this.enableDrag();
 
 		const footer = this.contentEl.createDiv({ cls: 'eb-checklist-footer' });
 		const add = footer.createEl('button', { cls: 'mod-cta', text: 'Add item' });
@@ -58,6 +66,8 @@ export class ChecklistModal extends Modal {
 	}
 
 	override onClose(): void {
+		this.sortable?.destroy();
+		this.sortable = null;
 		this.contentEl.empty();
 	}
 
@@ -94,6 +104,13 @@ export class ChecklistModal extends Modal {
 	private renderRow(item: ChecklistItem, path: ChecklistPath): void {
 		const rowEl = this.listEl.createDiv({ cls: 'eb-checklist-row' });
 		rowEl.setCssProps({ '--eb-checklist-depth': String(path.length - 1) });
+		rowEl.dataset.path = path.join('.');
+
+		// The row's only drag zone, so the text field keeps its own gestures.
+		const grip = rowEl.createSpan({ cls: 'eb-checklist-grip' });
+		setIcon(grip, 'grip-vertical');
+		grip.setAttr('aria-hidden', 'true');
+		grip.setAttr('title', 'Drag to reorder');
 
 		const check = rowEl.createEl('input', {
 			type: 'checkbox',
@@ -197,8 +214,47 @@ export class ChecklistModal extends Modal {
 	/** The row above `path` in display order, or `null` at the top. */
 	private previousPath(path: ChecklistPath): ChecklistPath | null {
 		const rows = cl.flatten(this.options.items());
-		const at = rows.findIndex((r) => samePath(r.path, path));
+		const at = rows.findIndex((r) => cl.samePath(r.path, path));
 		return at > 0 ? rows[at - 1]!.path : null;
+	}
+
+	// --- drag & drop ------------------------------------------------------
+
+	/**
+	 * Rows are dragged by their grip. The list is flat in the DOM but a tree in
+	 * the model, so a dropped row **takes the slot it was dropped into** — the
+	 * level of the row it now sits in front of — and carries its subtree along
+	 * (`model/checklist.ts: moveTo`).
+	 */
+	private enableDrag(): void {
+		this.sortable = Sortable.create(this.listEl, {
+			animation: 150,
+			handle: '.eb-checklist-grip',
+			draggable: '.eb-checklist-row',
+			ghostClass: 'eb-drag-ghost',
+			dragClass: 'eb-drag-item',
+			fallbackOnBody: true,
+			onEnd: (evt) => {
+				const from = readPath(evt.item);
+				// Pre-move coordinates on both sides: the model resolves the move,
+				// and `render` rebuilds every row from what it returns.
+				const to = readPath(evt.item.nextElementSibling);
+				this.revert(evt);
+				if (!from) return;
+				this.change((items) => {
+					const r = cl.moveTo(items, from, to);
+					this.focusPath = r.path;
+					return r.items;
+				});
+			},
+		});
+	}
+
+	/** Undo Sortable's DOM move, so `render` starts from the document it built. */
+	private revert(evt: Sortable.SortableEvent): void {
+		const { item, from, oldIndex } = evt;
+		item.remove();
+		from.insertBefore(item, oldIndex === undefined ? null : (from.children[oldIndex] ?? null));
 	}
 
 	private openRowMenu(evt: MouseEvent, path: ChecklistPath, input: HTMLInputElement): void {
