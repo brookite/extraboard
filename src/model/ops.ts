@@ -6,10 +6,21 @@
 // actually edited. Stacks touched by an operation are re-normalized so blank
 // lines stay canonical (see `normalizeStack`).
 
+import { ChecklistItem, cloneChecklist, progress } from './checklist';
 import { configToDoc, writeConfig } from './frontmatter';
+import { parseCardLink, unlinkedTitle } from './link';
 import { parseCardContent } from './parse';
 import { formatValue, parseValue } from './properties';
-import type { Board, BoardConfig, Card, Divider, PropertyDef, Stack, StackItem } from './types';
+import type {
+	Board,
+	BoardConfig,
+	Card,
+	Divider,
+	PropertyDef,
+	PropertyValue,
+	Stack,
+	StackItem,
+} from './types';
 
 /** Address of an item inside a board. */
 export interface ItemRef {
@@ -178,20 +189,114 @@ export function addDivider(
 	return withItems(board, stackIndex, items);
 }
 
+/** Replace one card in place, keeping every other item's identity. */
+function replaceCard(board: Board, ref: ItemRef, card: Card): Board {
+	const items = board.stacks[ref.stack]!.items.slice();
+	items[ref.item] = { kind: 'card', card };
+	return withItems(board, ref.stack, items);
+}
+
 /**
  * Replace a card's inline content (title + property tokens + tags). The editor
  * shows the text without the task marker, so an existing marker is carried
  * over — unless the user typed a new one (`[x] …`) in front of the text.
+ *
+ * With `keepProperties` the field held only the title and tags, so the card's
+ * property values are carried over instead of being read from the text
+ * (card-content-and-checklists.md §3). A token the user typed anyway is still
+ * honoured — it overrides the carried-over value of the same name — so hiding
+ * the tokens can never lose a property, whichever way the user edits.
  */
-export function setCardText(board: Board, ref: ItemRef, text: string): Board {
+export function setCardText(
+	board: Board,
+	ref: ItemRef,
+	text: string,
+	options: { keepProperties?: boolean } = {},
+): Board {
 	const entry = board.stacks[ref.stack]?.items[ref.item];
 	if (entry?.kind !== 'card') return board;
 	const parsed = newCard(text, board);
 	const task = parsed.task ?? entry.card.task;
-	const card: Card = { ...parsed, ...(task !== undefined && { task }), trailing: entry.card.trailing };
-	const items = board.stacks[ref.stack]!.items.slice();
-	items[ref.item] = { kind: 'card', card };
-	return withItems(board, ref.stack, items);
+	const properties = options.keepProperties
+		? mergeProperties(entry.card.properties, parsed.properties)
+		: parsed.properties;
+	const card: Card = {
+		...parsed,
+		properties,
+		...(task !== undefined && { task }),
+		checklist: entry.card.checklist,
+		trailing: entry.card.trailing,
+	};
+	return replaceCard(board, ref, card);
+}
+
+/** `base` with every value from `typed` overriding or appended by name. */
+function mergeProperties(base: PropertyValue[], typed: PropertyValue[]): PropertyValue[] {
+	if (!typed.length) return base;
+	const out = base.slice();
+	for (const pv of typed) {
+		const at = out.findIndex((p) => p.name === pv.name);
+		if (at === -1) out.push(pv);
+		else out[at] = pv;
+	}
+	return out;
+}
+
+/** Replace only the card's title, leaving properties, tags and task alone. */
+export function setCardTitle(board: Board, ref: ItemRef, title: string): Board {
+	const entry = board.stacks[ref.stack]?.items[ref.item];
+	if (entry?.kind !== 'card' || entry.card.title === title) return board;
+	return replaceCard(board, ref, { ...entry.card, title });
+}
+
+/**
+ * Replace the card's title with the display text of its content link, leaving
+ * the note on disk alone (card-content-and-checklists.md §2).
+ */
+export function unlinkCardNote(board: Board, ref: ItemRef): Board {
+	const entry = board.stacks[ref.stack]?.items[ref.item];
+	if (entry?.kind !== 'card' || !parseCardLink(entry.card.title)) return board;
+	return setCardTitle(board, ref, unlinkedTitle(entry.card.title));
+}
+
+/** Set or replace one property value on a card (the editor's badges, §3.1). */
+export function setCardProperty(board: Board, ref: ItemRef, pv: PropertyValue): Board {
+	const entry = board.stacks[ref.stack]?.items[ref.item];
+	if (entry?.kind !== 'card') return board;
+	const properties = mergeProperties(entry.card.properties, [pv]);
+	if (properties === entry.card.properties) return board;
+	return replaceCard(board, ref, { ...entry.card, properties });
+}
+
+/** Remove every value of `name` from a card. */
+export function removeCardProperty(board: Board, ref: ItemRef, name: string): Board {
+	const entry = board.stacks[ref.stack]?.items[ref.item];
+	if (entry?.kind !== 'card') return board;
+	const properties = entry.card.properties.filter((pv) => pv.name !== name);
+	if (properties.length === entry.card.properties.length) return board;
+	return replaceCard(board, ref, { ...entry.card, properties });
+}
+
+/**
+ * Apply a pure tree transform from `model/checklist` to a card's checklist.
+ * The transform returning the same array means nothing changed, so the file is
+ * left alone — the same contract every op here follows.
+ */
+export function updateChecklist(
+	board: Board,
+	ref: ItemRef,
+	mutate: (items: ChecklistItem[]) => ChecklistItem[],
+): Board {
+	const entry = board.stacks[ref.stack]?.items[ref.item];
+	if (entry?.kind !== 'card') return board;
+	const checklist = mutate(entry.card.checklist);
+	if (checklist === entry.card.checklist) return board;
+	return replaceCard(board, ref, { ...entry.card, checklist });
+}
+
+/** `N/M` for a card's checklist; `total: 0` means "no indicator" (§4.2). */
+export function checklistProgress(card: Card): { done: number; total: number } {
+	return progress(card.checklist);
 }
 
 /** True for a card whose task marker means "done" (§4.0). */
@@ -319,6 +424,7 @@ export function duplicateItem(board: Board, ref: ItemRef): Board {
 						...entry.card,
 						properties: entry.card.properties.slice(),
 						tags: entry.card.tags.slice(),
+						checklist: cloneChecklist(entry.card.checklist),
 						trailing: entry.card.trailing.slice(),
 					},
 				}

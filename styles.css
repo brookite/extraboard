@@ -235,13 +235,63 @@
 	font-style: italic;
 }
 
+/* The title's content link is a real internal link; the theme styles it, the
+   board only makes sure the card's own cursor does not override it (§1.1). */
+.eb-card-title .internal-link {
+	cursor: pointer;
+}
+
 .eb-card-props,
 .eb-card-tags {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 4px;
+}
+
+.eb-card-props {
 	margin-top: 6px;
+}
+
+/* Tags on the left, the checklist indicator pinned bottom-right (§5.5). */
+.eb-card-foot {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 6px;
+	margin-top: 6px;
+}
+
+.eb-card-foot .eb-card-tags {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.eb-progress {
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+	padding: 0;
+	background: none;
+	border: none;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.eb-chip {
+	display: inline-flex;
+	align-items: center;
+	padding: 1px 7px;
+	font-size: var(--font-smaller, 0.8em);
+	line-height: 1.5;
+	color: var(--text-muted);
+	background: var(--background-modifier-hover);
+	border-radius: 10px;
+	white-space: nowrap;
+}
+
+.eb-progress:hover .eb-chip {
+	color: var(--text-normal);
 }
 
 .eb-badge {
@@ -359,6 +409,201 @@
 	border: none;
 	box-shadow: none;
 	background: none;
+}
+
+/* The inline card editor: a Markdown field plus its property badges (§6.6). */
+.eb-card-editor {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 6px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border-focus, var(--interactive-accent));
+	border-radius: var(--radius-s, 6px);
+	cursor: auto;
+}
+
+/* Obsidian's embedded editor brings its own chrome; the card only bounds it. */
+.eb-card-field {
+	min-height: 1.6em;
+}
+
+.eb-card-editor .eb-card-field .cm-editor {
+	background: none;
+}
+
+.eb-card-editor .eb-card-field .cm-scroller {
+	padding: 0;
+	overflow-x: hidden;
+}
+
+.eb-card-editor .eb-card-field .cm-line {
+	padding-inline: 2px;
+}
+
+.eb-card-editor .eb-editor {
+	border: none;
+	padding: 2px;
+}
+
+.eb-card-editor-props {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.eb-badge-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+}
+
+.eb-badge-edit {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	border: 1px solid transparent;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.eb-badge-edit:hover {
+	border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+.eb-badge-edit.is-active {
+	border-color: var(--interactive-accent);
+}
+
+.eb-badge-add {
+	padding: 1px 5px;
+	color: var(--text-muted);
+	border: 1px dashed var(--background-modifier-border);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.eb-badge-add .svg-icon {
+	width: 12px;
+	height: 12px;
+}
+
+/* One property's typed editor, opened by selecting its badge (§3.1). */
+.eb-value-editor {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+}
+
+.eb-value-editor-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.eb-value-editor-name {
+	font-weight: var(--font-semibold, 600);
+}
+
+.eb-value-editor-type,
+.eb-value-empty {
+	font-size: var(--font-smaller, 0.8em);
+	color: var(--text-faint);
+}
+
+.eb-value-input {
+	width: 100%;
+}
+
+.eb-value-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 40vh;
+	overflow-y: auto;
+}
+
+.eb-value-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.eb-value-color {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	cursor: pointer;
+}
+
+.eb-value-editor-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 6px;
+}
+
+/* Checklist modal (card-content-and-checklists.md §4.3) */
+.eb-checklist-count {
+	color: var(--text-muted);
+	font-weight: var(--font-normal, 400);
+	white-space: pre;
+}
+
+.eb-checklist {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-height: 60vh;
+	overflow-y: auto;
+	padding-right: 4px;
+}
+
+.eb-checklist-empty {
+	color: var(--text-muted);
+	padding: 8px 0;
+}
+
+.eb-checklist-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding-left: calc(var(--eb-checklist-depth, 0) * 20px);
+}
+
+.eb-checklist-row input[type='checkbox'] {
+	flex: 0 0 auto;
+	margin: 0;
+	cursor: pointer;
+}
+
+.eb-checklist-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	background: none;
+	border: 1px solid transparent;
+	box-shadow: none;
+}
+
+.eb-checklist-text:hover {
+	border-color: var(--background-modifier-border);
+}
+
+.eb-checklist-text:focus {
+	background: var(--background-primary);
+	border-color: var(--background-modifier-border-focus, var(--interactive-accent));
+}
+
+.eb-checklist-footer {
+	display: flex;
+	justify-content: flex-start;
+	margin-top: 10px;
 }
 
 .eb-stack-name-editor {

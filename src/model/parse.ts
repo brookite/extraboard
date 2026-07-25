@@ -1,5 +1,6 @@
 // Markdown -> Board. Spec: docs/specs/markdown-format.md. Pure; no `obsidian`.
 
+import { splitChecklist } from './checklist';
 import { parseFrontmatter } from './frontmatter';
 import { parseValue } from './properties';
 import {
@@ -112,7 +113,14 @@ export function parseCardContent(content: string, config: BoardConfig): Card {
 	const properties = tokens
 		.map((t) => parseValue(t.name, t.value, findDef(config, t.name)))
 		.filter((v): v is NonNullable<typeof v> => v !== null);
-	return { title, properties, tags, ...(task !== undefined && { task }), trailing: [] };
+	return {
+		title,
+		properties,
+		tags,
+		...(task !== undefined && { task }),
+		checklist: [],
+		trailing: [],
+	};
 }
 
 function stripCollapse(s: string): { text: string; collapsed: boolean } {
@@ -187,6 +195,18 @@ export function parseBody(
 		}
 
 		sink.push(line);
+	}
+
+	// A card's continuation lines can only be classified once they are all in:
+	// the checklist is the leading contiguous block of nested task items (§4.5),
+	// everything after it stays verbatim.
+	for (const s of stacks) {
+		for (const entry of s.items) {
+			if (entry.kind !== 'card') continue;
+			const split = splitChecklist(entry.card.trailing);
+			entry.card.checklist = split.checklist;
+			entry.card.trailing = split.trailing;
+		}
 	}
 
 	return { preamble, stacks };

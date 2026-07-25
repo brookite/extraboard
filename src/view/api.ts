@@ -2,19 +2,43 @@
 // the save path; components only describe *what* changed via a pure op from
 // `model/ops.ts`. Spec: docs/specs/kanban-view.md §6.
 
-import { App, Modal, Notice } from 'obsidian';
+import { App, HoverParent, Modal, Notice } from 'obsidian';
+import type { ItemRef } from '../model/ops';
 import type { Board } from '../model/types';
 import type { ColorPickerOptions } from '../ui/ColorPicker';
 
 export interface BoardApi {
+	/**
+	 * Obsidian itself, for the components that must talk to it directly: the
+	 * embedded card editor, internal links and the checklist modal. Everything
+	 * that changes the *board* still goes through `update` and a pure op.
+	 */
+	app: App;
+	/** The board file's path — links resolve relative to it. Read on demand,
+	 * because the file changes under the view (rename, another board in the
+	 * same leaf). */
+	sourcePath(): string;
+	/** Owner of hover previews raised from cards. */
+	hoverParent: HoverParent;
 	/** Apply a pure op; a no-op op (same reference back) never touches the file. */
 	update(mutate: (board: Board) => Board): void;
+	/**
+	 * The board as it stands now. Long-lived UI (the checklist modal) must read
+	 * through this rather than close over the board it was opened with, which
+	 * every edit replaces.
+	 */
+	getBoard(): Board | null;
 	/** Ask before something destructive. Resolves false when dismissed. */
 	confirm(title: string, message: string, cta: string): Promise<boolean>;
 	/** Open the vault search for a tag, as clicking a tag elsewhere does. */
 	searchTag(tag: string): void;
 	/** Pick a color: the color, `''` when cleared, `null` when dismissed. */
 	pickColor(options: ColorPickerOptions): Promise<string | null>;
+	/**
+	 * Create the content note for a card, rewrite its title into a link to it,
+	 * and open it (card-content-and-checklists.md §2).
+	 */
+	createCardNote(ref: ItemRef): void;
 }
 
 /**

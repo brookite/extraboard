@@ -1,6 +1,15 @@
-// Custom SVG progress ring for percent properties and checklist N/M (M6).
+// Custom SVG progress ring for percent properties and checklist N/M.
 
-export function ProgressRing({ value, size = 22 }: { value: number; size?: number }) {
+interface Props {
+	value: number;
+	size?: number;
+	/** Text inside the ring; defaults to the percentage. */
+	label?: string;
+	/** Tooltip; defaults to the percentage. */
+	title?: string;
+}
+
+export function ProgressRing({ value, size = 22, label, title }: Props) {
 	const clamped = Math.max(0, Math.min(100, value));
 	const stroke = 3;
 	const r = (size - stroke) / 2;
@@ -8,8 +17,8 @@ export function ProgressRing({ value, size = 22 }: { value: number; size?: numbe
 	const offset = circumference * (1 - clamped / 100);
 	const center = size / 2;
 	return (
-		<span class="eb-ring" title={`${clamped}%`}>
-			<svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+		<span class="eb-ring" title={title ?? `${String(clamped)}%`}>
+			<svg width={size} height={size} viewBox={`0 0 ${String(size)} ${String(size)}`}>
 				<circle
 					class="eb-ring-track"
 					cx={center}
@@ -28,10 +37,10 @@ export function ProgressRing({ value, size = 22 }: { value: number; size?: numbe
 					stroke-dasharray={circumference}
 					stroke-dashoffset={offset}
 					stroke-linecap="round"
-					transform={`rotate(-90 ${center} ${center})`}
+					transform={`rotate(-90 ${String(center)} ${String(center)})`}
 				/>
 			</svg>
-			<span class="eb-ring-label">{clamped}</span>
+			<span class="eb-ring-label">{label ?? clamped}</span>
 		</span>
 	);
 }

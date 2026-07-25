@@ -1,13 +1,16 @@
 import { Menu } from 'obsidian';
 import { useState } from 'preact/hooks';
+import { parseCardLink } from '../../model/link';
 import * as ops from '../../model/ops';
-import { cardLineContent } from '../../model/serialize';
 import type { Board, Card } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
+import { ChecklistModal } from '../../ui/ChecklistModal';
 import type { BoardApi } from '../api';
+import { CardEditor } from '../CardEditor';
+import { hoverCardLink, openCardLink, resolveCardLink } from '../links';
 import { isDragging } from '../useSortable';
 import { IconButton } from './Icon';
-import { InlineEditor } from './InlineEditor';
+import { ChecklistProgress, progressStyleFor } from './Progress';
 import { PropertyBadge } from './PropertyBadge';
 import { safeColor } from './style';
 import { Tag } from './Tag';
@@ -37,14 +40,13 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 	if (editing) {
 		return (
 			<div class="eb-item eb-card is-editing" data-index={index}>
-				<InlineEditor
-					value={cardLineContent(card, board.config)}
-					placeholder="Card text, @{property|value}, #tag"
-					onSubmit={(text) => {
-						setEditing(false);
-						api.update((b) => ops.setCardText(b, ref, text));
-					}}
-					onCancel={() => setEditing(false)}
+				<CardEditor
+					board={board}
+					card={card}
+					target={ref}
+					api={api}
+					settings={settings}
+					onClose={() => setEditing(false)}
 				/>
 			</div>
 		);
@@ -52,6 +54,10 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 
 	const rawColor = cardColor(card);
 	const color = safeColor(rawColor);
+	// The content note is derived from the title, never stored (§4.4).
+	const link = parseCardLink(card.title);
+	const resolved = link !== null && resolveCardLink(api.app, link, api.sourcePath()) !== null;
+	const progress = ops.checklistProgress(card);
 
 	const chooseColor = async (): Promise<void> => {
 		const next = await api.pickColor({
@@ -61,6 +67,19 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 		});
 		if (next === null) return;
 		api.update((b) => ops.setCardColor(b, ref, next));
+	};
+
+	const openChecklist = (): void => {
+		new ChecklistModal(api.app, {
+			title: link?.display ?? card.title,
+			// Read through the live board every time: the modal outlives the render
+			// that opened it, and every edit replaces the board object.
+			items: () => {
+				const current = api.getBoard()?.stacks[stackIndex]?.items[index];
+				return current?.kind === 'card' ? current.card.checklist : [];
+			},
+			apply: (mutate) => api.update((b) => ops.updateChecklist(b, ref, mutate)),
+		}).open();
 	};
 
 	const openMenu = (event: MouseEvent): void => {
@@ -93,6 +112,39 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 					void chooseColor();
 				}),
 		);
+		menu.addItem((item) =>
+			item
+				.setTitle('Checklist')
+				.setIcon('list-checks')
+				.onClick(openChecklist),
+		);
+
+		// Only the note actions that apply to this card (§2).
+		menu.addSeparator();
+		if (link) {
+			menu.addItem((item) =>
+				item
+					.setTitle('Open note')
+					.setIcon('file-text')
+					.onClick(() => {
+						void api.app.workspace.openLinkText(link.linktext, api.sourcePath(), false);
+					}),
+			);
+			menu.addItem((item) =>
+				item
+					.setTitle('Unlink note')
+					.setIcon('unlink')
+					.onClick(() => api.update((b) => ops.unlinkCardNote(b, ref))),
+			);
+		} else {
+			menu.addItem((item) =>
+				item
+					.setTitle('Create note')
+					.setIcon('file-plus')
+					.onClick(() => api.createCardNote(ref)),
+			);
+		}
+
 		// A flat "Move to" section, one item per stack — no submenu, so it works
 		// the same way on mobile (kanban-view.md §5.3).
 		if (board.stacks.length > 1) {
@@ -159,7 +211,32 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 					/>
 				) : null}
 				<div class="eb-card-title">
-					{card.title || <span class="eb-placeholder">Untitled</span>}
+					{link ? (
+						// A real internal link, so hover preview, mod-click and the
+						// unresolved style all behave as they do everywhere else (§1.1).
+						<a
+							class={`internal-link${resolved ? '' : ' is-unresolved'}`}
+							href={link.linktext}
+							data-href={link.linktext}
+							rel="noopener"
+							onClick={(e) => {
+								e.stopPropagation();
+								e.preventDefault();
+								openCardLink(api.app, link, api.sourcePath(), e);
+							}}
+							onAuxClick={(e) => {
+								if (e.button !== 1) return;
+								e.stopPropagation();
+								e.preventDefault();
+								openCardLink(api.app, link, api.sourcePath(), e);
+							}}
+							onMouseOver={(e) => hoverCardLink(api.app, link, api.sourcePath(), e, api.hoverParent)}
+						>
+							{link.display}
+						</a>
+					) : (
+						card.title || <span class="eb-placeholder">Untitled</span>
+					)}
 				</div>
 				<IconButton
 					icon="more-horizontal"
@@ -171,15 +248,28 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 			{badges.length > 0 ? (
 				<div class="eb-card-props">
 					{badges.map((pv, i) => (
-						<PropertyBadge key={i} pv={pv} config={board.config} />
+						<PropertyBadge
+							key={i}
+							pv={pv}
+							config={board.config}
+							progress={progressStyleFor(board, settings)}
+						/>
 					))}
 				</div>
 			) : null}
-			{card.tags.length > 0 ? (
-				<div class="eb-card-tags">
-					{card.tags.map((t) => (
-						<Tag key={t} tag={t} config={board.config} api={api} />
-					))}
+			{card.tags.length > 0 || progress.total > 0 ? (
+				<div class="eb-card-foot">
+					<div class="eb-card-tags">
+						{card.tags.map((t) => (
+							<Tag key={t} tag={t} config={board.config} api={api} />
+						))}
+					</div>
+					<ChecklistProgress
+						done={progress.done}
+						total={progress.total}
+						style={progressStyleFor(board, settings)}
+						onOpen={openChecklist}
+					/>
 				</div>
 			) : null}
 		</div>

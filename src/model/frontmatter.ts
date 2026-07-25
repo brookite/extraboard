@@ -109,6 +109,11 @@ function toConfig(eb: unknown): BoardConfig {
 	const dir = asString(eb.cardContentDir);
 	if (dir !== undefined) config.cardContentDir = dir;
 
+	const style = asString(eb.progressStyle);
+	if (style === 'ring' || style === 'fraction' || style === 'percent') {
+		config.progressStyle = style;
+	}
+
 	if (isRecord(eb.archive)) {
 		const file = asString(eb.archive.file);
 		config.archive = { ...(file !== undefined && { file }) };
@@ -169,6 +174,7 @@ function configToPlain(config: BoardConfig): Record<string, unknown> {
 	const eb: Record<string, unknown> = { version: config.version, view: config.view };
 	if (config.showCardCheckbox) eb.showCardCheckbox = true;
 	if (config.cardContentDir) eb.cardContentDir = config.cardContentDir;
+	if (config.progressStyle) eb.progressStyle = config.progressStyle;
 	if (config.archive) eb.archive = { ...(config.archive.file && { file: config.archive.file }) };
 	if (config.calendar) {
 		eb.calendar = {
