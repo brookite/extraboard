@@ -9,10 +9,14 @@ import {
 	normalizePath,
 } from 'obsidian';
 import { DEFAULT_SETTINGS, ExtraboardSettings } from './settings';
+import { BoardSettingsModal } from './ui/BoardSettingsModal';
+import { cloneDefs } from './ui/PropertyDefsEditor';
+import { ExtraboardSettingTab } from './ui/SettingsTab';
 import { BoardView } from './view/BoardView';
 import { ICONS, VIEW_TYPE_BOARD } from './util/constants';
-import { NEW_BOARD_BASENAME, NEW_BOARD_TEMPLATE } from './util/newBoard';
+import { NEW_BOARD_BASENAME, newBoardConfig, newBoardText } from './util/newBoard';
 import { parseFrontmatter } from './model/frontmatter';
+import type { BoardConfig } from './model/types';
 
 export default class ExtraboardPlugin extends Plugin {
 	settings!: ExtraboardSettings;
@@ -29,6 +33,8 @@ export default class ExtraboardPlugin extends Plugin {
 			(leaf: WorkspaceLeaf) => new BoardView(leaf, this),
 		);
 
+		this.addSettingTab(new ExtraboardSettingTab(this.app, this));
+
 		// Intercept every leaf.setViewState so a board file about to open as
 		// Markdown is redirected to the board view *before* the Markdown view is
 		// built. This catches all open paths uniformly (file explorer, links,
@@ -37,14 +43,14 @@ export default class ExtraboardPlugin extends Plugin {
 		this.patchLeafSetViewState();
 
 		this.addRibbonIcon(ICONS.board, 'Create new board', () => {
-			void this.createNewBoard();
+			this.createNewBoard();
 		});
 
 		this.addCommand({
 			id: 'create-board',
 			name: 'Create new board',
 			callback: () => {
-				void this.createNewBoard();
+				this.createNewBoard();
 			},
 		});
 
@@ -55,6 +61,17 @@ export default class ExtraboardPlugin extends Plugin {
 				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (!view || !view.file) return false;
 				if (!checking) void this.openAsBoard(view.leaf, view.file);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'board-settings',
+			name: 'Board settings',
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(BoardView);
+				if (!view?.board) return false;
+				if (!checking) view.openBoardSettings();
 				return true;
 			},
 		});
@@ -87,6 +104,14 @@ export default class ExtraboardPlugin extends Plugin {
 	suppressAutoOpen(path: string): void {
 		this.suppressed.add(path);
 		window.setTimeout(() => this.suppressed.delete(path), 1000);
+	}
+
+	/** Re-render every open board, e.g. after a display setting changed. */
+	refreshBoards(): void {
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_BOARD)) {
+			const view = leaf.view;
+			if (view instanceof BoardView) view.refresh();
+		}
 	}
 
 	/** Add the "Open as board" switch to a leaf that now shows a board as Markdown. */
@@ -222,13 +247,29 @@ export default class ExtraboardPlugin extends Plugin {
 		}
 	}
 
-	private async createNewBoard(): Promise<void> {
+	/**
+	 * Creating a board starts from `defaultProperties` and lets the user adjust
+	 * the configuration *before* the file is written (settings.md); dismissing
+	 * the dialog creates nothing.
+	 */
+	private createNewBoard(): void {
+		new BoardSettingsModal(this.app, {
+			config: newBoardConfig(cloneDefs(this.settings.defaultProperties)),
+			title: 'New board',
+			cta: 'Create',
+			onSave: (config) => {
+				void this.writeNewBoard(config);
+			},
+		}).open();
+	}
+
+	private async writeNewBoard(config: BoardConfig): Promise<void> {
 		const active = this.app.workspace.getActiveFile();
 		const parent = this.app.fileManager.getNewFileParent(active?.path ?? '');
 		const path = this.uniqueBoardPath(parent);
 		let file: TFile;
 		try {
-			file = await this.app.vault.create(path, NEW_BOARD_TEMPLATE);
+			file = await this.app.vault.create(path, newBoardText(config));
 		} catch (err) {
 			console.error('Extraboard: failed to create board', err);
 			new Notice('Extraboard: could not create the board file.');

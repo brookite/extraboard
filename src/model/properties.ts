@@ -144,14 +144,20 @@ export function formatToken(pv: PropertyValue): string {
 /**
  * Non-fatal validation of board property definitions. Returns human-readable
  * diagnostics; never throws.
+ *
+ * `color` is limited to one per board because it paints the card. `checkbox`
+ * is not: the card's own checkbox is a native task marker (markdown-format.md
+ * §4.0), so a `checkbox` property is just a named boolean badge (M5).
  */
 export function validatePropertyDefs(defs: PropertyDef[]): string[] {
 	const diags: string[] = [];
+	const seen = new Set<string>();
 	let colors = 0;
-	let checkboxes = 0;
 	for (const d of defs) {
+		if (!d.name.trim()) diags.push('A property has no name.');
+		else if (seen.has(d.name)) diags.push(`Property "${d.name}" is declared more than once.`);
+		seen.add(d.name);
 		if (d.type === 'color') colors++;
-		if (d.type === 'checkbox') checkboxes++;
 		if ((d.strict !== undefined || d.options !== undefined) && d.type !== 'string-list') {
 			diags.push(`Property "${d.name}": strict/options are only valid on string-list.`);
 		}
@@ -160,6 +166,5 @@ export function validatePropertyDefs(defs: PropertyDef[]): string[] {
 		}
 	}
 	if (colors > 1) diags.push('At most one color property is allowed per board.');
-	if (checkboxes > 1) diags.push('At most one checkbox property is allowed per board.');
 	return diags;
 }

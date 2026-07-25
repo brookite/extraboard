@@ -2,6 +2,7 @@ import { Menu } from 'obsidian';
 import { useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { Board } from '../../model/types';
+import type { ExtraboardSettings } from '../../settings';
 import type { BoardApi } from '../api';
 import { useSortable } from '../useSortable';
 import { CardTile } from './Card';
@@ -13,6 +14,7 @@ interface Props {
 	board: Board;
 	index: number;
 	api: BoardApi;
+	settings: ExtraboardSettings;
 }
 
 /** How many consecutive items right after `index` are hidden by that divider. */
@@ -22,7 +24,7 @@ function countHiddenAfter(hidden: Set<number>, index: number): number {
 	return count;
 }
 
-export function StackColumn({ board, index, api }: Props) {
+export function StackColumn({ board, index, api, settings }: Props) {
 	const [renaming, setRenaming] = useState(false);
 	const [composing, setComposing] = useState(false);
 	const bodyRef = useRef<HTMLDivElement>(null);
@@ -164,7 +166,14 @@ export function StackColumn({ board, index, api }: Props) {
 			<div class="eb-stack-body" ref={bodyRef} data-list={index} hidden={collapsed}>
 				{stack.items.map((item, i) =>
 					hidden.has(i) ? null : item.kind === 'card' ? (
-						<CardTile key={i} board={board} stackIndex={index} index={i} api={api} />
+						<CardTile
+								key={i}
+								board={board}
+								stackIndex={index}
+								index={i}
+								api={api}
+								settings={settings}
+							/>
 					) : (
 						<DividerRow
 							key={i}

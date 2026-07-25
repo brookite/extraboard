@@ -104,6 +104,7 @@ function toConfig(eb: unknown): BoardConfig {
 
 	if (typeof eb.version === 'number') config.version = eb.version;
 	if (eb.view === 'calendar' || eb.view === 'kanban') config.view = eb.view;
+	if (typeof eb.showCardCheckbox === 'boolean') config.showCardCheckbox = eb.showCardCheckbox;
 
 	const dir = asString(eb.cardContentDir);
 	if (dir !== undefined) config.cardContentDir = dir;
@@ -166,6 +167,7 @@ export function serializeFrontmatter(doc: Document | null, body: string): string
 /** Minimal, empty-pruned plain object for writing `extraboard` config. */
 function configToPlain(config: BoardConfig): Record<string, unknown> {
 	const eb: Record<string, unknown> = { version: config.version, view: config.view };
+	if (config.showCardCheckbox) eb.showCardCheckbox = true;
 	if (config.cardContentDir) eb.cardContentDir = config.cardContentDir;
 	if (config.archive) eb.archive = { ...(config.archive.file && { file: config.archive.file }) };
 	if (config.calendar) {

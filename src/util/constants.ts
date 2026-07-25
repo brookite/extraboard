@@ -8,4 +8,5 @@ export const ICONS = {
 	board: 'square-kanban',
 	markdown: 'file-text',
 	calendar: 'calendar-days',
+	settings: 'sliders-horizontal',
 } as const;

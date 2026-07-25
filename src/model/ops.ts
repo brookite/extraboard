@@ -6,8 +6,10 @@
 // actually edited. Stacks touched by an operation are re-normalized so blank
 // lines stay canonical (see `normalizeStack`).
 
+import { configToDoc, writeConfig } from './frontmatter';
 import { parseCardContent } from './parse';
-import type { Board, Card, Divider, Stack, StackItem } from './types';
+import { formatValue, parseValue } from './properties';
+import type { Board, BoardConfig, Card, Divider, Stack, StackItem } from './types';
 
 /** Address of an item inside a board. */
 export interface ItemRef {
@@ -176,15 +178,50 @@ export function addDivider(
 	return withItems(board, stackIndex, items);
 }
 
-/** Replace a card's inline content (title + property tokens + tags). */
+/**
+ * Replace a card's inline content (title + property tokens + tags). The editor
+ * shows the text without the task marker, so an existing marker is carried
+ * over — unless the user typed a new one (`[x] …`) in front of the text.
+ */
 export function setCardText(board: Board, ref: ItemRef, text: string): Board {
 	const entry = board.stacks[ref.stack]?.items[ref.item];
 	if (entry?.kind !== 'card') return board;
 	const parsed = newCard(text, board);
-	const card: Card = { ...parsed, trailing: entry.card.trailing };
+	const task = parsed.task ?? entry.card.task;
+	const card: Card = { ...parsed, ...(task !== undefined && { task }), trailing: entry.card.trailing };
 	const items = board.stacks[ref.stack]!.items.slice();
 	items[ref.item] = { kind: 'card', card };
 	return withItems(board, ref.stack, items);
+}
+
+/** True for a card whose task marker means "done" (§4.0). */
+export function isCardDone(card: Card): boolean {
+	return card.task === 'x' || card.task === 'X';
+}
+
+/**
+ * Set a card's task marker; `undefined` turns it back into a plain list item.
+ */
+export function setCardTask(board: Board, ref: ItemRef, task: string | undefined): Board {
+	const entry = board.stacks[ref.stack]?.items[ref.item];
+	if (entry?.kind !== 'card' || entry.card.task === task) return board;
+	const card: Card = { ...entry.card };
+	if (task === undefined) delete card.task;
+	else card.task = task;
+	const items = board.stacks[ref.stack]!.items.slice();
+	items[ref.item] = { kind: 'card', card };
+	return withItems(board, ref.stack, items);
+}
+
+/**
+ * Toggle a card's checkbox. A card that is not a task item becomes a done task;
+ * a done one goes back to `[ ]`. A custom marker (`[/]`, `[-]`) counts as "not
+ * done", so toggling it means "done" — nothing rewrites it until then.
+ */
+export function toggleCardTask(board: Board, ref: ItemRef): Board {
+	const entry = board.stacks[ref.stack]?.items[ref.item];
+	if (entry?.kind !== 'card') return board;
+	return setCardTask(board, ref, isCardDone(entry.card) ? ' ' : 'x');
 }
 
 export function renameDivider(board: Board, ref: ItemRef, name: string | undefined): Board {
@@ -268,7 +305,54 @@ export function moveItem(board: Board, from: ItemRef, toStack: number, before: I
 	return { ...board, stacks };
 }
 
+// --- board configuration ----------------------------------------------------
+
+/**
+ * Replace the board configuration and write it back into the `extraboard`
+ * frontmatter node. The YAML document is cloned first, so the previous board
+ * object stays valid and the op keeps the usual "new board out" contract;
+ * foreign frontmatter keys and comments are preserved by `writeConfig`.
+ *
+ * Existing cards are deliberately left alone: a value that no longer validates
+ * under the new definition keeps its text until the user edits that card
+ * (kanban-view.md §5.4).
+ */
+export function setBoardConfig(board: Board, config: BoardConfig): Board {
+	let doc = board.frontmatterDoc;
+	if (doc) {
+		doc = doc.clone();
+		writeConfig(doc, config);
+	} else {
+		doc = configToDoc(config);
+	}
+	return { ...board, config, frontmatterDoc: doc };
+}
+
 // --- queries ----------------------------------------------------------------
+
+/**
+ * Card values that would no longer validate under `config` — i.e. the tokens a
+ * future re-read of the file would drop. Used to warn before board settings are
+ * changed; nothing is rewritten (kanban-view.md §5.4).
+ */
+export function invalidatedValues(
+	board: Board,
+	config: BoardConfig,
+): { card: string; property: string }[] {
+	const defs = new Map(config.properties.map((d) => [d.name, d]));
+	const out: { card: string; property: string }[] = [];
+	for (const stack of board.stacks) {
+		for (const entry of stack.items) {
+			if (entry.kind !== 'card') continue;
+			for (const pv of entry.card.properties) {
+				if (parseValue(pv.name, formatValue(pv), defs.get(pv.name)) === null) {
+					out.push({ card: entry.card.title, property: pv.name });
+				}
+			}
+		}
+	}
+	return out;
+}
 
 /** Number of cards in a stack (dividers do not count). */
 export function cardCount(stack: Stack): number {

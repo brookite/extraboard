@@ -87,7 +87,9 @@ describe('formatValue round-trips through parseValue', () => {
 });
 
 describe('validatePropertyDefs', () => {
-	it('flags duplicate singletons and misplaced options', () => {
+	// Since M5 only `color` is a singleton: the card checkbox is a task marker,
+	// so `checkbox` is an ordinary named boolean badge (properties.md).
+	it('flags a second color and misplaced options', () => {
 		const diags = validatePropertyDefs([
 			{ name: 'c1', type: 'color' },
 			{ name: 'c2', type: 'color' },
@@ -95,7 +97,7 @@ describe('validatePropertyDefs', () => {
 			{ name: 'f2', type: 'checkbox' },
 			{ name: 'bad', type: 'integer', strict: true },
 		]);
-		expect(diags.length).toBe(3);
+		expect(diags.length).toBe(2);
 	});
 	it('accepts a valid config', () => {
 		expect(validatePropertyDefs([

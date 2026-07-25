@@ -121,6 +121,9 @@
 
 /* Cards */
 .eb-card {
+	position: relative;
+	/* Own stacking context, so the color tint stays behind the card content. */
+	isolation: isolate;
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-s, 6px);
@@ -129,10 +132,52 @@
 	cursor: pointer;
 }
 
+/* The board's single `color` property: a full-strength left stripe... */
+.eb-card.is-colored {
+	border-left: 4px solid var(--eb-card-color);
+	padding-left: 7px;
+}
+
+/* ...plus, with `fillCardWithColor`, a tint composited over the theme
+   background so card text keeps its contrast in light and dark themes. */
+.eb-card.is-filled::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: var(--eb-card-color);
+	opacity: 0.14;
+	border-radius: inherit;
+	pointer-events: none;
+}
+
 .eb-card-head {
 	display: flex;
 	align-items: flex-start;
 	gap: 4px;
+}
+
+/* The card menu sits in the top-left corner (kanban-view.md §5.3). */
+.eb-card-menu {
+	width: 20px;
+	height: 20px;
+	margin: -1px -2px 0 -4px;
+}
+
+.eb-card-menu .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.eb-card-check {
+	flex: 0 0 auto;
+	margin: 3px 2px 0 0;
+	cursor: pointer;
+}
+
+.eb-card.is-done .eb-card-title {
+	color: var(--text-muted);
+	text-decoration: line-through;
 }
 
 .eb-card-title {
@@ -355,6 +400,110 @@ body.is-mobile .eb-hover-only {
 	background: var(--background-secondary);
 	border: 1px dashed var(--background-modifier-border);
 	border-radius: var(--radius-m, 8px);
+}
+
+/* Property / tag color editors (board settings modal + settings tab) */
+.eb-pe {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin: 8px 0 4px;
+}
+
+.eb-pe-empty {
+	color: var(--text-muted);
+	font-size: var(--font-smaller, 0.85em);
+}
+
+.eb-pe-row {
+	padding: 8px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+}
+
+.eb-pe-head,
+.eb-pe-option {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.eb-pe-option {
+	margin-top: 6px;
+}
+
+.eb-pe-name,
+.eb-pe-value {
+	flex: 1 1 120px;
+	min-width: 90px;
+}
+
+.eb-pe-type {
+	flex: 0 1 auto;
+}
+
+.eb-pe-body {
+	margin: 8px 0 0 4px;
+	padding-left: 8px;
+	border-left: 2px solid var(--background-modifier-border);
+}
+
+.eb-pe-label {
+	margin-right: 6px;
+	font-size: var(--font-smaller, 0.85em);
+	color: var(--text-muted);
+}
+
+.eb-pe-check {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--font-smaller, 0.85em);
+	color: var(--text-muted);
+}
+
+.eb-pe-color {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.eb-pe-color-input {
+	width: 8em;
+}
+
+.eb-pe-button {
+	padding: 0 8px;
+	background: none;
+	border: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.eb-pe-button:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
+.eb-pe-actions {
+	display: flex;
+	gap: 6px;
+}
+
+.eb-pe-diags {
+	color: var(--text-warning, var(--text-muted));
+	font-size: var(--font-smaller, 0.85em);
+}
+
+.eb-pe-diags:empty {
+	display: none;
+}
+
+.eb-board-settings {
+	width: min(46rem, 90vw);
 }
 
 /* Drag & drop */
