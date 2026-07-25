@@ -153,6 +153,64 @@ describe('board configuration rewriting', () => {
 	});
 });
 
+describe('card color', () => {
+	const colored: BoardConfig = {
+		...config,
+		properties: [...config.properties, { name: 'accent', type: 'color' }],
+	};
+	const withDef = (body: string): Board => {
+		const { preamble, stacks } = parseBody(body, colored);
+		return { config: colored, frontmatterDoc: null, preamble, stacks, trailing: '' };
+	};
+	const ref = { stack: 0, item: 0 };
+
+	it('writes the color into the board color property', () => {
+		const next = ops.setCardColor(withDef('## A\n\n- Card\n'), ref, '#7852ee');
+		expect(cardAt(next, 0, 0).properties).toEqual([
+			{ name: 'accent', type: 'color', value: '#7852ee' },
+		]);
+		expect(serializeBody(next)).toContain('- Card @{accent|#7852ee}');
+	});
+
+	it('replaces an existing color instead of adding a second one', () => {
+		const board = withDef('## A\n\n- Card @{accent|#111111} @{priority|2}\n');
+		const next = ops.setCardColor(board, ref, 'rebeccapurple');
+		// Tokens are emitted in the board's property order (priority, accent).
+		expect(serializeBody(next)).toContain('- Card @{priority|2} @{accent|rebeccapurple}');
+		expect(ops.setCardColor(next, ref, 'rebeccapurple')).toBe(next);
+	});
+
+	it('clears the color with an empty value', () => {
+		const board = withDef('## A\n\n- Card @{accent|#111111}\n');
+		expect(serializeBody(ops.setCardColor(board, ref, ''))).toContain('- Card\n');
+		// Nothing to clear is a no-op, on a colorless card and a colorless board.
+		const plain = withDef('## A\n\n- Card\n');
+		expect(ops.setCardColor(plain, ref, '')).toBe(plain);
+		const noDef = boardFromBody('## A\n\n- Card\n');
+		expect(ops.setCardColor(noDef, ref, '')).toBe(noDef);
+	});
+
+	it('adds a color property to a board that declares none', () => {
+		const board = parseBoard('---\nextraboard:\n  version: 1\n---\n## A\n\n- Card\n');
+		const next = ops.setCardColor(board, ref, '#08b94e');
+		expect(next.config.properties).toEqual([{ name: 'color', type: 'color' }]);
+
+		const text = serializeBoard(next);
+		expect(text).toContain('- Card @{color|#08b94e}');
+		expect(parseBoard(text).config.properties).toEqual([{ name: 'color', type: 'color' }]);
+		expect(cardAt(parseBoard(text), 0, 0).properties).toEqual([
+			{ name: 'color', type: 'color', value: '#08b94e' },
+		]);
+	});
+
+	it('replaces an untyped token of the same name instead of duplicating it', () => {
+		const board = parseBoard('---\nextraboard:\n  version: 1\n---\n## A\n\n- Card @{color|red}\n');
+		const next = ops.setCardColor(board, ref, 'blue');
+		expect(cardAt(next, 0, 0).properties).toHaveLength(1);
+		expect(serializeBody(next)).toContain('- Card @{color|blue}');
+	});
+});
+
 describe('property definition validation', () => {
 	it('allows several checkbox properties but only one color', () => {
 		expect(

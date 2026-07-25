@@ -4,6 +4,7 @@
 
 import { App, Modal, Notice } from 'obsidian';
 import type { Board } from '../model/types';
+import type { ColorPickerOptions } from '../ui/ColorPicker';
 
 export interface BoardApi {
 	/** Apply a pure op; a no-op op (same reference back) never touches the file. */
@@ -12,6 +13,8 @@ export interface BoardApi {
 	confirm(title: string, message: string, cta: string): Promise<boolean>;
 	/** Open the vault search for a tag, as clicking a tag elsewhere does. */
 	searchTag(tag: string): void;
+	/** Pick a color: the color, `''` when cleared, `null` when dismissed. */
+	pickColor(options: ColorPickerOptions): Promise<string | null>;
 }
 
 /**

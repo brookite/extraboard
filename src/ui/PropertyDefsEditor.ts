@@ -2,8 +2,10 @@
 // settings modal (per-board `extraboard.properties`) and the plugin settings
 // tab (`defaultProperties`). Specs: properties.md, settings.md.
 
+import { App } from 'obsidian';
 import { validatePropertyDefs } from '../model/properties';
 import type { PropertyDef, PropertyType, StringListOption } from '../model/types';
+import { colorField } from './ColorPicker';
 
 const TYPE_LABELS: Record<PropertyType, string> = {
 	string: 'Text',
@@ -43,6 +45,7 @@ export class PropertyDefsEditor {
 	private defs: PropertyDef[];
 
 	constructor(
+		private readonly app: App,
 		private readonly container: HTMLElement,
 		defs: PropertyDef[],
 		private readonly onChange: (defs: PropertyDef[]) => void,
@@ -178,12 +181,12 @@ export class PropertyDefsEditor {
 			this.commit();
 		});
 
-		this.colorField(el, 'Background', option.bg, (next) => {
+		colorField(this.app, el, 'Background', option.bg, (next) => {
 			if (next) option.bg = next;
 			else delete option.bg;
 			this.commit();
 		});
-		this.colorField(el, 'Text', option.fg, (next) => {
+		colorField(this.app, el, 'Text', option.fg, (next) => {
 			if (next) option.fg = next;
 			else delete option.fg;
 			this.commit();
@@ -196,26 +199,6 @@ export class PropertyDefsEditor {
 	}
 
 	// --- small controls -------------------------------------------------------
-
-	/**
-	 * A color is stored verbatim (any CSS color, or empty for the theme default),
-	 * so it is a text field with a live swatch rather than a hex-only picker.
-	 */
-	private colorField(
-		el: HTMLElement,
-		label: string,
-		value: string | undefined,
-		onChange: (value: string) => void,
-	): void {
-		const wrap = el.createDiv({ cls: 'eb-pe-color' });
-		const swatch = wrap.createSpan({ cls: 'eb-swatch' });
-		swatch.style.background = value ?? 'transparent';
-		const input = wrap.createEl('input', { type: 'text', cls: 'eb-pe-color-input' });
-		input.value = value ?? '';
-		input.placeholder = label;
-		input.setAttribute('aria-label', label);
-		input.addEventListener('change', () => onChange(input.value.trim()));
-	}
 
 	private iconButton(
 		el: HTMLElement,

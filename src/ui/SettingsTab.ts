@@ -48,6 +48,7 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 		});
 
 		const editor = new PropertyDefsEditor(
+			this.app,
 			containerEl.createDiv(),
 			this.plugin.settings.defaultProperties,
 			(defs) => {

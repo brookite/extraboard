@@ -9,7 +9,7 @@
 import { configToDoc, writeConfig } from './frontmatter';
 import { parseCardContent } from './parse';
 import { formatValue, parseValue } from './properties';
-import type { Board, BoardConfig, Card, Divider, Stack, StackItem } from './types';
+import type { Board, BoardConfig, Card, Divider, PropertyDef, Stack, StackItem } from './types';
 
 /** Address of an item inside a board. */
 export interface ItemRef {
@@ -222,6 +222,62 @@ export function toggleCardTask(board: Board, ref: ItemRef): Board {
 	const entry = board.stacks[ref.stack]?.items[ref.item];
 	if (entry?.kind !== 'card') return board;
 	return setCardTask(board, ref, isCardDone(entry.card) ? ' ' : 'x');
+}
+
+/** The board's single `color`-typed property definition, if it declares one. */
+function colorDef(config: BoardConfig): PropertyDef | undefined {
+	return config.properties.find((d) => d.type === 'color');
+}
+
+/** `base`, or `base 2`, `base 3`… when the board already uses that name. */
+function freeName(config: BoardConfig, base: string): string {
+	const taken = new Set(config.properties.map((d) => d.name));
+	let name = base;
+	for (let i = 2; taken.has(name); i++) name = `${base} ${String(i)}`;
+	return name;
+}
+
+/**
+ * Paint a card, or strip its color with `''`. The value lives in the board's
+ * single `color`-typed property (kanban-view.md §5.2); a board that declares
+ * none gets one added to its configuration the first time a card is painted, so
+ * the card menu works without a trip through board settings first.
+ */
+export function setCardColor(board: Board, ref: ItemRef, color: string): Board {
+	const entry = board.stacks[ref.stack]?.items[ref.item];
+	if (entry?.kind !== 'card') return board;
+
+	const value = color.trim();
+	const existing = colorDef(board.config);
+	if (!existing && value === '') return board;
+
+	const def: PropertyDef = existing ?? { name: freeName(board.config, 'color'), type: 'color' };
+	const next = existing
+		? board
+		: setBoardConfig(board, { ...board.config, properties: [...board.config.properties, def] });
+
+	// Match by name too: on a board that had no color property, an existing
+	// `@{color|…}` token parsed as an untyped value and must be replaced, not
+	// duplicated.
+	const at = entry.card.properties.findIndex((pv) => pv.type === 'color' || pv.name === def.name);
+	if (value === '' && at === -1) return board;
+
+	const properties = entry.card.properties.slice();
+	if (value === '') {
+		properties.splice(at, 1);
+	} else {
+		const pv = { name: def.name, type: 'color' as const, value };
+		const current = at === -1 ? undefined : properties[at];
+		if (current?.type === 'color' && current.name === pv.name && current.value === value) {
+			return board;
+		}
+		if (at === -1) properties.push(pv);
+		else properties[at] = pv;
+	}
+
+	const items = next.stacks[ref.stack]!.items.slice();
+	items[ref.item] = { kind: 'card', card: { ...entry.card, properties } };
+	return withItems(next, ref.stack, items);
 }
 
 export function renameDivider(board: Board, ref: ItemRef, name: string | undefined): Board {

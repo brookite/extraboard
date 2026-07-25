@@ -21,9 +21,9 @@ interface Props {
 }
 
 /** The board's single `color` property paints the card instead of a badge. */
-function cardColor(card: Card): string | null {
+function cardColor(card: Card): string {
 	const pv = card.properties.find((p) => p.type === 'color');
-	return pv?.type === 'color' ? safeColor(pv.value) : null;
+	return pv?.type === 'color' ? pv.value : '';
 }
 
 export function CardTile({ board, stackIndex, index, api, settings }: Props) {
@@ -50,6 +50,19 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 		);
 	}
 
+	const rawColor = cardColor(card);
+	const color = safeColor(rawColor);
+
+	const chooseColor = async (): Promise<void> => {
+		const next = await api.pickColor({
+			title: 'Card color',
+			value: rawColor,
+			clearLabel: 'No color',
+		});
+		if (next === null) return;
+		api.update((b) => ops.setCardColor(b, ref, next));
+	};
+
 	const openMenu = (event: MouseEvent): void => {
 		const menu = new Menu();
 		menu.addItem((item) =>
@@ -71,6 +84,14 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 				.onClick(() =>
 					api.update((b) => ops.setCardTask(b, ref, card.task === undefined ? ' ' : undefined)),
 				),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle('Card color')
+				.setIcon('palette')
+				.onClick(() => {
+					void chooseColor();
+				}),
 		);
 		// A flat "Move to" section, one item per stack — no submenu, so it works
 		// the same way on mobile (kanban-view.md §5.3).
@@ -97,7 +118,6 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 		menu.showAtMouseEvent(event);
 	};
 
-	const color = cardColor(card);
 	// The color property is chrome, not a badge (kanban-view.md §3).
 	const badges = card.properties.filter((pv) => pv.type !== 'color');
 	const done = ops.isCardDone(card);
@@ -126,12 +146,6 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 			}}
 		>
 			<div class="eb-card-head">
-				<IconButton
-					icon="more-horizontal"
-					label="Card options"
-					class="eb-hover-only eb-card-menu"
-					onClick={openMenu}
-				/>
 				{hasCheckbox ? (
 					<input
 						type="checkbox"
@@ -147,6 +161,12 @@ export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 				<div class="eb-card-title">
 					{card.title || <span class="eb-placeholder">Untitled</span>}
 				</div>
+				<IconButton
+					icon="more-horizontal"
+					label="Card options"
+					class="eb-hover-only eb-card-menu"
+					onClick={openMenu}
+				/>
 			</div>
 			{badges.length > 0 ? (
 				<div class="eb-card-props">
