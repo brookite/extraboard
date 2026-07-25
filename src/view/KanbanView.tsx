@@ -3,6 +3,7 @@
 import { useRef, useState } from 'preact/hooks';
 import * as ops from '../model/ops';
 import type { Board } from '../model/types';
+import type { ExtraboardSettings } from '../settings';
 import type { BoardApi } from './api';
 import { useSortable } from './useSortable';
 import { Icon } from './components/Icon';
@@ -32,7 +33,13 @@ function AddStack({ api }: { api: BoardApi }) {
 	);
 }
 
-export function KanbanView({ board, api }: { board: Board; api: BoardApi }) {
+interface BoardProps {
+	board: Board;
+	api: BoardApi;
+	settings: ExtraboardSettings;
+}
+
+export function KanbanView({ board, api, settings }: BoardProps) {
 	const boardRef = useRef<HTMLDivElement>(null);
 
 	useSortable(
@@ -51,7 +58,7 @@ export function KanbanView({ board, api }: { board: Board; api: BoardApi }) {
 	return (
 		<div class="eb-board" ref={boardRef} data-list={0}>
 			{board.stacks.map((_, i) => (
-				<StackColumn key={i} board={board} index={i} api={api} />
+				<StackColumn key={i} board={board} index={i} api={api} settings={settings} />
 			))}
 			<AddStack api={api} />
 		</div>

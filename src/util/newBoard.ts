@@ -1,16 +1,23 @@
-// Template for a freshly created board file.
+// Content of a freshly created board file.
 
-export const NEW_BOARD_TEMPLATE = `---
-extraboard:
-  version: 1
-  view: kanban
-  properties: []
----
-## To do
+import { configToDoc, serializeFrontmatter } from '../model/frontmatter';
+import type { BoardConfig, PropertyDef } from '../model/types';
+import { DEFAULT_BOARD_CONFIG } from '../model/types';
 
-## In progress
+const NEW_BOARD_BODY = '## To do\n\n## In progress\n\n## Done\n';
 
-## Done
-`;
+/**
+ * Configuration a new board starts from: the plugin's `defaultProperties`
+ * (settings.md) are a starting point the creation dialog can adjust, and the
+ * board owns its copy from then on.
+ */
+export function newBoardConfig(properties: PropertyDef[]): BoardConfig {
+	return { ...DEFAULT_BOARD_CONFIG, properties, tagColors: {} };
+}
+
+/** File content of a new board with the given configuration. */
+export function newBoardText(config: BoardConfig): string {
+	return serializeFrontmatter(configToDoc(config), NEW_BOARD_BODY);
+}
 
 export const NEW_BOARD_BASENAME = 'Untitled board';

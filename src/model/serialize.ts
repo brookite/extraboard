@@ -8,9 +8,10 @@ import { Board, BoardConfig, Card, Divider, Stack } from './types';
 const COLLAPSE = '%%collapsed%%';
 
 /**
- * The text of a card's `- ` line without the marker: title, property tokens in
- * config order, then tags. This is also what the inline card editor shows, so
- * `parseCardContent(cardLineContent(card, config), config)` is a fixed point.
+ * The text of a card's `- ` line without the task marker: title, property
+ * tokens in config order, then tags. This is also what the inline card editor
+ * shows, so re-parsing it reproduces the card (the marker is carried over
+ * separately by `ops.setCardText`).
  */
 export function cardLineContent(card: Card, config: BoardConfig): string {
 	const order = new Map(config.properties.map((p, i) => [p.name, i]));
@@ -31,7 +32,9 @@ export function cardLineContent(card: Card, config: BoardConfig): string {
 
 function serializeCard(card: Card, config: BoardConfig): string[] {
 	const content = cardLineContent(card, config);
-	const line = content ? `- ${content}` : '-';
+	// A task card is an ordinary Markdown task list item (§4.0): `- [x] text`.
+	const marker = card.task !== undefined ? `[${card.task}]` : '';
+	const line = `-${[marker, content].filter(Boolean).map((s) => ` ${s}`).join('')}`;
 	return [line, ...card.trailing];
 }
 

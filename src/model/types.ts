@@ -50,6 +50,8 @@ export interface BoardConfig {
 	view: ViewKind;
 	properties: PropertyDef[];
 	tagColors: Record<string, BadgeColor>;
+	/** Offer a task checkbox on cards that are not task list items yet. */
+	showCardCheckbox?: boolean;
 	cardContentDir?: string;
 	archive?: { file?: string };
 	calendar?: CalendarConfig;
@@ -73,6 +75,12 @@ export interface Card {
 	title: string;
 	properties: PropertyValue[];
 	tags: string[];
+	/**
+	 * Raw task marker of a `- [x] ` list item, e.g. `' '`, `'x'`, `'/'`, stored
+	 * verbatim so custom statuses round-trip. Absent => plain list item.
+	 * "Done" means `'x'` or `'X'`. Spec: markdown-format.md §4.0.
+	 */
+	task?: string;
 	/** Verbatim continuation/nested lines below the card's `- ` line. */
 	trailing: string[];
 }

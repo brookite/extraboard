@@ -34,7 +34,8 @@ export function PropertyBadge({ pv, config }: { pv: PropertyValue; config: Board
 		case 'percent':
 			return <ProgressRing value={pv.value} />;
 		case 'color':
-			return <span class="eb-swatch" style={{ background: pv.value }} title={pv.value} />;
+			// Not a badge: the board's single color property paints the card (§5.2).
+			return null;
 		case 'checkbox':
 			return (
 				<span class="eb-badge">

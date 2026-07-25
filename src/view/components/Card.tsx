@@ -2,12 +2,14 @@ import { Menu } from 'obsidian';
 import { useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import { cardLineContent } from '../../model/serialize';
-import type { Board } from '../../model/types';
+import type { Board, Card } from '../../model/types';
+import type { ExtraboardSettings } from '../../settings';
 import type { BoardApi } from '../api';
 import { isDragging } from '../useSortable';
 import { IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
 import { PropertyBadge } from './PropertyBadge';
+import { safeColor } from './style';
 import { Tag } from './Tag';
 
 interface Props {
@@ -15,9 +17,16 @@ interface Props {
 	stackIndex: number;
 	index: number;
 	api: BoardApi;
+	settings: ExtraboardSettings;
 }
 
-export function CardTile({ board, stackIndex, index, api }: Props) {
+/** The board's single `color` property paints the card instead of a badge. */
+function cardColor(card: Card): string | null {
+	const pv = card.properties.find((p) => p.type === 'color');
+	return pv?.type === 'color' ? safeColor(pv.value) : null;
+}
+
+export function CardTile({ board, stackIndex, index, api, settings }: Props) {
 	const [editing, setEditing] = useState(false);
 	const entry = board.stacks[stackIndex]?.items[index];
 	if (entry?.kind !== 'card') return null;
@@ -55,6 +64,28 @@ export function CardTile({ board, stackIndex, index, api }: Props) {
 				.setIcon('copy')
 				.onClick(() => api.update((b) => ops.duplicateItem(b, ref))),
 		);
+		menu.addItem((item) =>
+			item
+				.setTitle(card.task === undefined ? 'Add checkbox' : 'Remove checkbox')
+				.setIcon(card.task === undefined ? 'square-check' : 'square')
+				.onClick(() =>
+					api.update((b) => ops.setCardTask(b, ref, card.task === undefined ? ' ' : undefined)),
+				),
+		);
+		// A flat "Move to" section, one item per stack — no submenu, so it works
+		// the same way on mobile (kanban-view.md §5.3).
+		if (board.stacks.length > 1) {
+			menu.addSeparator();
+			board.stacks.forEach((stack, i) => {
+				menu.addItem((item) =>
+					item
+						.setTitle(`Move to ${stack.name || 'Untitled'}`)
+						.setIcon('corner-up-right')
+						.setDisabled(i === stackIndex)
+						.onClick(() => api.update((b) => ops.moveItem(b, ref, i, null))),
+				);
+			});
+		}
 		menu.addSeparator();
 		menu.addItem((item) =>
 			item
@@ -66,10 +97,26 @@ export function CardTile({ board, stackIndex, index, api }: Props) {
 		menu.showAtMouseEvent(event);
 	};
 
+	const color = cardColor(card);
+	// The color property is chrome, not a badge (kanban-view.md §3).
+	const badges = card.properties.filter((pv) => pv.type !== 'color');
+	const done = ops.isCardDone(card);
+	const hasCheckbox = card.task !== undefined || board.config.showCardCheckbox === true;
+	const classes = [
+		'eb-item',
+		'eb-card',
+		color ? 'is-colored' : '',
+		color && settings.fillCardWithColor ? 'is-filled' : '',
+		done ? 'is-done' : '',
+	]
+		.filter(Boolean)
+		.join(' ');
+
 	return (
 		<div
-			class="eb-item eb-card"
+			class={classes}
 			data-index={index}
+			style={color ? `--eb-card-color: ${color}` : undefined}
 			onClick={() => {
 				if (!isDragging()) setEditing(true);
 			}}
@@ -79,19 +126,31 @@ export function CardTile({ board, stackIndex, index, api }: Props) {
 			}}
 		>
 			<div class="eb-card-head">
+				<IconButton
+					icon="more-horizontal"
+					label="Card options"
+					class="eb-hover-only eb-card-menu"
+					onClick={openMenu}
+				/>
+				{hasCheckbox ? (
+					<input
+						type="checkbox"
+						class="eb-card-check task-list-item-checkbox"
+						checked={done}
+						aria-label={done ? 'Mark as not done' : 'Mark as done'}
+						onClick={(e) => {
+							e.stopPropagation();
+							api.update((b) => ops.toggleCardTask(b, ref));
+						}}
+					/>
+				) : null}
 				<div class="eb-card-title">
 					{card.title || <span class="eb-placeholder">Untitled</span>}
 				</div>
-				<IconButton
-					icon="more-vertical"
-					label="Card options"
-					class="eb-hover-only"
-					onClick={openMenu}
-				/>
 			</div>
-			{card.properties.length > 0 ? (
+			{badges.length > 0 ? (
 				<div class="eb-card-props">
-					{card.properties.map((pv, i) => (
+					{badges.map((pv, i) => (
 						<PropertyBadge key={i} pv={pv} config={board.config} />
 					))}
 				</div>

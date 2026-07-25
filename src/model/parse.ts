@@ -65,6 +65,20 @@ export function extractTokens(s: string): { tokens: Token[]; rest: string } {
 	return { tokens, rest: out };
 }
 
+/**
+ * A task marker is exactly one character between brackets at the very start of
+ * the card content, followed by a space or the end of the line (§4.0). The
+ * single-character rule keeps `[[wikilinks]]` and `[a](links)` out.
+ */
+const TASK_RE = /^\[(.)\](?: (.*))?$/;
+
+/** Split a leading `[x] ` task marker off a card's content. */
+export function extractTask(content: string): { task?: string; rest: string } {
+	const m = TASK_RE.exec(content);
+	if (!m) return { rest: content };
+	return { task: m[1]!, rest: m[2] ?? '' };
+}
+
 const TAG_RE = /(^|\s)#([A-Za-z0-9/_-]+)/g;
 
 /** Extract `#tag` tokens, returning deduped tags and the text with tags removed. */
@@ -85,15 +99,20 @@ function findDef(config: BoardConfig, name: string): PropertyDef | undefined {
 	return config.properties.find((p) => p.name === name);
 }
 
-/** Parse a card's inline content (text after `- `). */
+/**
+ * Parse a card's inline content (text after `- `), including an optional
+ * leading task marker. The inline editor shows the marker-free text, so a user
+ * who types `[x] ` in front of it turns the card into a task list item.
+ */
 export function parseCardContent(content: string, config: BoardConfig): Card {
-	const { tokens, rest: afterTokens } = extractTokens(content);
+	const { task, rest } = extractTask(content);
+	const { tokens, rest: afterTokens } = extractTokens(rest);
 	const { tags, rest: afterTags } = extractTags(afterTokens);
 	const title = collapseWhitespace(afterTags);
 	const properties = tokens
 		.map((t) => parseValue(t.name, t.value, findDef(config, t.name)))
 		.filter((v): v is NonNullable<typeof v> => v !== null);
-	return { title, properties, tags, trailing: [] };
+	return { title, properties, tags, ...(task !== undefined && { task }), trailing: [] };
 }
 
 function stripCollapse(s: string): { text: string; collapsed: boolean } {

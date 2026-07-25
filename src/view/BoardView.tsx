@@ -6,8 +6,10 @@ import { TextFileView, WorkspaceLeaf } from 'obsidian';
 import { render } from 'preact';
 import type ExtraboardPlugin from '../main';
 import type { Board } from '../model/types';
+import * as ops from '../model/ops';
 import { parseBoard } from '../model/parse';
 import { serializeBoard } from '../model/serialize';
+import { BoardSettingsModal } from '../ui/BoardSettingsModal';
 import { ICONS, VIEW_TYPE_BOARD } from '../util/constants';
 import { BoardApi, confirmDestructive, searchTag } from './api';
 import { KanbanView } from './KanbanView';
@@ -42,6 +44,7 @@ export class BoardView extends TextFileView {
 
 	override async onOpen(): Promise<void> {
 		this.ensureMount();
+		this.addAction(ICONS.settings, 'Board settings', () => this.openBoardSettings());
 		this.addAction(ICONS.markdown, 'Open as Markdown', () => this.openAsMarkdown());
 	}
 
@@ -75,6 +78,24 @@ export class BoardView extends TextFileView {
 		if (this.mountEl) render(null, this.mountEl);
 	}
 
+	/** Re-render with the current plugin settings (after the settings tab changes). */
+	refresh(): void {
+		this.renderBoard();
+	}
+
+	/** Edit this board's `extraboard` configuration (header action + command). */
+	openBoardSettings(): void {
+		const board = this.board;
+		if (!board) return;
+		new BoardSettingsModal(this.app, {
+			config: board.config,
+			board,
+			onSave: (config) => {
+				this.applyEdit((b) => ops.setBoardConfig(b, config));
+			},
+		}).open();
+	}
+
 	// --- internals ---
 
 	private ensureMount(): HTMLElement {
@@ -104,7 +125,7 @@ export class BoardView extends TextFileView {
 			render(<div class="eb-empty">Could not parse this board.</div>, el);
 			return;
 		}
-		render(<KanbanView board={this.board} api={this.api} />, el);
+		render(<KanbanView board={this.board} api={this.api} settings={this.plugin.settings} />, el);
 	}
 
 	private async openAsMarkdown(): Promise<void> {
