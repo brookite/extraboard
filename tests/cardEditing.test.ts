@@ -77,13 +77,15 @@ describe('card text editing with hidden property tokens', () => {
 		expect(cardAt(next, 0, 0).properties).toEqual([{ name: 'priority', type: 'integer', value: 9 }]);
 	});
 
-	// The field accepts Shift+Enter, but a card is one list item: without the
-	// fold a re-serialized card would split into several cards.
-	it('folds a multi-line field back into one line', () => {
-		const typed = 'Title line\n- [ ] step one\n\n- [x] step two';
+	// The field accepts Shift+Enter, but a card is one list item: prose folds
+	// into that line and task lines are lifted into the checklist, so a
+	// re-serialized card can never split into several cards (cardText.ts).
+	it('folds a multi-line field back into one card', () => {
+		const typed = 'Title line\nsecond line\n- [ ] step one\n\n- [x] step two';
 		const next = ops.setCardText(board(), ref, typed, { keepProperties: true });
 		const card = cardAt(next, 0, 0);
-		expect(card.title).toBe('Title line - [ ] step one - [x] step two');
+		expect(card.title).toBe('Title line second line');
+		expect(card.checklist.map((i) => i.text)).toEqual(['step one', 'step two']);
 
 		const stack = next.stacks[0];
 		expect(stack?.items).toHaveLength(1);

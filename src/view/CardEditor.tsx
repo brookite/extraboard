@@ -4,7 +4,8 @@
 
 import type { RefObject } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import type { App } from 'obsidian';
+import { Notice, type App } from 'obsidian';
+import { describeDropped, processCardText } from '../model/cardText';
 import * as ops from '../model/ops';
 import { cardLineContent } from '../model/serialize';
 import type { Board, Card } from '../model/types';
@@ -100,6 +101,10 @@ export function CardEditor({ board, card, target, api, settings, onClose }: Prop
 	const showRaw = settings.showRawPropertyTokens;
 	const rootRef = useRef<HTMLDivElement>(null);
 	const save = (text: string): void => {
+		// The op processes the raw text itself; this only reports what a card
+		// could not keep, so a silent removal never surprises the user (§3.2).
+		const notice = describeDropped(processCardText(text).dropped);
+		if (notice) new Notice(notice);
 		api.update((b) => ops.setCardText(b, target, text, { keepProperties: !showRaw }));
 	};
 
