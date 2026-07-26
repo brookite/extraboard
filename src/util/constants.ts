@@ -10,4 +10,5 @@ export const ICONS = {
 	markdown: 'file-text',
 	calendar: 'calendar-days',
 	settings: 'sliders-horizontal',
+	archive: 'archive',
 } as const;

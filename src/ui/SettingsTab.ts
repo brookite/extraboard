@@ -88,6 +88,19 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 				}),
 			);
 
+		new Setting(containerEl)
+			.setName('Allow deleting cards without archiving')
+			.setDesc(
+				'Adds a delete action back to the card menu. Off by default: a card leaves the board through the archive, where it can be restored or destroyed.',
+			)
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.allowDeleteWithoutArchive).onChange((value) => {
+					this.plugin.settings.allowDeleteWithoutArchive = value;
+					void this.plugin.saveSettings();
+					this.plugin.refreshBoards();
+				}),
+			);
+
 		new Setting(containerEl).setName('Default properties').setHeading();
 		containerEl.createDiv({
 			cls: 'setting-item-description',

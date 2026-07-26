@@ -114,11 +114,6 @@ function toConfig(eb: unknown): BoardConfig {
 		config.progressStyle = style;
 	}
 
-	if (isRecord(eb.archive)) {
-		const file = asString(eb.archive.file);
-		config.archive = { ...(file !== undefined && { file }) };
-	}
-
 	if (isRecord(eb.calendar)) {
 		const cal: CalendarConfig = {
 			mode: eb.calendar.mode === 'week' ? 'week' : 'month',
@@ -175,7 +170,6 @@ function configToPlain(config: BoardConfig): Record<string, unknown> {
 	if (config.showCardCheckbox) eb.showCardCheckbox = true;
 	if (config.cardContentDir) eb.cardContentDir = config.cardContentDir;
 	if (config.progressStyle) eb.progressStyle = config.progressStyle;
-	if (config.archive) eb.archive = { ...(config.archive.file && { file: config.archive.file }) };
 	if (config.calendar) {
 		eb.calendar = {
 			mode: config.calendar.mode,

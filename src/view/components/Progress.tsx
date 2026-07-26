@@ -14,7 +14,8 @@ interface ChecklistProps {
 	done: number;
 	total: number;
 	style: ProgressStyle;
-	onOpen: () => void;
+	/** Absent => the indicator is inert (an archived card, archive.md §6). */
+	onOpen?: () => void;
 }
 
 /**
@@ -26,6 +27,20 @@ export function ChecklistProgress({ done, total, style, onOpen }: ChecklistProps
 	if (total === 0) return null;
 	const label = `${String(done)}/${String(total)}`;
 	const percent = Math.round((done / total) * 100);
+	const body =
+		style === 'ring' ? (
+			<ProgressRing value={percent} label={String(done)} title={label} />
+		) : (
+			<span class="eb-chip">{style === 'percent' ? `${String(percent)}%` : label}</span>
+		);
+
+	if (!onOpen) {
+		return (
+			<span class="eb-progress is-static" title={label} aria-label={`Checklist ${label}`}>
+				{body}
+			</span>
+		);
+	}
 	return (
 		<button
 			type="button"
@@ -37,11 +52,7 @@ export function ChecklistProgress({ done, total, style, onOpen }: ChecklistProps
 				onOpen();
 			}}
 		>
-			{style === 'ring' ? (
-				<ProgressRing value={percent} label={String(done)} title={label} />
-			) : (
-				<span class="eb-chip">{style === 'percent' ? `${String(percent)}%` : label}</span>
-			)}
+			{body}
 		</button>
 	);
 }

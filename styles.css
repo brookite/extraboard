@@ -967,6 +967,94 @@ body.is-mobile .eb-hover-only {
 	min-width: 0;
 }
 
+/* Archive: drop target (archive.md §5.5) */
+
+/* Mounted with the board so Sortable knows it, shown only while a card is being
+   dragged — the body class is toggled outside Preact, so the board is never
+   re-rendered mid-drag. */
+.eb-archive-drop {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	/* Wider than the "Add stack" button above it, so it reads as a target
+	   rather than a twin. */
+	margin: 8px -4px 0;
+	padding: 18px 8px;
+	font-size: var(--font-ui-small, 0.85em);
+	color: var(--text-muted);
+	background: var(--background-primary);
+	border: 2px dashed var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+}
+
+body.eb-dragging-card .eb-archive-drop {
+	display: flex;
+}
+
+/* Sortable puts the dragged card inside the zone while it hovers over it, which
+   is both the highlight's trigger and its preview. */
+.eb-archive-drop:has(.eb-item) {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+	border-color: var(--text-accent);
+	border-style: solid;
+}
+
+.eb-archive-drop .eb-item {
+	width: 100%;
+	pointer-events: none;
+}
+
+.eb-archive-drop .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+/* Archive: the modal (archive.md §6) */
+.eb-archive-modal .eb-archive-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	max-height: 60vh;
+	overflow-y: auto;
+	padding-right: 4px;
+}
+
+.eb-archive-empty {
+	padding: 8px 0;
+	color: var(--text-muted);
+}
+
+.eb-archive-row {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+}
+
+.eb-archive-row.is-done .eb-card-title {
+	color: var(--text-muted);
+}
+
+.eb-archive-row .eb-card-check {
+	cursor: default;
+}
+
+.eb-archive-from {
+	color: var(--text-muted);
+	background: var(--background-modifier-border);
+}
+
+/* Nothing in a row edits anything: its chips and indicator are inert. */
+.eb-tag.is-static,
+.eb-progress.is-static {
+	cursor: default;
+}
+
 /* Drag & drop */
 .eb-drag-ghost {
 	opacity: 0.4;

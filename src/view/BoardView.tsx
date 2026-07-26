@@ -2,13 +2,14 @@
 // manages the underlying Markdown file (load/save, tab, rename, delete).
 // Spec: docs/specs/kanban-view.md §1, §6.
 
-import { HoverPopover, TextFileView, WorkspaceLeaf } from 'obsidian';
+import { HoverPopover, Notice, TextFileView, WorkspaceLeaf } from 'obsidian';
 import { render } from 'preact';
 import type ExtraboardPlugin from '../main';
 import type { Board } from '../model/types';
 import * as ops from '../model/ops';
 import { parseBoard } from '../model/parse';
 import { serializeBoard } from '../model/serialize';
+import { ArchiveModal } from '../ui/ArchiveModal';
 import { BoardSettingsModal } from '../ui/BoardSettingsModal';
 import { pickColor } from '../ui/ColorPicker';
 import { createCardNote, resolveNoteFolder } from '../util/cardNote';
@@ -58,6 +59,9 @@ export class BoardView extends TextFileView {
 	override async onOpen(): Promise<void> {
 		this.ensureMount();
 		this.addAction(ICONS.add, 'Add stack', () => this.addStack());
+		// The archive is reached often enough to deserve the header, not only the
+		// file menu (user decision, 2026-07-26).
+		this.addAction(ICONS.archive, 'Open archive', () => this.openArchive());
 		this.addAction(ICONS.settings, 'Board settings', () => this.openBoardSettings());
 		this.addAction(ICONS.markdown, 'Open as Markdown', () => this.openAsMarkdown());
 	}
@@ -143,6 +147,31 @@ export class BoardView extends TextFileView {
 	/** Remove every untitled card from the board (file-menu item added in main.ts). */
 	deleteUntitledCards(): void {
 		this.applyEdit((b) => ops.deleteUntitledCards(b));
+	}
+
+	/**
+	 * Open the archive (archive.md §6). This is the one moment the section is
+	 * parsed — nothing before it, on any path, has looked inside it.
+	 */
+	openArchive(): void {
+		if (!this.board) return;
+		new ArchiveModal(this.app, this.api, this.plugin.settings).open();
+	}
+
+	/**
+	 * Archive every card whose own task marker is `x`/`X` (§5.2). Not confirmed:
+	 * it is reversible, so the notice is the whole feedback.
+	 */
+	archiveCompletedCards(): void {
+		const board = this.board;
+		if (!board) return;
+		const count = ops.countCompletedCards(board);
+		if (count === 0) {
+			new Notice('No completed cards to archive.');
+			return;
+		}
+		this.applyEdit((b) => ops.archiveCompletedCards(b));
+		new Notice(`Archived ${String(count)} card${count === 1 ? '' : 's'}.`);
 	}
 
 	// --- internals ---

@@ -59,7 +59,6 @@ export interface BoardConfig {
 	cardContentDir?: string;
 	/** Board override for the plugin's `progressStyle`; absent => follow it. */
 	progressStyle?: ProgressStyle;
-	archive?: { file?: string };
 	calendar?: CalendarConfig;
 }
 
@@ -116,6 +115,25 @@ export interface Stack {
 	items: StackItem[];
 }
 
+/**
+ * The archive section, kept as text. Opening a board must not cost what its
+ * archive weighs, so nothing here is interpreted until the archive modal asks
+ * for it (archive.md §4). Spec: markdown-format.md §5.
+ */
+export interface RawArchive {
+	/** Heading text without the `%%archive%%` marker; `Archive` when created. */
+	heading: string;
+	/** Everything after the heading line, verbatim. */
+	body: string;
+}
+
+/** One archived card, as `model/archive.ts` reads it back on demand. */
+export interface ArchivedCard {
+	card: Card;
+	/** Origin stack name from `%%from|…%%`; absent when unknown. */
+	from?: string;
+}
+
 export interface Board {
 	config: BoardConfig;
 	/** Opaque YAML document preserving foreign frontmatter keys/comments. */
@@ -123,6 +141,8 @@ export interface Board {
 	/** Body text before the first stack, verbatim ("" if none). */
 	preamble: string;
 	stacks: Stack[];
+	/** The archive section; absent iff the file has none. */
+	archive?: RawArchive;
 	/** Unclassified body after the last stack, verbatim ("" if none). */
 	trailing: string;
 }

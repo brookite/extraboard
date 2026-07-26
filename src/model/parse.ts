@@ -9,6 +9,7 @@ import {
 	Card,
 	Divider,
 	PropertyDef,
+	RawArchive,
 	Stack,
 } from './types';
 
@@ -17,6 +18,13 @@ const H3_RE = /^###(?: (.*))?$/;
 const HR_RE = /^---\s*(%%collapsed%%)?\s*$/;
 const CARD_RE = /^-(?: (.*))?$/;
 const COLLAPSE_RE = /^(.*?)\s*%%collapsed%%\s*$/;
+const ARCHIVE_RE = /^(.*?)\s*%%archive%%\s*$/;
+
+/** The content of a `- ` list item, or `null` when the line is not one. */
+export function cardLineText(line: string): string | null {
+	const m = CARD_RE.exec(line);
+	return m ? (m[1] ?? '') : null;
+}
 
 interface Token {
 	name: string;
@@ -135,22 +143,47 @@ function stripCollapse(s: string): { text: string; collapsed: boolean } {
 	return { text: s, collapsed: false };
 }
 
-/** Parse the body (after frontmatter) into preamble + stacks. */
+/** The heading text of an `%%archive%%` H2, or `null` for an ordinary stack. */
+function stripArchive(h2Text: string): string | null {
+	const m = ARCHIVE_RE.exec(h2Text);
+	return m ? (m[1] ?? '').trim() : null;
+}
+
+/** Parse the body (after frontmatter) into preamble + stacks + archive. */
 export function parseBody(
 	body: string,
 	config: BoardConfig,
-): { preamble: string; stacks: Stack[] } {
+): { preamble: string; stacks: Stack[]; archive?: RawArchive } {
 	const lines = body.split('\n');
 
+	// The archive heading ends the board: everything after it belongs to the
+	// archive and is kept verbatim, never interpreted here (archive.md §4).
+	let archive: RawArchive | undefined;
+	let end = lines.length;
+	// Offset of the archive heading in `body`, so the text before it stays exact.
+	let cut = body.length;
+	for (let i = 0, at = 0; i < lines.length; i++) {
+		const h2 = H2_RE.exec(lines[i]!);
+		const heading = h2 ? stripArchive(h2[1] ?? '') : null;
+		if (heading !== null) {
+			archive = { heading, body: lines.slice(i + 1).join('\n') };
+			end = i;
+			cut = at;
+			break;
+		}
+		at += lines[i]!.length + 1;
+	}
+	const withArchive = archive ? { archive } : {};
+
 	let firstStack = -1;
-	for (let i = 0; i < lines.length; i++) {
+	for (let i = 0; i < end; i++) {
 		if (H2_RE.test(lines[i]!)) {
 			firstStack = i;
 			break;
 		}
 	}
 	if (firstStack === -1) {
-		return { preamble: body, stacks: [] };
+		return { preamble: body.slice(0, cut), stacks: [], ...withArchive };
 	}
 
 	let offset = 0;
@@ -161,7 +194,7 @@ export function parseBody(
 	let stack: Stack | null = null;
 	let sink: string[] = [];
 
-	for (let i = firstStack; i < lines.length; i++) {
+	for (let i = firstStack; i < end; i++) {
 		const line = lines[i]!;
 
 		const h2 = H2_RE.exec(line);
@@ -192,9 +225,9 @@ export function parseBody(
 			continue;
 		}
 
-		const card = CARD_RE.exec(line);
-		if (card) {
-			const parsed = parseCardContent(card[1] ?? '', config);
+		const content = cardLineText(line);
+		if (content !== null) {
+			const parsed = parseCardContent(content, config);
 			s.items.push({ kind: 'card', card: parsed });
 			sink = parsed.trailing;
 			continue;
@@ -215,19 +248,20 @@ export function parseBody(
 		}
 	}
 
-	return { preamble, stacks };
+	return { preamble, stacks, ...withArchive };
 }
 
 /** Parse full board file text into a Board. */
 export function parseBoard(text: string): Board {
 	const normalized = text.replace(/\r\n/g, '\n');
 	const fm = parseFrontmatter(normalized);
-	const { preamble, stacks } = parseBody(fm.body, fm.config);
+	const { preamble, stacks, archive } = parseBody(fm.body, fm.config);
 	return {
 		config: fm.config,
 		frontmatterDoc: fm.doc,
 		preamble,
 		stacks,
+		...(archive && { archive }),
 		trailing: '',
 	};
 }

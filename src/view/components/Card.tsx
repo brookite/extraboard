@@ -187,11 +187,24 @@ export function CardTile({
 		menu.addSeparator();
 		menu.addItem((item) =>
 			item
-				.setTitle('Delete card')
-				.setIcon('trash-2')
+				.setTitle('Archive card')
+				.setIcon('archive')
+				// Warning styling: it is the item that takes the card off the board,
+				// so it has to read as one at a glance (kanban-view.md §5.3).
 				.setWarning(true)
-				.onClick(() => api.update((b) => ops.deleteItem(b, ref))),
+				.onClick(() => api.update((b) => ops.archiveCard(b, ref))),
 		);
+		// Archiving is the non-destructive default, so deleting is opt-in
+		// (settings.md, archive.md §1).
+		if (settings.allowDeleteWithoutArchive) {
+			menu.addItem((item) =>
+				item
+					.setTitle('Delete card')
+					.setIcon('trash-2')
+					.setWarning(true)
+					.onClick(() => api.update((b) => ops.deleteItem(b, ref))),
+			);
+		}
 		menu.showAtMouseEvent(event);
 	};
 

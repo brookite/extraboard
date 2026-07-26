@@ -30,6 +30,13 @@ export interface ExtraboardSettings {
 	 * `true` — it also tints the whole card (kanban-view.md §5.2).
 	 */
 	fillCardWithColor: boolean;
+	/**
+	 * `false` — a card leaves the board only through the archive and the card
+	 * menu offers no "Delete card"; `true` — the item comes back (archive.md §1).
+	 * It governs cards only: stacks, dividers and the archive's own delete
+	 * actions are unaffected.
+	 */
+	allowDeleteWithoutArchive: boolean;
 }
 
 export const DEFAULT_SETTINGS: ExtraboardSettings = {
@@ -38,4 +45,5 @@ export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	progressStyle: 'ring',
 	showRawPropertyTokens: false,
 	fillCardWithColor: false,
+	allowDeleteWithoutArchive: false,
 };

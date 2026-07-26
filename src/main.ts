@@ -76,6 +76,28 @@ export default class ExtraboardPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: 'open-archive',
+			name: 'Open archive',
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(BoardView);
+				if (!view?.board) return false;
+				if (!checking) view.openArchive();
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'archive-completed-cards',
+			name: 'Archive completed cards',
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(BoardView);
+				if (!view?.board) return false;
+				if (!checking) view.archiveCompletedCards();
+				return true;
+			},
+		});
+
 		// Fallback + housekeeping. The setViewState patch handles the common case;
 		// this catches a board opened before its frontmatter was indexed (cold
 		// cache, so the patch could not detect it) and removes a stale switch
@@ -87,11 +109,23 @@ export default class ExtraboardPlugin extends Plugin {
 		);
 
 		// Add board-wide actions to the view's own "more options" menu instead of a
-		// dedicated header icon.
+		// dedicated header icon (archive.md §7).
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file, _source, leaf) => {
 				const view = leaf?.view;
 				if (!(view instanceof BoardView) || !view.board || view.file !== file) return;
+				menu.addItem((item) =>
+					item
+						.setTitle('Open archive')
+						.setIcon('archive')
+						.onClick(() => view.openArchive()),
+				);
+				menu.addItem((item) =>
+					item
+						.setTitle('Archive completed cards')
+						.setIcon('check-check')
+						.onClick(() => view.archiveCompletedCards()),
+				);
 				menu.addItem((item) =>
 					item
 						.setTitle('Delete untitled cards')

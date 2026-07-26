@@ -16,8 +16,11 @@ archive.
 ## Status
 
 **Early development** — the MVP is being implemented milestone by milestone.
-The plugin currently builds and loads but has no user-facing features yet. This
-section will be replaced with setup and usage instructions as features land.
+The Kanban side works: boards open in their own view, and cards, stacks and
+dividers can be created, edited, dragged, given typed properties and colors,
+linked to a note, given a checklist, and archived. The calendar view,
+recurrence and localization are still ahead. This section will be replaced with
+setup and usage instructions once the MVP is complete.
 
 ## Development
 

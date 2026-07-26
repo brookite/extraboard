@@ -19,6 +19,8 @@ export interface DropInfo {
 	fromIndex: number;
 	/** `data-index` of the item it was dropped in front of; `null` = at the end. */
 	before: number | null;
+	/** The item was dropped on a `data-archive` zone, not on a list (archive.md §5.5). */
+	toArchive: boolean;
 }
 
 let dragging = false;
@@ -26,6 +28,20 @@ let dragging = false;
 /** True while a drag is in flight, so click handlers can ignore the drop. */
 export function isDragging(): boolean {
 	return dragging;
+}
+
+/**
+ * Class put on the document body while a **card** is being dragged, so the
+ * archive drop target can show itself in CSS alone. Toggling it outside Preact
+ * is deliberate: re-rendering the board mid-drag would move the very nodes
+ * Sortable is holding.
+ */
+const DRAGGING_CARD = 'eb-dragging-card';
+
+function markDrag(item: HTMLElement, on: boolean): void {
+	const body = item.ownerDocument.body;
+	if (on && item.classList.contains('eb-card')) body.addClass(DRAGGING_CARD);
+	else body.removeClass(DRAGGING_CARD);
 }
 
 function readIndex(el: Element | null, attr: 'index' | 'list'): number | null {
@@ -39,8 +55,16 @@ function readIndex(el: Element | null, attr: 'index' | 'list'): number | null {
 function readDrop(evt: Sortable.SortableEvent): DropInfo | null {
 	const fromIndex = readIndex(evt.item, 'index');
 	const fromList = readIndex(evt.from, 'list');
+	if (fromIndex === null || fromList === null) return null;
+
+	// The archive zone is a drop target, not a list: it has no position, only a
+	// meaning (archive.md §5.5).
+	if (evt.to.dataset.archive !== undefined) {
+		return { fromList, toList: fromList, fromIndex, before: null, toArchive: true };
+	}
+
 	const toList = readIndex(evt.to, 'list');
-	if (fromIndex === null || fromList === null || toList === null) return null;
+	if (toList === null) return null;
 
 	// The first following sibling that belongs to the model tells us what the
 	// dragged item now sits in front of. Its `data-index` is still expressed in
@@ -53,7 +77,7 @@ function readDrop(evt: Sortable.SortableEvent): DropInfo | null {
 			break;
 		}
 	}
-	return { fromList, toList, fromIndex, before };
+	return { fromList, toList, fromIndex, before, toArchive: false };
 }
 
 /** Undo Sortable's DOM move so Preact's tree matches the document again. */
@@ -88,14 +112,16 @@ export function useSortable(
 			// Let filtered elements keep their native behaviour (focus, clicks).
 			preventOnFilter: false,
 			...options,
-			onStart: () => {
+			onStart: (evt) => {
 				dragging = true;
+				markDrag(evt.item, true);
 			},
 			onEnd: (evt) => {
 				// Clear after the synthetic click that follows a mouse drag.
 				window.setTimeout(() => {
 					dragging = false;
 				}, 0);
+				markDrag(evt.item, false);
 				const info = readDrop(evt);
 				revert(evt);
 				if (info) latest.current(info);

@@ -32,9 +32,13 @@ export function StackColumn({ board, index, api, settings }: Props) {
 	const bodyRef = useRef<HTMLDivElement>(null);
 
 	useSortable(bodyRef, { group: 'eb-items', draggable: '.eb-item' }, (drop) => {
-		api.update((b) =>
-			ops.moveItem(b, { stack: drop.fromList, item: drop.fromIndex }, drop.toList, drop.before),
-		);
+		const from = { stack: drop.fromList, item: drop.fromIndex };
+		// Dropping a card on the archive target is not a move (archive.md §5.5).
+		if (drop.toArchive) {
+			api.update((b) => ops.archiveCard(b, from));
+			return;
+		}
+		api.update((b) => ops.moveItem(b, from, drop.toList, drop.before));
 	});
 
 	const stack = board.stacks[index];
@@ -57,9 +61,11 @@ export function StackColumn({ board, index, api, settings }: Props) {
 	const deleteStack = async (): Promise<void> => {
 		const count = ops.cardCount(stack);
 		if (count > 0) {
+			// The cards are archived, not destroyed (archive.md §5.6) — which is
+			// what the confirmation has to say, so "Delete" is not read as "lose".
 			const ok = await api.confirm(
 				'Delete stack',
-				`"${stack.name}" contains ${String(count)} card${count === 1 ? '' : 's'}. Deleting the stack removes them from the board.`,
+				`"${stack.name}" contains ${String(count)} card${count === 1 ? '' : 's'}. Deleting the stack moves ${count === 1 ? 'it' : 'them'} to the archive, where ${count === 1 ? 'it' : 'they'} can be restored.`,
 				'Delete',
 			);
 			if (!ok) return;
