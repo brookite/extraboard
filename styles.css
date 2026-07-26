@@ -1563,3 +1563,67 @@ body.eb-dragging-card .eb-archive-drop {
 	flex: 1;
 	min-width: 0;
 }
+
+/* Repetition rule form (recurrence.md §4) */
+.eb-recurrence-interval {
+	width: 4em;
+}
+
+.eb-weekday-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+}
+
+.eb-weekday {
+	padding: 2px 8px;
+	background: var(--background-modifier-border);
+	border: none;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.eb-weekday.is-on {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+/* The rule is unreadable as controls alone, so it is always spelled out. */
+.eb-recurrence-preview {
+	margin: 12px 0;
+	padding: 8px;
+	background: var(--background-secondary);
+	border-radius: var(--radius-s, 6px);
+}
+
+.eb-recurrence-phrase {
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller, 0.85em);
+}
+
+.eb-recurrence-next {
+	margin-top: 4px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller, 0.85em);
+}
+
+.eb-recurrence-problem {
+	color: var(--text-error);
+	font-size: var(--font-ui-smaller, 0.85em);
+}
+
+.eb-value-rule {
+	width: 100%;
+	text-align: left;
+}
+
+.eb-cal-chip-repeat {
+	display: flex;
+	flex: 0 0 auto;
+	color: var(--text-faint);
+}
+
+.eb-cal-chip-repeat svg {
+	width: 12px;
+	height: 12px;
+}

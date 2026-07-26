@@ -281,7 +281,13 @@ class DayModal extends Modal {
 		const board = api.getBoard();
 		if (!board) return;
 
-		const { occurrences, undated } = placeCards(board, view.dateProperty);
+		// A day modal only ever asks about one day, so that is the window a
+		// recurrence is expanded over (recurrence.md §3).
+		const { occurrences, undated } = placeCards(
+			board,
+			view.dateProperty,
+			day ? { from: day, to: day } : undefined,
+		);
 		const refs = day
 			? occurrencesOn(occurrences, day)
 					.slice()

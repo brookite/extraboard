@@ -13,6 +13,13 @@ import {
 	stripTime,
 } from './dates';
 import { removeCardProperty, setCardProperty, type ItemRef } from './ops';
+import {
+	expandRecurrence,
+	formatRecurrence,
+	parseRecurrence,
+	shiftRecurrence,
+	singleDayRule,
+} from './recurrence';
 import type { Board, Card, PropertyValue } from './types';
 
 /** One placement of a card on the grid. */
@@ -26,12 +33,20 @@ export interface Occurrence {
 	hasTime: boolean;
 	/** Days covered, ≥ 1. */
 	length: number;
+	/** This day comes from a repetition rule (recurrence.md §3). */
+	repeating?: boolean;
 }
 
 export interface Placement {
 	occurrences: Occurrence[];
 	/** Cards the view cannot place: no value, or one that does not parse (§4). */
 	undated: ItemRef[];
+}
+
+/** The period a recurrence is expanded over; unbounded values ignore it. */
+export interface Window {
+	from: CalDate;
+	to: CalDate;
 }
 
 /** The card's value for this property, whatever its declared type. */
@@ -45,21 +60,38 @@ function rawDates(pv: PropertyValue | undefined): string[] {
 	switch (pv.type) {
 		case 'datetime':
 		case 'date-range':
+		case 'recurrence':
 			return [pv.raw];
 		case 'date-list':
 			return pv.raw;
-		// A `recurrence` is not expandable until M9, and any other type simply is
-		// not a date — both leave the card undated (§1.1).
+		// Any other type is not a date, which leaves the card undated (§1.1).
 		default:
 			return [];
 	}
 }
 
 /**
+ * The series anchor for a rule with no `from` (recurrence.md §1.2): the earliest
+ * parseable date among the card's **other** date properties. Absent means the
+ * card is undated — a series is never anchored to "today".
+ */
+function anchorFor(card: Card, property: string): CalDate | undefined {
+	let best: CalDate | undefined;
+	for (const pv of card.properties) {
+		if (pv.name === property) continue;
+		for (const raw of rawDates(pv)) {
+			const span = parseSpan(raw);
+			if (span && (!best || compareDates(span.start, best) < 0)) best = span.start;
+		}
+	}
+	return best;
+}
+
+/**
  * Index the whole board in one pass. Cards in collapsed stacks and groups are
  * placed like any other: collapsing is a Kanban layout decision (§1.4).
  */
-export function placeCards(board: Board, property: string): Placement {
+export function placeCards(board: Board, property: string, window?: Window): Placement {
 	const occurrences: Occurrence[] = [];
 	const undated: ItemRef[] = [];
 
@@ -68,21 +100,42 @@ export function placeCards(board: Board, property: string): Placement {
 			if (entry.kind !== 'card') return;
 			const ref: ItemRef = { stack: s, item: i };
 			const raws = rawDates(valueOf(entry.card, property));
-			let placed = 0;
+			// "Understood" is not "visible": a rule with no hit in this window is
+			// still a dated card and must not fall into the tray (recurrence.md §3).
+			let understood = 0;
 			raws.forEach((raw, index) => {
 				const span = parseSpan(raw);
-				if (!span) return;
-				occurrences.push({
-					ref,
-					index,
-					start: span.start,
-					end: span.end,
-					hasTime: span.start.minutes !== undefined,
-					length: daysBetween(span.end, span.start) + 1,
-				});
-				placed++;
+				if (span) {
+					understood++;
+					occurrences.push({
+						ref,
+						index,
+						start: span.start,
+						end: span.end,
+						hasTime: span.start.minutes !== undefined,
+						length: daysBetween(span.end, span.start) + 1,
+					});
+					return;
+				}
+				const rule = parseRecurrence(raw);
+				if (!rule) return;
+				const anchor = rule.start ?? anchorFor(entry.card, property);
+				if (!anchor) return;
+				understood++;
+				if (!window) return;
+				for (const day of expandRecurrence(rule, anchor, window.from, window.to)) {
+					occurrences.push({
+						ref,
+						index,
+						start: day,
+						end: day,
+						hasTime: day.minutes !== undefined,
+						length: 1,
+						repeating: true,
+					});
+				}
 			});
-			if (placed === 0) undated.push(ref);
+			if (understood === 0) undated.push(ref);
 		});
 	});
 
@@ -112,11 +165,14 @@ function write(board: Board, ref: ItemRef, property: string, type: PropertyValue
 		return setCardProperty(board, ref, { name: property, type: 'date-list', raw });
 	}
 	const only = raw[0] ?? '';
-	return setCardProperty(board, ref, {
-		name: property,
-		type: type === 'date-range' ? 'date-range' : 'datetime',
-		raw: only,
-	});
+	const single = type === 'date-range' || type === 'recurrence' ? type : 'datetime';
+	return setCardProperty(board, ref, { name: property, type: single, raw: only });
+}
+
+/** The card behind a ref, when it still is one. */
+function cardAt(board: Board, ref: ItemRef): Card | null {
+	const entry = board.stacks[ref.stack]?.items[ref.item];
+	return entry?.kind === 'card' ? entry.card : null;
 }
 
 /** Everything the card currently holds for this property, as raw elements. */
@@ -138,7 +194,14 @@ export function setCardDay(
 	day: CalDate,
 ): Board {
 	const at = stripTime(day);
-	const raw = type === 'date-range' ? formatSpan({ start: at, end: at }) : formatDate(at);
+	const raw =
+		type === 'date-range'
+			? formatSpan({ start: at, end: at })
+			: type === 'recurrence'
+				? // A day is not a rule, so it becomes the one-day rule
+					// (recurrence.md §3.2) rather than an unreadable value.
+					formatRecurrence(singleDayRule(at))
+				: formatDate(at);
 	return write(board, ref, property, type, [raw]);
 }
 
@@ -158,15 +221,27 @@ export function moveOccurrence(
 	const delta = daysBetween(toDay, fromDay);
 	if (delta === 0) return board;
 
-	const start = addDays(occurrence.start, delta);
-	const end = addDays(occurrence.end, delta);
-	const moved = occurrence.length === 1 && type !== 'date-range'
-		? formatDate(start)
-		: formatSpan({ start, end });
-
 	const raw = currentRaw(board, occurrence.ref, property).slice();
 	if (raw.length === 0) return board;
-	raw[Math.min(occurrence.index, raw.length - 1)] = moved;
+	const at = Math.min(occurrence.index, raw.length - 1);
+
+	// A repeating occurrence moves its **rule**, not that one day: there are no
+	// exceptions in the format, so the series is what a drag can mean (§3.1).
+	if (occurrence.repeating) {
+		const card = cardAt(board, occurrence.ref);
+		const rule = card ? parseRecurrence(raw[at] ?? '') : null;
+		const anchor = rule?.start ?? (card ? anchorFor(card, property) : undefined);
+		if (!rule || !anchor) return board;
+		raw[at] = formatRecurrence(shiftRecurrence(rule, anchor, delta));
+		return write(board, occurrence.ref, property, type, raw);
+	}
+
+	const start = addDays(occurrence.start, delta);
+	const end = addDays(occurrence.end, delta);
+	raw[at] =
+		occurrence.length === 1 && type !== 'date-range'
+			? formatDate(start)
+			: formatSpan({ start, end });
 	return write(board, occurrence.ref, property, type, raw);
 }
 

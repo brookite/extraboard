@@ -3,11 +3,16 @@
 
 import type { BoardConfig, CalendarMode, PropertyDef, PropertyType, ViewDef, ViewKind } from './types';
 
-/** Property types a calendar view can be computed from (views.md §4.3). */
+/**
+ * Property types a calendar view can be computed from (views.md §4.3).
+ * `recurrence` joined them in M9, once rules could be expanded into days
+ * (recurrence.md §3).
+ */
 const CALENDAR_TYPES: ReadonlySet<PropertyType> = new Set<PropertyType>([
 	'datetime',
 	'date-range',
 	'date-list',
+	'recurrence',
 ]);
 
 const ID_RE = /^[A-Za-z0-9_-]{1,32}$/;

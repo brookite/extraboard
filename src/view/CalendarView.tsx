@@ -161,10 +161,12 @@ interface ChipProps {
 	/** `data-index` — the occurrence's index, or the undated card's in the tray. */
 	index: number;
 	time?: number;
+	/** From a repetition rule: one card showing up on many days (recurrence.md §3). */
+	repeating?: boolean;
 	onOpen: () => void;
 }
 
-function Chip({ board, card, occRef, index, time, onOpen }: ChipProps) {
+function Chip({ board, card, occRef, index, time, repeating, onOpen }: ChipProps) {
 	const color = chipColor(board, occRef, card);
 	const done = ops.isCardDone(card);
 	return (
@@ -179,6 +181,7 @@ function Chip({ board, card, occRef, index, time, onOpen }: ChipProps) {
 			}}
 		>
 			{done ? <Icon name="check" class="eb-cal-chip-check" /> : null}
+			{repeating ? <Icon name="repeat" class="eb-cal-chip-repeat" /> : null}
 			{time !== undefined ? <span class="eb-cal-chip-time">{formatTime(time)}</span> : null}
 			<span class="eb-cal-chip-text">{chipText(card)}</span>
 		</div>
@@ -244,7 +247,7 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	const propertyType: PropertyType = def?.type ?? 'datetime';
 
 	// A view whose property is gone renders its reason, not an empty grid (§7).
-	if (!def || !['datetime', 'date-range', 'date-list'].includes(def.type)) {
+	if (!def || !['datetime', 'date-range', 'date-list', 'recurrence'].includes(def.type)) {
 		return (
 			<div class="eb-cal-broken">
 				<p>
@@ -270,7 +273,12 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	const days: CalDate[] = Array.from({ length: rows * 7 }, (_, i) => addDays(start, i));
 	const now = today();
 
-	const { occurrences, undated } = placeCards(board, view.dateProperty);
+	// Recurrences are unbounded, so placement is asked for this window only
+	// (recurrence.md §3); a rule with no hit here is still a dated card.
+	const { occurrences, undated } = placeCards(board, view.dateProperty, {
+		from: start,
+		to: days[days.length - 1]!,
+	});
 	const indexOf = new Map(occurrences.map((o, i) => [o, i]));
 
 	const byDay = new Map<string, Occurrence[]>();
@@ -561,6 +569,7 @@ function DayCell({
 							occRef={occurrence.ref}
 							index={indexOf.get(occurrence) ?? 0}
 							time={occurrence.start.minutes}
+							repeating={occurrence.repeating}
 							onOpen={onOpen}
 						/>
 					);

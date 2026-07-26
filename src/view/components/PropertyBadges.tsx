@@ -9,12 +9,13 @@ import { useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import { escapeValue, formatValue, parseValue } from '../../model/properties';
 import type { Board, Card, PropertyDef, PropertyValue } from '../../model/types';
+import { editRecurrence } from '../../ui/RecurrenceModal';
 import type { BoardApi } from '../api';
 import { Icon } from './Icon';
 import { safeColor } from './style';
 
 /** Types edited as one text field; the rest have a control of their own. */
-const TEXT_TYPES = new Set(['string', 'datetime', 'date-range', 'recurrence']);
+const TEXT_TYPES = new Set(['string', 'datetime', 'date-range']);
 /** Types whose text is the raw token value, so `;` separates list elements. */
 const LIST_TEXT_TYPES = new Set(['date-list', 'raw']);
 
@@ -195,6 +196,22 @@ function ValueEditor({ name, def, pv, api, onCommit, onRemove, onClose }: Editor
 				</button>
 			) : type === 'string-list' ? (
 				<StringListEditor name={name} def={def} pv={pv} onCommit={onCommit} />
+			) : type === 'recurrence' ? (
+				// A rule is not something to type by hand (recurrence.md §4).
+				<button
+					type="button"
+					class="eb-value-rule"
+					onClick={() => {
+						void (async () => {
+							const next = await editRecurrence(api.app, { name, value: current });
+							if (next === null) return;
+							onCommit(next ? { name, type: 'recurrence', raw: next } : null);
+							onClose();
+						})();
+					}}
+				>
+					{current || 'Set a repetition rule'}
+				</button>
 			) : (
 				<input
 					type={type === 'integer' || type === 'percent' ? 'number' : 'text'}
