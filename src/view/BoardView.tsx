@@ -17,6 +17,7 @@ import { openViewsModal } from '../ui/ViewsModal';
 import { createCardNote, resolveNoteFolder } from '../util/cardNote';
 import { ICONS, VIEW_TYPE_BOARD, viewIcon } from '../util/constants';
 import { BoardApi, confirmDestructive, searchTag } from './api';
+import { CalendarView } from './CalendarView';
 import { KanbanView, addStack } from './KanbanView';
 
 export class BoardView extends TextFileView {
@@ -28,6 +29,8 @@ export class BoardView extends TextFileView {
 	private api: BoardApi;
 	/** The view-switch header action, re-iconed whenever the active view changes. */
 	private viewSwitchEl?: HTMLElement;
+	/** Board-change subscribers outside the board's own tree (`BoardApi.onChange`). */
+	private listeners = new Set<() => void>();
 
 	constructor(leaf: WorkspaceLeaf, plugin: ExtraboardPlugin) {
 		super(leaf);
@@ -44,6 +47,11 @@ export class BoardView extends TextFileView {
 			pickColor: (options) => pickColor(this.app, options),
 			createCardNote: (ref) => {
 				void this.createCardNote(ref);
+			},
+			manageViews: () => this.manageViews(),
+			onChange: (listener) => {
+				this.listeners.add(listener);
+				return () => this.listeners.delete(listener);
 			},
 		};
 	}
@@ -273,11 +281,15 @@ export class BoardView extends TextFileView {
 			this.viewSwitchEl.setAttribute('aria-label', `View: ${view.name}`);
 		}
 		if (view.type === 'calendar') {
-			// The grid itself is part B of M8 (calendar-view.md).
-			render(<div class="eb-empty">The calendar view is not built yet.</div>, el);
-			return;
+			render(
+				<CalendarView board={this.board} view={view} api={this.api} settings={this.plugin.settings} />,
+				el,
+			);
+		} else {
+			render(<KanbanView board={this.board} api={this.api} settings={this.plugin.settings} />, el);
 		}
-		render(<KanbanView board={this.board} api={this.api} settings={this.plugin.settings} />, el);
+		// Anything living outside this tree (the day modal) re-reads the board here.
+		for (const listener of this.listeners) listener();
 	}
 
 	private async openAsMarkdown(): Promise<void> {

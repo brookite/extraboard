@@ -44,6 +44,15 @@ export interface BoardApi {
 	 * and open it (card-content-and-checklists.md §2).
 	 */
 	createCardNote(ref: ItemRef): void;
+	/** Open the manage-views modal (views.md §4) — a calendar whose date property
+	 * is gone offers it as the way out (calendar-view.md §7). */
+	manageViews(): void;
+	/**
+	 * Subscribe to board changes; returns the unsubscribe. UI that outlives one
+	 * render and is not part of the board's own Preact tree — the calendar's day
+	 * modal (calendar-view.md §5.1) — re-renders through this.
+	 */
+	onChange(listener: () => void): () => void;
 }
 
 /**

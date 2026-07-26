@@ -1198,3 +1198,368 @@ body.eb-dragging-card .eb-archive-drop {
 	gap: 6px;
 	padding: 8px 0;
 }
+
+/* ---------------------------------------------------------------------------
+   Calendar view (calendar-view.md §2–§5)
+   Cells are summaries: chips are plain text with a fixed height, so a month of
+   them costs a month of divs and nothing more.
+   --------------------------------------------------------------------------- */
+
+.eb-cal {
+	--eb-cal-chip-h: 20px;
+	--eb-cal-bar-h: 20px;
+	--eb-cal-daynum-h: 20px;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: var(--size-4-2, 8px);
+	gap: 6px;
+	overflow: hidden;
+}
+
+.eb-cal-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.eb-cal-nav {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.eb-cal-nav button {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 8px;
+}
+
+.eb-cal-title {
+	flex: 1;
+	min-width: 0;
+	font-weight: var(--font-semibold, 600);
+	text-align: center;
+	text-transform: capitalize;
+}
+
+.eb-cal-modes {
+	display: flex;
+	gap: 2px;
+}
+
+.eb-cal-modes .is-active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.eb-cal-weekdays,
+.eb-cal-cells,
+.eb-cal-bars {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.eb-cal-weekday {
+	padding: 2px 4px;
+	font-size: var(--font-ui-smaller, 0.8em);
+	color: var(--text-muted);
+	text-align: center;
+	text-transform: capitalize;
+}
+
+.eb-cal-grid {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	border-top: 1px solid var(--background-modifier-border);
+	border-left: 1px solid var(--background-modifier-border);
+}
+
+.eb-cal-row {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+}
+
+.eb-cal-cells {
+	height: 100%;
+}
+
+.eb-cal-cell {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	overflow: hidden;
+	padding: 2px;
+	border-right: 1px solid var(--background-modifier-border);
+	border-bottom: 1px solid var(--background-modifier-border);
+	cursor: pointer;
+}
+
+.eb-cal-cell:hover {
+	background: var(--background-modifier-hover);
+}
+
+.eb-cal-cell.is-dim .eb-cal-daynum {
+	color: var(--text-faint);
+}
+
+.eb-cal-cell.is-today .eb-cal-daynum {
+	color: var(--text-on-accent);
+	background: var(--interactive-accent);
+	border-radius: 999px;
+}
+
+.eb-cal-daynum {
+	flex: 0 0 auto;
+	height: var(--eb-cal-daynum-h);
+	min-width: var(--eb-cal-daynum-h);
+	align-self: flex-start;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 4px;
+	font-size: var(--font-ui-smaller, 0.8em);
+	color: var(--text-muted);
+}
+
+.eb-cal-lane-space {
+	flex: 0 0 auto;
+}
+
+.eb-cal-chips {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-height: 0;
+}
+
+.eb-cal-chip {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	height: var(--eb-cal-chip-h);
+	padding: 0 4px;
+	font-size: var(--font-ui-smaller, 0.8em);
+	line-height: var(--eb-cal-chip-h);
+	background: var(--background-secondary);
+	border-radius: var(--radius-s, 4px);
+	white-space: nowrap;
+	overflow: hidden;
+	cursor: pointer;
+}
+
+.eb-cal-chip.is-colored {
+	border-left: 3px solid var(--eb-card-color);
+}
+
+.eb-cal-chip.is-done .eb-cal-chip-text {
+	color: var(--text-muted);
+	text-decoration: line-through;
+}
+
+.eb-cal-chip-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.eb-cal-chip-time {
+	flex: 0 0 auto;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.eb-cal-chip-check {
+	display: flex;
+	flex: 0 0 auto;
+	color: var(--text-muted);
+}
+
+.eb-cal-chip-check svg {
+	width: 12px;
+	height: 12px;
+}
+
+.eb-cal-more {
+	flex: 0 0 auto;
+	padding: 0 4px;
+	font-size: var(--font-ui-smaller, 0.8em);
+	color: var(--text-muted);
+}
+
+/* Bars sit above the cells: a span crosses columns, so it cannot live in one. */
+.eb-cal-bars {
+	position: absolute;
+	top: var(--eb-cal-daynum-h);
+	left: 0;
+	right: 0;
+	grid-auto-rows: var(--eb-cal-bar-h);
+	pointer-events: none;
+	z-index: 1;
+}
+
+.eb-cal-bar {
+	margin: 0 2px 1px;
+	padding: 0 6px;
+	height: calc(var(--eb-cal-bar-h) - 2px);
+	line-height: calc(var(--eb-cal-bar-h) - 2px);
+	font-size: var(--font-ui-smaller, 0.8em);
+	background: var(--background-modifier-border);
+	border-radius: var(--radius-s, 4px);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	pointer-events: auto;
+	cursor: pointer;
+}
+
+.eb-cal-bar.is-colored {
+	background: var(--eb-card-color);
+	color: var(--text-on-accent);
+}
+
+/* A segment that continues into another row must not look like a shorter one. */
+.eb-cal-bar.is-cut-start {
+	margin-left: 0;
+	border-top-left-radius: 0;
+	border-bottom-left-radius: 0;
+}
+
+.eb-cal-bar.is-cut-end {
+	margin-right: 0;
+	border-top-right-radius: 0;
+	border-bottom-right-radius: 0;
+}
+
+/* The "No date" tray (§4) */
+.eb-cal-tray {
+	flex: 0 0 auto;
+	border-top: 1px solid var(--background-modifier-border);
+	padding-top: 4px;
+}
+
+.eb-cal-tray-head {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	width: 100%;
+	padding: 4px;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.eb-cal-tray-count {
+	padding: 0 6px;
+	background: var(--background-modifier-border);
+	border-radius: 999px;
+	font-size: var(--font-ui-smaller, 0.8em);
+}
+
+.eb-cal-tray-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	min-height: var(--eb-cal-chip-h);
+	padding: 2px;
+}
+
+.eb-cal-tray:not(.is-open) .eb-cal-tray-list {
+	max-height: var(--eb-cal-chip-h);
+	overflow: hidden;
+	opacity: 0.5;
+}
+
+.eb-cal-tray-list .eb-cal-chip {
+	max-width: 220px;
+}
+
+/* A calendar whose date property is gone explains itself (§7). */
+.eb-cal-broken {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	padding: 3em 2em;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+/* The day modal (§5) */
+.eb-day-modal .eb-day-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.eb-day-row {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+	padding: 4px;
+}
+
+.eb-day-row .eb-card {
+	background: transparent;
+	border: none;
+	box-shadow: none;
+}
+
+.eb-day-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding: 0 6px 4px;
+}
+
+.eb-day-stack,
+.eb-day-divider {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 1px 6px;
+	background: var(--background-modifier-border);
+	color: var(--text-muted);
+	border: none;
+	box-shadow: none;
+	font-size: var(--font-ui-smaller, 0.8em);
+	cursor: pointer;
+}
+
+.eb-day-stack svg,
+.eb-day-divider svg {
+	width: 12px;
+	height: 12px;
+}
+
+.eb-day-divider {
+	color: var(--eb-divider-color, var(--text-muted));
+}
+
+.eb-day-divider.is-empty {
+	opacity: 0.6;
+}
+
+.eb-day-empty {
+	padding: 2em;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+.eb-day-composer {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding-top: 8px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.eb-day-composer input {
+	flex: 1;
+	min-width: 0;
+}
