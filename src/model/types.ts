@@ -99,6 +99,12 @@ export interface Divider {
 	/** Present => `### name`; absent => `---`. */
 	name?: string;
 	collapsed: boolean;
+	/**
+	 * `%%color|…%%` — a CSS color, verbatim, that the cards of this divider's
+	 * group inherit. Named dividers only. Spec:
+	 * stack-completion-and-divider-colors.md §4.
+	 */
+	color?: string;
 	/** Verbatim lines following the divider (up to the next item). */
 	trailing: string[];
 }
@@ -110,6 +116,12 @@ export type StackItem =
 export interface Stack {
 	name: string;
 	collapsed: boolean;
+	/**
+	 * `%%completes%%` — a card entering this stack is completed (its task marker
+	 * and every checklist item become `x`). Spec:
+	 * stack-completion-and-divider-colors.md §3.
+	 */
+	completes: boolean;
 	/** Verbatim lines between the `## ` heading and the first item. */
 	lead: string[];
 	items: StackItem[];

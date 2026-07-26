@@ -7,6 +7,7 @@
 // serialized lines without reading the rest of the section.
 
 import { splitChecklist } from './checklist';
+import { MARKER_VALUE, escapeMarker, unescapeMarker } from './markers';
 import { cardLineText, parseCardContent } from './parse';
 import { serializeCardLines } from './serialize';
 import type { ArchivedCard, BoardConfig, Card, RawArchive } from './types';
@@ -14,21 +15,13 @@ import type { ArchivedCard, BoardConfig, Card, RawArchive } from './types';
 /** Heading written when the plugin creates the section (markdown-format.md §5). */
 export const DEFAULT_ARCHIVE_HEADING = 'Archive';
 
-// The value is escaped (`%` -> `\%`, `\` -> `\\`), so the closing `%%` can never
-// be ambiguous and an escape is always consumed as a unit.
-const FROM_RE = /%%from\|((?:\\[\s\S]|[^\\])*?)%%/;
-
-export function escapeFrom(name: string): string {
-	return name.replace(/\\/g, '\\\\').replace(/%/g, '\\%');
-}
-
-function unescapeFrom(raw: string): string {
-	return raw.replace(/\\([\s\S])/g, '$1');
-}
+// The value is escaped by `markers.ts` — the same rule every `%%name|value%%`
+// marker follows — so the closing `%%` can never be ambiguous.
+const FROM_RE = new RegExp(`%%from\\|(${MARKER_VALUE})%%`);
 
 /** The `%%from|…%%` origin marker written after a card's tags. */
 export function fromMarker(from: string | undefined): string {
-	return from ? `%%from|${escapeFrom(from)}%%` : '';
+	return from ? `%%from|${escapeMarker(from)}%%` : '';
 }
 
 /**
@@ -39,7 +32,7 @@ export function fromMarker(from: string | undefined): string {
 export function extractFrom(content: string): { from?: string; rest: string } {
 	const m = FROM_RE.exec(content);
 	if (!m) return { rest: content };
-	const from = unescapeFrom(m[1] ?? '');
+	const from = unescapeMarker(m[1] ?? '');
 	const rest = content.slice(0, m.index) + content.slice(m.index + m[0].length);
 	return { ...(from !== '' && { from }), rest };
 }

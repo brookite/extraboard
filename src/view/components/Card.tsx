@@ -73,7 +73,10 @@ export function CardTile({
 	}
 
 	const rawColor = cardColor(card);
-	const color = safeColor(rawColor);
+	// A card in a colored divider's group inherits that color, in the same place
+	// the card's own would paint; its own always wins
+	// (stack-completion-and-divider-colors.md §4.1).
+	const color = safeColor(rawColor) ?? safeColor(ops.groupColor(board.stacks[stackIndex]!, index));
 	// The content note is derived from the title, never stored (§4.4): it is the
 	// first link in it. Only a title that is *nothing but* that link renders as
 	// one anchor; a title that merely contains it is rendered as Markdown, links

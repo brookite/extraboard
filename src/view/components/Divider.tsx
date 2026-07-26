@@ -5,6 +5,7 @@ import type { Board } from '../../model/types';
 import type { BoardApi } from '../api';
 import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
+import { safeColor } from './style';
 
 interface Props {
 	board: Board;
@@ -25,8 +26,21 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 	const named = divider.name !== undefined;
 	const toggleLabel = divider.collapsed ? 'Expand group' : 'Collapse group';
 
+	const color = safeColor(divider.color);
+
 	const toggle = (): void =>
 		api.update((b) => ops.setDividerCollapsed(b, ref, !divider.collapsed));
+
+	/** The color the group's cards inherit (stack-completion-and-divider-colors.md §4). */
+	const chooseColor = async (): Promise<void> => {
+		const next = await api.pickColor({
+			title: 'Divider color',
+			value: divider.color ?? '',
+			clearLabel: 'No color',
+		});
+		if (next === null) return;
+		api.update((b) => ops.setDividerColor(b, ref, next));
+	};
 
 	const openMenu = (event: MouseEvent): void => {
 		const menu = new Menu();
@@ -43,6 +57,16 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 				.onClick(() => setEditing(true)),
 		);
 		if (named) {
+			// Only a named divider can carry a color: there is no label to hold it
+			// and no group to read as a band (§4.2).
+			menu.addItem((item) =>
+				item
+					.setTitle('Divider color')
+					.setIcon('palette')
+					.onClick(() => {
+						void chooseColor();
+					}),
+			);
 			menu.addItem((item) =>
 				item
 					.setTitle('Remove name')
@@ -79,8 +103,9 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 
 	return (
 		<div
-			class={`eb-item eb-divider-row${divider.collapsed ? ' is-collapsed' : ''}`}
+			class={`eb-item eb-divider-row${divider.collapsed ? ' is-collapsed' : ''}${color ? ' is-colored' : ''}`}
 			data-index={index}
+			style={color ? `--eb-divider-color: ${color}` : undefined}
 			onContextMenu={(e) => {
 				e.preventDefault();
 				openMenu(e);

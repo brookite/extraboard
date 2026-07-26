@@ -15,7 +15,7 @@ import { pickColor } from '../ui/ColorPicker';
 import { createCardNote, resolveNoteFolder } from '../util/cardNote';
 import { ICONS, VIEW_TYPE_BOARD } from '../util/constants';
 import { BoardApi, confirmDestructive, searchTag } from './api';
-import { KanbanView } from './KanbanView';
+import { KanbanView, addStack } from './KanbanView';
 
 export class BoardView extends TextFileView {
 	plugin: ExtraboardPlugin;
@@ -104,12 +104,14 @@ export class BoardView extends TextFileView {
 	/**
 	 * Append a stack from the view header, mirroring the "Add stack" column at
 	 * the right end of the board — which is off-screen on a wide board, hence
-	 * the scroll.
+	 * the scroll. It opens the same form as that column, so the completion flag
+	 * is offered here too (stack-completion-and-divider-colors.md §3.3).
 	 */
 	addStack(): void {
-		this.applyEdit((b) => ops.addStack(b, 'New stack'));
-		const board = this.mountEl?.querySelector('.eb-board');
-		if (board instanceof HTMLElement) board.scrollLeft = board.scrollWidth;
+		addStack(this.api, null, () => {
+			const board = this.mountEl?.querySelector('.eb-board');
+			if (board instanceof HTMLElement) board.scrollLeft = board.scrollWidth;
+		});
 	}
 
 	/**

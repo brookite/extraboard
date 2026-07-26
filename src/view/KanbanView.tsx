@@ -1,13 +1,13 @@
 // Top-level Kanban render plus stack drag & drop. Spec: docs/specs/kanban-view.md.
 
-import { useRef, useState } from 'preact/hooks';
+import { useRef } from 'preact/hooks';
 import * as ops from '../model/ops';
 import type { Board } from '../model/types';
 import type { ExtraboardSettings } from '../settings';
+import { editStack } from '../ui/StackModal';
 import type { BoardApi } from './api';
 import { useSortable } from './useSortable';
 import { Icon } from './components/Icon';
-import { InlineEditor } from './components/InlineEditor';
 import { StackColumn } from './components/Stack';
 
 /**
@@ -42,25 +42,26 @@ function ArchiveTarget() {
 	);
 }
 
+/**
+ * A new stack is configured before it exists: the same form the stack menu's
+ * "Edit stack" opens, so the completion flag is offered at creation
+ * (stack-completion-and-divider-colors.md §3.3).
+ */
+export function addStack(api: BoardApi, at: ops.InsertPos = null, onAdded?: () => void): void {
+	void editStack(api.app, { title: 'Add stack', cta: 'Add' }).then((fields) => {
+		if (!fields) return;
+		api.update((b) => ops.addStack(b, fields.name, at, fields.completes));
+		onAdded?.();
+	});
+}
+
 function AddStack({ api }: { api: BoardApi }) {
-	const [adding, setAdding] = useState(false);
 	return (
 		<div class="eb-add-stack">
-			{adding ? (
-				<InlineEditor
-					placeholder="Stack name"
-					onSubmit={(name) => {
-						setAdding(false);
-						api.update((b) => ops.addStack(b, name));
-					}}
-					onCancel={() => setAdding(false)}
-				/>
-			) : (
-				<button type="button" class="eb-add-stack-button" onClick={() => setAdding(true)}>
-					<Icon name="plus" />
-					<span>Add stack</span>
-				</button>
-			)}
+			<button type="button" class="eb-add-stack-button" onClick={() => addStack(api)}>
+				<Icon name="plus" />
+				<span>Add stack</span>
+			</button>
 			<ArchiveTarget />
 		</div>
 	);

@@ -3,6 +3,7 @@
 
 import { serializeChecklist } from './checklist';
 import { serializeFrontmatter } from './frontmatter';
+import { withMarkers } from './markers';
 import { formatToken } from './properties';
 import { Board, BoardConfig, Card, Divider, Stack } from './types';
 
@@ -57,19 +58,22 @@ export function serializeCardLines(card: Card, config: BoardConfig, suffix = '')
 }
 
 function serializeDivider(divider: Divider): string[] {
+	// Only a named divider has a heading to carry markers; an unnamed one keeps
+	// its exact `---` / `--- %%collapsed%%` grammar
+	// (stack-completion-and-divider-colors.md §1.1).
 	let line: string;
 	if (divider.name !== undefined) {
-		line = `### ${divider.name}`;
+		const { name, ...rest } = divider;
+		line = `### ${withMarkers(name, rest)}`;
 	} else {
 		line = '---';
+		if (divider.collapsed) line += ` ${COLLAPSE}`;
 	}
-	if (divider.collapsed) line += ` ${COLLAPSE}`;
 	return [line, ...divider.trailing];
 }
 
 function serializeStack(stack: Stack, config: BoardConfig): string[] {
-	let heading = `## ${stack.name}`;
-	if (stack.collapsed) heading += ` ${COLLAPSE}`;
+	const heading = `## ${withMarkers(stack.name, stack)}`;
 	const lines = [heading, ...stack.lead];
 	for (const item of stack.items) {
 		if (item.kind === 'card') lines.push(...serializeCardLines(item.card, config));

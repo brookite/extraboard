@@ -106,6 +106,23 @@ export function progress(items: ChecklistItem[]): { done: number; total: number 
 	return { done, total };
 }
 
+/**
+ * Every item at every level marked done — what a completing stack does to the
+ * card it receives (stack-completion-and-divider-colors.md §3.1). A custom
+ * marker is overwritten; an item that already reads as done keeps its own
+ * character. Returns the same array when there was nothing to tick.
+ */
+export function checkAll(items: ChecklistItem[]): ChecklistItem[] {
+	let changed = false;
+	const out = items.map((item) => {
+		const children = checkAll(item.children);
+		if (isDone(item) && children === item.children) return item;
+		changed = true;
+		return { ...item, marker: isDone(item) ? item.marker : 'x', children };
+	});
+	return changed ? out : items;
+}
+
 export function cloneChecklist(items: ChecklistItem[]): ChecklistItem[] {
 	return items.map((item) => ({ ...item, children: cloneChecklist(item.children) }));
 }

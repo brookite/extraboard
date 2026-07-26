@@ -3,6 +3,7 @@ import { useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { Board } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
+import { editStack } from '../../ui/StackModal';
 import type { BoardApi } from '../api';
 import { useSortable } from '../useSortable';
 import { CardTile } from './Card';
@@ -58,6 +59,25 @@ export function StackColumn({ board, index, api, settings }: Props) {
 		setPendingNewCard(true);
 	};
 
+	/** Name plus the completion flag, in one form (§3.3). */
+	const editParameters = async (): Promise<void> => {
+		const fields = await editStack(api.app, {
+			title: 'Edit stack',
+			cta: 'Save',
+			name: stack.name,
+			completes: stack.completes,
+		});
+		if (!fields) return;
+		api.update((b) => ops.setStackCompletes(ops.renameStack(b, index, fields.name), index, fields.completes));
+	};
+
+	/** Insert a stack beside this one, configured before it exists. */
+	const insertStack = async (at: number): Promise<void> => {
+		const fields = await editStack(api.app, { title: 'Add stack', cta: 'Add' });
+		if (!fields) return;
+		api.update((b) => ops.addStack(b, fields.name, at, fields.completes));
+	};
+
 	const deleteStack = async (): Promise<void> => {
 		const count = ops.cardCount(stack);
 		if (count > 0) {
@@ -94,11 +114,16 @@ export function StackColumn({ board, index, api, settings }: Props) {
 				.onClick(() => api.update((b) => ops.addDivider(b, index, 'Group'))),
 		);
 		menu.addSeparator();
+		// "Edit", not "Rename": the flag belongs to the same form as the name
+		// (stack-completion-and-divider-colors.md §3.3). Clicking the name still
+		// renames inline, which is the faster path when that is all one wants.
 		menu.addItem((item) =>
 			item
-				.setTitle('Rename stack')
+				.setTitle('Edit stack')
 				.setIcon('pencil')
-				.onClick(() => setRenaming(true)),
+				.onClick(() => {
+					void editParameters();
+				}),
 		);
 		menu.addItem((item) =>
 			item
@@ -110,13 +135,17 @@ export function StackColumn({ board, index, api, settings }: Props) {
 			item
 				.setTitle('Insert stack left')
 				.setIcon('arrow-left')
-				.onClick(() => api.update((b) => ops.addStack(b, 'New stack', index))),
+				.onClick(() => {
+					void insertStack(index);
+				}),
 		);
 		menu.addItem((item) =>
 			item
 				.setTitle('Insert stack right')
 				.setIcon('arrow-right')
-				.onClick(() => api.update((b) => ops.addStack(b, 'New stack', index + 1))),
+				.onClick(() => {
+					void insertStack(index + 1);
+				}),
 		);
 		menu.addSeparator();
 		menu.addItem((item) =>
@@ -173,6 +202,13 @@ export function StackColumn({ board, index, api, settings }: Props) {
 						{stack.name || <span class="eb-placeholder">Untitled</span>}
 					</span>
 				)}
+				{/* Otherwise the flag would be invisible and cards would look like
+				    they complete themselves (§3.3). */}
+				{stack.completes ? (
+					<span class="eb-stack-completes" title="Completes cards" aria-label="Completes cards">
+						<Icon name="check-check" />
+					</span>
+				) : null}
 				<span class="eb-stack-count">{ops.cardCount(stack)}</span>
 				<IconButton icon="more-vertical" label="Stack options" onClick={openMenu} />
 			</div>

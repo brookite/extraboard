@@ -7,7 +7,7 @@
 // lines stay canonical (see `normalizeStack`).
 
 import { parseArchive, prependToArchive, serializeArchive, serializeArchivedCard } from './archive';
-import { ChecklistItem, cloneChecklist, progress } from './checklist';
+import { ChecklistItem, checkAll, cloneChecklist, progress } from './checklist';
 import { processCardText } from './cardText';
 import { configToDoc, writeConfig } from './frontmatter';
 import { parseCardLink, unlinkedTitle } from './link';
@@ -112,8 +112,8 @@ function resolveIndex<T>(items: T[], target: T | undefined): number {
 
 // --- constructors -----------------------------------------------------------
 
-export function emptyStack(name: string): Stack {
-	return { name, collapsed: false, lead: [''], items: [] };
+export function emptyStack(name: string, completes = false): Stack {
+	return { name, collapsed: false, completes, lead: [''], items: [] };
 }
 
 /**
@@ -129,10 +129,15 @@ export function newCard(text: string, board: Board): Card {
 
 // --- stack operations -------------------------------------------------------
 
-export function addStack(board: Board, name: string, at: InsertPos = null): Board {
+export function addStack(
+	board: Board,
+	name: string,
+	at: InsertPos = null,
+	completes = false,
+): Board {
 	const stacks = board.stacks.slice();
 	const index = at === null ? stacks.length : Math.max(0, Math.min(at, stacks.length));
-	stacks.splice(index, 0, emptyStack(name));
+	stacks.splice(index, 0, emptyStack(name, completes));
 	// Normalize the neighbour too: a stack that used to end the file may need a
 	// blank line before the new heading.
 	const board2 = { ...board, stacks };
@@ -149,6 +154,18 @@ export function setStackCollapsed(board: Board, index: number, collapsed: boolea
 	const stack = board.stacks[index];
 	if (!stack || stack.collapsed === collapsed) return board;
 	return replaceStack(board, index, { ...stack, collapsed });
+}
+
+/**
+ * Mark a stack as completing the cards that land in it, or stop it doing so
+ * (stack-completion-and-divider-colors.md §3). **Nothing is completed
+ * retroactively:** the cards already in the stack are left exactly as they are,
+ * and the flag only decides what happens to the next card that enters.
+ */
+export function setStackCompletes(board: Board, index: number, completes: boolean): Board {
+	const stack = board.stacks[index];
+	if (!stack || stack.completes === completes) return board;
+	return replaceStack(board, index, { ...stack, completes });
 }
 
 /**
@@ -187,8 +204,34 @@ export function addCard(board: Board, stackIndex: number, text: string, at: Inse
 	if (!stack) return board;
 	const items = stack.items.slice();
 	const index = at === null ? items.length : Math.max(0, Math.min(at, items.length));
-	items.splice(index, 0, { kind: 'card', card: newCard(text, board) });
+	// A card created in a completing stack is created done (§3.2).
+	const card = enteringCard(newCard(text, board), stack);
+	items.splice(index, 0, { kind: 'card', card });
 	return withItems(board, stackIndex, items);
+}
+
+/**
+ * The card as it enters `stack`: completed when the stack completes what lands
+ * in it, unchanged otherwise. Every path that puts a card into a stack goes
+ * through here, so drag, "Move to", the composer and restore agree
+ * (stack-completion-and-divider-colors.md §3.2).
+ */
+function enteringCard(card: Card, stack: Stack): Card {
+	return stack.completes ? completeCard(card) : card;
+}
+
+/**
+ * A completed card: its own marker is `x` and **every checklist item at every
+ * level** is ticked (§3.1). A custom marker (`- [/]`) is overwritten — the one
+ * place the plugin rewrites a marker the user did not toggle — while a card
+ * that already reads as done keeps its own `x`/`X`. Returns the same card when
+ * there is nothing to complete.
+ */
+export function completeCard(card: Card): Card {
+	const checklist = checkAll(card.checklist);
+	const task = isCardDone(card) ? (card.task ?? 'x') : 'x';
+	if (task === card.task && checklist === card.checklist) return card;
+	return { ...card, task, checklist };
 }
 
 export function addDivider(
@@ -429,11 +472,46 @@ export function renameDivider(board: Board, ref: ItemRef, name: string | undefin
 	const entry = board.stacks[ref.stack]?.items[ref.item];
 	if (entry?.kind !== 'divider') return board;
 	const divider: Divider = { ...entry.divider };
-	if (name === undefined) delete divider.name;
-	else divider.name = name;
+	if (name === undefined) {
+		delete divider.name;
+		// An unnamed divider has no label to carry a color
+		// (stack-completion-and-divider-colors.md §4.2).
+		delete divider.color;
+	} else divider.name = name;
 	const items = board.stacks[ref.stack]!.items.slice();
 	items[ref.item] = { kind: 'divider', divider };
 	return withItems(board, ref.stack, items);
+}
+
+/**
+ * Color a **named** divider, or clear it with `''` (§4). The color is stored on
+ * the divider alone: the cards of its group inherit it at render time, so no
+ * card line is touched.
+ */
+export function setDividerColor(board: Board, ref: ItemRef, color: string): Board {
+	const entry = board.stacks[ref.stack]?.items[ref.item];
+	if (entry?.kind !== 'divider' || entry.divider.name === undefined) return board;
+	const value = color.trim() || undefined;
+	if (value === entry.divider.color) return board;
+	const divider: Divider = { ...entry.divider };
+	if (value === undefined) delete divider.color;
+	else divider.color = value;
+	const items = board.stacks[ref.stack]!.items.slice();
+	items[ref.item] = { kind: 'divider', divider };
+	return withItems(board, ref.stack, items);
+}
+
+/**
+ * The color a card at `index` inherits: the nearest divider above it in the
+ * stack, if that one carries a color. A card before the first divider, or under
+ * an uncolored one, inherits nothing (§4.1).
+ */
+export function groupColor(stack: Stack, index: number): string | undefined {
+	for (let i = index - 1; i >= 0; i--) {
+		const entry = stack.items[i];
+		if (entry?.kind === 'divider') return entry.divider.color;
+	}
+	return undefined;
 }
 
 export function setDividerCollapsed(board: Board, ref: ItemRef, collapsed: boolean): Board {
@@ -498,8 +576,12 @@ export function moveItem(board: Board, from: ItemRef, toStack: number, before: I
 
 	const sourceItems = source.items.slice();
 	sourceItems.splice(from.item, 1);
+	// Entering a completing stack completes the card; a move *within* one does
+	// not, since the card did not enter anything (§3.2).
+	const entering: StackItem =
+		moved.kind === 'card' ? { kind: 'card', card: enteringCard(moved.card, dest) } : moved;
 	const destItems = dest.items.slice();
-	destItems.splice(resolveIndex(destItems, target), 0, moved);
+	destItems.splice(resolveIndex(destItems, target), 0, entering);
 
 	const stacks = board.stacks.slice();
 	stacks[from.stack] = normalizeStack({ ...source, items: sourceItems });
@@ -617,8 +699,9 @@ export function restoreCard(board: Board, index: number): Board {
 		next = addStack(next, entry.from ?? 'Restored');
 		target = next.stacks.length - 1;
 	}
-	const items = [...next.stacks[target]!.items, { kind: 'card' as const, card: entry.card }];
-	return withItems(next, target, items);
+	const stack = next.stacks[target]!;
+	const card = enteringCard(entry.card, stack);
+	return withItems(next, target, [...stack.items, { kind: 'card' as const, card }]);
 }
 
 /** Destroy one archived card (§5.4). Confirmed by the modal, not here. */

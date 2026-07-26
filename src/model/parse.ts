@@ -2,6 +2,7 @@
 
 import { splitChecklist } from './checklist';
 import { parseFrontmatter } from './frontmatter';
+import { stripMarkers } from './markers';
 import { parseValue } from './properties';
 import {
 	Board,
@@ -17,7 +18,6 @@ const H2_RE = /^##(?: (.*))?$/;
 const H3_RE = /^###(?: (.*))?$/;
 const HR_RE = /^---\s*(%%collapsed%%)?\s*$/;
 const CARD_RE = /^-(?: (.*))?$/;
-const COLLAPSE_RE = /^(.*?)\s*%%collapsed%%\s*$/;
 const ARCHIVE_RE = /^(.*?)\s*%%archive%%\s*$/;
 
 /** The content of a `- ` list item, or `null` when the line is not one. */
@@ -137,12 +137,6 @@ export function parseCardContent(content: string, config: BoardConfig): Card {
 	};
 }
 
-function stripCollapse(s: string): { text: string; collapsed: boolean } {
-	const m = COLLAPSE_RE.exec(s);
-	if (m) return { text: m[1] ?? '', collapsed: true };
-	return { text: s, collapsed: false };
-}
-
 /** The heading text of an `%%archive%%` H2, or `null` for an ordinary stack. */
 function stripArchive(h2Text: string): string | null {
 	const m = ARCHIVE_RE.exec(h2Text);
@@ -199,8 +193,16 @@ export function parseBody(
 
 		const h2 = H2_RE.exec(line);
 		if (h2) {
-			const { text, collapsed } = stripCollapse(h2[1] ?? '');
-			stack = { name: text.trim(), collapsed, lead: [], items: [] };
+			// `%%completes%%` is meaningful on a stack heading, `%%color|…%%` on a
+			// named divider's; each is ordinary text on the other (§1.1).
+			const { text, markers } = stripMarkers(h2[1] ?? '', 'stack');
+			stack = {
+				name: text,
+				collapsed: markers.collapsed,
+				completes: markers.completes,
+				lead: [],
+				items: [],
+			};
 			stacks.push(stack);
 			sink = stack.lead;
 			continue;
@@ -210,8 +212,9 @@ export function parseBody(
 
 		const h3 = H3_RE.exec(line);
 		if (h3) {
-			const { text, collapsed } = stripCollapse(h3[1] ?? '');
-			const divider: Divider = { name: text.trim(), collapsed, trailing: [] };
+			const { text, markers } = stripMarkers(h3[1] ?? '', 'divider');
+			const divider: Divider = { name: text, collapsed: markers.collapsed, trailing: [] };
+			if (markers.color !== undefined) divider.color = markers.color;
 			s.items.push({ kind: 'divider', divider });
 			sink = divider.trailing;
 			continue;
