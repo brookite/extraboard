@@ -17,13 +17,16 @@ import type {
 	ArchivedCard,
 	Board,
 	BoardConfig,
+	CalendarMode,
 	Card,
 	Divider,
 	PropertyDef,
 	PropertyValue,
 	Stack,
 	StackItem,
+	ViewDef,
 } from './types';
+import { nextViewId } from './views';
 
 /** Address of an item inside a board. */
 export interface ItemRef {
@@ -740,6 +743,102 @@ export function setBoardConfig(board: Board, config: BoardConfig): Board {
 		doc = configToDoc(config);
 	}
 	return { ...board, config, frontmatterDoc: doc };
+}
+
+// --- view operations --------------------------------------------------------
+// Spec: views.md §2.4. Each one rewrites the `extraboard` node through
+// `setBoardConfig`, so a view change travels the same path as any other config
+// edit and preserves foreign frontmatter.
+
+function withViews(board: Board, views: ViewDef[], activeView?: string): Board {
+	const active = activeView ?? board.config.activeView;
+	return setBoardConfig(board, {
+		...board.config,
+		views,
+		activeView: views.some((v) => v.id === active) ? active : (views[0]?.id ?? active),
+	});
+}
+
+/** Make `id` the active view; unknown ids and the current one change nothing. */
+export function setActiveView(board: Board, id: string): Board {
+	if (board.config.activeView === id) return board;
+	if (!board.config.views.some((v) => v.id === id)) return board;
+	return setBoardConfig(board, { ...board.config, activeView: id });
+}
+
+/** Activate the next view in list order, wrapping (the `next-view` command). */
+export function nextView(board: Board): Board {
+	const views = board.config.views;
+	if (views.length < 2) return board;
+	const at = views.findIndex((v) => v.id === board.config.activeView);
+	const next = views[(at + 1) % views.length];
+	return next ? setActiveView(board, next.id) : board;
+}
+
+/** A view as a caller describes it — the id is the op's business. */
+type WithoutId<T> = T extends unknown ? Omit<T, 'id'> : never;
+export type NewView = WithoutId<ViewDef>;
+
+/** Append a view; the id is assigned here, so callers never invent one. */
+export function addView(board: Board, def: NewView, activate = true): Board {
+	const id = nextViewId(board.config.views);
+	const view: ViewDef = { ...def, id };
+	const views = [...board.config.views, view];
+	return withViews(board, views, activate ? id : board.config.activeView);
+}
+
+/**
+ * Patch a view's editable fields. The type is not among them: changing it would
+ * discard the view's configuration, so the modal offers delete-and-create
+ * instead (views.md §4.2).
+ */
+export function updateView(
+	board: Board,
+	id: string,
+	patch: { name?: string; dateProperty?: string; mode?: CalendarMode },
+): Board {
+	const at = board.config.views.findIndex((v) => v.id === id);
+	const view = board.config.views[at];
+	if (!view) return board;
+
+	const name = patch.name?.trim();
+	let next: ViewDef = name && name !== view.name ? { ...view, name } : view;
+	if (next.type === 'calendar') {
+		const dateProperty = patch.dateProperty?.trim();
+		if (dateProperty && dateProperty !== next.dateProperty) next = { ...next, dateProperty };
+		if (patch.mode && patch.mode !== next.mode) next = { ...next, mode: patch.mode };
+	}
+	if (next === view) return board;
+
+	const views = board.config.views.slice();
+	views[at] = next;
+	return withViews(board, views);
+}
+
+/**
+ * Delete a view. The last one is never deleted — a board without a view has
+ * nothing to render (views.md §4.1) — and deleting the active view falls back
+ * to the first survivor.
+ */
+export function deleteView(board: Board, id: string): Board {
+	if (board.config.views.length <= 1) return board;
+	const views = board.config.views.filter((v) => v.id !== id);
+	if (views.length === board.config.views.length) return board;
+	return withViews(board, views);
+}
+
+/** Reorder a view; `before` is resolved by identity like every other move. */
+export function moveView(board: Board, id: string, before: InsertPos): Board {
+	const views = board.config.views.slice();
+	const from = views.findIndex((v) => v.id === id);
+	if (from === -1) return board;
+	const target = before === null ? undefined : views[before];
+	const [moved] = views.splice(from, 1);
+	if (!moved) return board;
+	const at = resolveIndex(views, target);
+	views.splice(at, 0, moved);
+	if (views.every((v, i) => v === board.config.views[i])) return board;
+	return withViews(board, views);
 }
 
 // --- queries ----------------------------------------------------------------

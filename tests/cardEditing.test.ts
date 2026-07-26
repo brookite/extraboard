@@ -10,7 +10,8 @@ import type { Board, BoardConfig, Card } from '../src/model/types';
 
 const config: BoardConfig = {
 	version: 1,
-	view: 'kanban',
+	views: [{ id: 'v1', name: 'Board', type: 'kanban' }],
+	activeView: 'v1',
 	properties: [
 		{ name: 'status', type: 'string-list', strict: true, options: [{ value: 'Todo' }, { value: 'Doing' }] },
 		{ name: 'priority', type: 'integer' },

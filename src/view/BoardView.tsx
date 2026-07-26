@@ -2,18 +2,20 @@
 // manages the underlying Markdown file (load/save, tab, rename, delete).
 // Spec: docs/specs/kanban-view.md §1, §6.
 
-import { HoverPopover, Notice, TextFileView, WorkspaceLeaf } from 'obsidian';
+import { HoverPopover, Menu, Notice, TextFileView, WorkspaceLeaf, setIcon } from 'obsidian';
 import { render } from 'preact';
 import type ExtraboardPlugin from '../main';
 import type { Board } from '../model/types';
 import * as ops from '../model/ops';
 import { parseBoard } from '../model/parse';
 import { serializeBoard } from '../model/serialize';
+import { activeViewOf } from '../model/views';
 import { ArchiveModal } from '../ui/ArchiveModal';
 import { BoardSettingsModal } from '../ui/BoardSettingsModal';
 import { pickColor } from '../ui/ColorPicker';
+import { openViewsModal } from '../ui/ViewsModal';
 import { createCardNote, resolveNoteFolder } from '../util/cardNote';
-import { ICONS, VIEW_TYPE_BOARD } from '../util/constants';
+import { ICONS, VIEW_TYPE_BOARD, viewIcon } from '../util/constants';
 import { BoardApi, confirmDestructive, searchTag } from './api';
 import { KanbanView, addStack } from './KanbanView';
 
@@ -24,6 +26,8 @@ export class BoardView extends TextFileView {
 	hoverPopover: HoverPopover | null = null;
 	private mountEl?: HTMLElement;
 	private api: BoardApi;
+	/** The view-switch header action, re-iconed whenever the active view changes. */
+	private viewSwitchEl?: HTMLElement;
 
 	constructor(leaf: WorkspaceLeaf, plugin: ExtraboardPlugin) {
 		super(leaf);
@@ -58,6 +62,11 @@ export class BoardView extends TextFileView {
 
 	override async onOpen(): Promise<void> {
 		this.ensureMount();
+		// The switch wears the active view's own icon and opens the view menu
+		// (views.md §3.1); it is created first so it sits leftmost in the header.
+		this.viewSwitchEl = this.addAction(ICONS.board, 'Views', (event) => {
+			this.openViewMenu(event);
+		});
 		this.addAction(ICONS.add, 'Add stack', () => this.addStack());
 		// The archive is reached often enough to deserve the header, not only the
 		// file menu (user decision, 2026-07-26).
@@ -133,6 +142,55 @@ export class BoardView extends TextFileView {
 		await this.leaf.openFile(created.file);
 	}
 
+	/**
+	 * The view menu: one item per view with the active one checked, then the way
+	 * into the manage-views modal (views.md §3.1).
+	 */
+	private openViewMenu(event: MouseEvent): void {
+		const board = this.board;
+		if (!board) return;
+		const menu = new Menu();
+		for (const view of board.config.views) {
+			menu.addItem((item) =>
+				item
+					.setTitle(view.name)
+					.setIcon(viewIcon(view.type))
+					.setChecked(view.id === board.config.activeView)
+					.onClick(() => {
+						this.applyEdit((b) => ops.setActiveView(b, view.id));
+					}),
+			);
+		}
+		menu.addSeparator();
+		menu.addItem((item) =>
+			item
+				.setTitle('Manage views…')
+				.setIcon(ICONS.views)
+				.onClick(() => this.manageViews()),
+		);
+		menu.showAtMouseEvent(event);
+	}
+
+	/** Open the manage-views modal (menu item, file menu and command). */
+	manageViews(): void {
+		if (!this.board) return;
+		openViewsModal(this.app, {
+			api: this.api,
+			openBoardSettings: () => this.openBoardSettings(),
+		});
+	}
+
+	/**
+	 * Activate the next view (the `next-view` command). The notice is the whole
+	 * feedback a palette user gets that the switch happened.
+	 */
+	nextView(): void {
+		const board = this.board;
+		if (!board || board.config.views.length < 2) return;
+		this.applyEdit((b) => ops.nextView(b));
+		if (this.board) new Notice(activeViewOf(this.board.config).name);
+	}
+
 	/** Edit this board's `extraboard` configuration (header action + command). */
 	openBoardSettings(): void {
 		const board = this.board;
@@ -199,10 +257,24 @@ export class BoardView extends TextFileView {
 		this.renderBoard();
 	}
 
+	/**
+	 * Mount **one** view — whichever is active (views.md §3.4). An inactive view
+	 * costs nothing but its lines of frontmatter.
+	 */
 	private renderBoard(): void {
 		const el = this.ensureMount();
 		if (!this.board) {
 			render(<div class="eb-empty">Could not parse this board.</div>, el);
+			return;
+		}
+		const view = activeViewOf(this.board.config);
+		if (this.viewSwitchEl) {
+			setIcon(this.viewSwitchEl, viewIcon(view.type));
+			this.viewSwitchEl.setAttribute('aria-label', `View: ${view.name}`);
+		}
+		if (view.type === 'calendar') {
+			// The grid itself is part B of M8 (calendar-view.md).
+			render(<div class="eb-empty">The calendar view is not built yet.</div>, el);
 			return;
 		}
 		render(<KanbanView board={this.board} api={this.api} settings={this.plugin.settings} />, el);

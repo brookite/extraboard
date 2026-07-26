@@ -9,7 +9,7 @@ import { parseBody } from '../src/model/parse';
 import * as ops from '../src/model/ops';
 import type { Board, BoardConfig, Card } from '../src/model/types';
 
-const config: BoardConfig = { version: 1, view: 'kanban', properties: [], tagColors: {} };
+const config: BoardConfig = { version: 1, views: [{ id: 'v1', name: 'Board', type: 'kanban' }], activeView: 'v1', properties: [], tagColors: {} };
 
 function boardFromBody(body: string): Board {
 	const { preamble, stacks } = parseBody(body, config);

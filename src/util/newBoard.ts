@@ -2,7 +2,7 @@
 
 import { configToDoc, serializeFrontmatter } from '../model/frontmatter';
 import type { BoardConfig, PropertyDef } from '../model/types';
-import { DEFAULT_BOARD_CONFIG } from '../model/types';
+import { defaultBoardConfig } from '../model/types';
 
 const NEW_BOARD_BODY = '## To do\n\n## In progress\n\n## Done\n';
 
@@ -12,7 +12,7 @@ const NEW_BOARD_BODY = '## To do\n\n## In progress\n\n## Done\n';
  * board owns its copy from then on.
  */
 export function newBoardConfig(properties: PropertyDef[]): BoardConfig {
-	return { ...DEFAULT_BOARD_CONFIG, properties, tagColors: {} };
+	return { ...defaultBoardConfig(), properties };
 }
 
 /** File content of a new board with the given configuration. */

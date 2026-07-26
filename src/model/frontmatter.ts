@@ -5,13 +5,13 @@
 import { Document, parseDocument } from 'yaml';
 import {
 	BoardConfig,
-	CalendarConfig,
-	DEFAULT_BOARD_CONFIG,
+	defaultBoardConfig,
 	PropertyDef,
 	PropertyType,
 	StringListOption,
 	BadgeColor,
 } from './types';
+import { normalizeViews, parseViews, upgradeLegacyViews } from './views';
 
 const PROPERTY_TYPES: ReadonlySet<string> = new Set<PropertyType>([
 	'color', 'string', 'string-list', 'integer', 'percent',
@@ -95,15 +95,10 @@ function toPropertyDef(v: unknown): PropertyDef | null {
 }
 
 function toConfig(eb: unknown): BoardConfig {
-	const config: BoardConfig = {
-		...DEFAULT_BOARD_CONFIG,
-		properties: [],
-		tagColors: {},
-	};
+	const config: BoardConfig = defaultBoardConfig();
 	if (!isRecord(eb)) return config;
 
 	if (typeof eb.version === 'number') config.version = eb.version;
-	if (eb.view === 'calendar' || eb.view === 'kanban') config.view = eb.view;
 	if (typeof eb.showCardCheckbox === 'boolean') config.showCardCheckbox = eb.showCardCheckbox;
 
 	const dir = asString(eb.cardContentDir);
@@ -114,19 +109,24 @@ function toConfig(eb: unknown): BoardConfig {
 		config.progressStyle = style;
 	}
 
-	if (isRecord(eb.calendar)) {
-		const cal: CalendarConfig = {
-			mode: eb.calendar.mode === 'week' ? 'week' : 'month',
-		};
-		const dp = asString(eb.calendar.dateProperty);
-		if (dp !== undefined) cal.dateProperty = dp;
-		config.calendar = cal;
-	}
-
 	if (Array.isArray(eb.properties)) {
 		config.properties = eb.properties
 			.map(toPropertyDef)
 			.filter((d): d is PropertyDef => d !== null);
+	}
+
+	// Views are resolved after the properties, because upgrading a legacy
+	// `view: calendar` has to check its date property against them (views.md §1.1).
+	if ('views' in eb) {
+		config.views = normalizeViews(parseViews(eb.views));
+		const active = asString(eb.activeView)?.trim();
+		config.activeView = active && config.views.some((v) => v.id === active)
+			? active
+			: (config.views[0]?.id ?? 'v1');
+	} else {
+		const upgraded = upgradeLegacyViews(eb.view, eb.calendar, config.properties);
+		config.views = upgraded.views;
+		config.activeView = upgraded.activeView;
 	}
 
 	if (isRecord(eb.tagColors)) {
@@ -143,7 +143,7 @@ function toConfig(eb: unknown): BoardConfig {
 export function parseFrontmatter(text: string): Frontmatter {
 	const split = splitFrontmatter(text);
 	if (!split) {
-		return { doc: null, config: { ...DEFAULT_BOARD_CONFIG, properties: [], tagColors: {} }, body: text, isBoard: false };
+		return { doc: null, config: defaultBoardConfig(), body: text, isBoard: false };
 	}
 	const doc = parseDocument(split.yamlText);
 	const js = doc.toJS() as unknown;
@@ -164,18 +164,24 @@ export function serializeFrontmatter(doc: Document | null, body: string): string
 	return `---\n${docStr}---\n${body}`;
 }
 
-/** Minimal, empty-pruned plain object for writing `extraboard` config. */
+/**
+ * Minimal, empty-pruned plain object for writing `extraboard` config. Writing
+ * `views` is what upgrades a legacy board: the old `view` / `calendar` keys are
+ * simply not emitted (views.md §1.1).
+ */
 function configToPlain(config: BoardConfig): Record<string, unknown> {
-	const eb: Record<string, unknown> = { version: config.version, view: config.view };
+	const eb: Record<string, unknown> = { version: config.version };
+	const views = normalizeViews(config.views);
+	eb.views = views.map((v) =>
+		v.type === 'calendar'
+			? { id: v.id, name: v.name, type: v.type, dateProperty: v.dateProperty, mode: v.mode }
+			: { id: v.id, name: v.name, type: v.type },
+	);
+	// The first view is the default, so naming it would be noise.
+	if (config.activeView && config.activeView !== views[0]?.id) eb.activeView = config.activeView;
 	if (config.showCardCheckbox) eb.showCardCheckbox = true;
 	if (config.cardContentDir) eb.cardContentDir = config.cardContentDir;
 	if (config.progressStyle) eb.progressStyle = config.progressStyle;
-	if (config.calendar) {
-		eb.calendar = {
-			mode: config.calendar.mode,
-			...(config.calendar.dateProperty && { dateProperty: config.calendar.dateProperty }),
-		};
-	}
 	if (config.properties.length) eb.properties = config.properties;
 	if (Object.keys(config.tagColors).length) eb.tagColors = config.tagColors;
 	return eb;

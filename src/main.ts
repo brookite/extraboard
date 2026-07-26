@@ -77,6 +77,28 @@ export default class ExtraboardPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: 'manage-views',
+			name: 'Manage views',
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(BoardView);
+				if (!view?.board) return false;
+				if (!checking) view.manageViews();
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'next-view',
+			name: 'Switch to next view',
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(BoardView);
+				if (!view?.board || view.board.config.views.length < 2) return false;
+				if (!checking) view.nextView();
+				return true;
+			},
+		});
+
+		this.addCommand({
 			id: 'open-archive',
 			name: 'Open archive',
 			checkCallback: (checking: boolean) => {
@@ -114,6 +136,12 @@ export default class ExtraboardPlugin extends Plugin {
 			this.app.workspace.on('file-menu', (menu, file, _source, leaf) => {
 				const view = leaf?.view;
 				if (!(view instanceof BoardView) || !view.board || view.file !== file) return;
+				menu.addItem((item) =>
+					item
+						.setTitle('Manage views…')
+						.setIcon(ICONS.views)
+						.onClick(() => view.manageViews()),
+				);
 				menu.addItem((item) =>
 					item
 						.setTitle('Open archive')

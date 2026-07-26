@@ -5,7 +5,8 @@ import type { Board, BoardConfig } from '../src/model/types';
 
 const bodyConfig: BoardConfig = {
 	version: 1,
-	view: 'kanban',
+	views: [{ id: 'v1', name: 'Board', type: 'kanban' }],
+	activeView: 'v1',
 	properties: [
 		{ name: 'status', type: 'string-list', strict: true, options: [{ value: 'Todo' }, { value: 'Doing' }, { value: 'Done' }] },
 		{ name: 'priority', type: 'integer' },
@@ -141,7 +142,7 @@ describe('full file: frontmatter + body round-trip', () => {
 
 	it('reads config and marks the file as a board', () => {
 		const board = parseBoard(input);
-		expect(board.config.view).toBe('kanban');
+		expect(board.config.views).toEqual([{ id: 'v1', name: 'Board', type: 'kanban' }]);
 		expect(board.config.properties).toEqual([{ name: 'priority', type: 'integer' }]);
 		expect(board.stacks).toHaveLength(1);
 		expect(board.stacks[0]!.name).toBe('Backlog');

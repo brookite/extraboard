@@ -7,6 +7,23 @@ import type { ChecklistItem } from './checklist';
 
 export type ViewKind = 'kanban' | 'calendar';
 
+export type CalendarMode = 'month' | 'week';
+
+/**
+ * One of a board's views. `id` is generated and stable; `name` is the user's
+ * label. Spec: docs/specs/views.md §1–§2.
+ */
+export type ViewDef =
+	| { id: string; name: string; type: 'kanban' }
+	| {
+			id: string;
+			name: string;
+			type: 'calendar';
+			/** Board property the grid is computed from; required. */
+			dateProperty: string;
+			mode: CalendarMode;
+	  };
+
 /** Shape of the checklist `N/M` indicator and of `percent` badges. */
 export type ProgressStyle = 'ring' | 'fraction' | 'percent';
 
@@ -44,14 +61,12 @@ export interface PropertyDef {
 	time?: 'none' | 'optional' | 'required';
 }
 
-export interface CalendarConfig {
-	dateProperty?: string;
-	mode: 'month' | 'week';
-}
-
 export interface BoardConfig {
 	version: number;
-	view: ViewKind;
+	/** Ordered view list; never empty (views.md §2.2). */
+	views: ViewDef[];
+	/** Id of the active view; resolved through `activeViewOf` when unknown. */
+	activeView: string;
 	properties: PropertyDef[];
 	tagColors: Record<string, BadgeColor>;
 	/** Offer a task checkbox on cards that are not task list items yet. */
@@ -59,7 +74,6 @@ export interface BoardConfig {
 	cardContentDir?: string;
 	/** Board override for the plugin's `progressStyle`; absent => follow it. */
 	progressStyle?: ProgressStyle;
-	calendar?: CalendarConfig;
 }
 
 /** Ordered, discriminated card property values. Spec: properties.md. */
@@ -159,9 +173,16 @@ export interface Board {
 	trailing: string;
 }
 
-export const DEFAULT_BOARD_CONFIG: BoardConfig = {
-	version: 1,
-	view: 'kanban',
-	properties: [],
-	tagColors: {},
-};
+/**
+ * A board's starting configuration. A function rather than a shared constant:
+ * `views` and `properties` are mutable arrays, and every caller owns its copy.
+ */
+export function defaultBoardConfig(): BoardConfig {
+	return {
+		version: 1,
+		views: [{ id: 'v1', name: 'Board', type: 'kanban' }],
+		activeView: 'v1',
+		properties: [],
+		tagColors: {},
+	};
+}

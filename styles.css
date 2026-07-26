@@ -1088,3 +1088,113 @@ body.eb-dragging-card .eb-archive-drop {
 .eb-drag-item {
 	cursor: grabbing;
 }
+
+/* Manage views modal (views.md §4) */
+.eb-views-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.eb-views-row {
+	display: flex;
+	align-items: stretch;
+	gap: 4px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+	background: var(--background-secondary);
+	padding: 4px;
+}
+
+.eb-views-row.is-active {
+	border-color: var(--interactive-accent);
+}
+
+.eb-views-main {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+	padding: 6px 8px;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	text-align: left;
+	cursor: pointer;
+}
+
+.eb-views-main:disabled {
+	cursor: default;
+	opacity: 1;
+}
+
+.eb-views-icon {
+	display: flex;
+	color: var(--text-muted);
+}
+
+.eb-views-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.eb-views-name {
+	font-weight: var(--font-medium, 500);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.eb-views-desc {
+	font-size: var(--font-ui-smaller, 0.8em);
+	color: var(--text-muted);
+}
+
+.eb-views-active {
+	font-size: var(--font-ui-smaller, 0.8em);
+	color: var(--text-accent);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.eb-views-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.eb-views-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.eb-views-button:hover:not(:disabled) {
+	color: var(--text-normal);
+}
+
+.eb-views-button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.eb-views-button.mod-warning:hover:not(:disabled) {
+	color: var(--text-error);
+}
+
+/* The disabled-option explanations, which are shown rather than hidden. */
+.eb-views-note {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 8px 0;
+}
