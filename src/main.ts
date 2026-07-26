@@ -24,8 +24,6 @@ export default class ExtraboardPlugin extends Plugin {
 	private suppressed = new Set<string>();
 	/** "Open as board" buttons added to Markdown views, keyed by view instance. */
 	private boardActions = new WeakMap<MarkdownView, HTMLElement>();
-	/** The ribbon view cycler; hidden unless the active board has several views. */
-	private switchRibbonEl?: HTMLElement;
 
 	async onload() {
 		await this.loadSettings();
@@ -47,19 +45,6 @@ export default class ExtraboardPlugin extends Plugin {
 		this.addRibbonIcon(ICONS.board, 'Create new board', () => {
 			this.createNewBoard();
 		});
-
-		// A one-tap cycler for the active board, next to the header's own menu.
-		// It only earns ribbon space once the board actually has views to cycle
-		// through, so it stays hidden until then (views.md §3.3).
-		this.switchRibbonEl = this.addRibbonIcon(ICONS.switchView, 'Switch board view', () => {
-			this.app.workspace.getActiveViewOfType(BoardView)?.nextView();
-		});
-		this.updateSwitchRibbon();
-		this.registerEvent(
-			this.app.workspace.on('active-leaf-change', () => {
-				this.updateSwitchRibbon();
-			}),
-		);
 
 		this.addCommand({
 			id: 'create-board',
@@ -196,25 +181,6 @@ export default class ExtraboardPlugin extends Plugin {
 	suppressAutoOpen(path: string): void {
 		this.suppressed.add(path);
 		window.setTimeout(() => this.suppressed.delete(path), 1000);
-	}
-
-	/**
-	 * Show the ribbon cycler only while the active board has more than one view,
-	 * and name the view it would switch to — a blind cycler is worth little
-	 * (views.md §3.3). Called on leaf changes and whenever a board re-renders,
-	 * since adding or deleting a view changes the answer.
-	 */
-	updateSwitchRibbon(): void {
-		const el = this.switchRibbonEl;
-		if (!el) return;
-		const board = this.app.workspace.getActiveViewOfType(BoardView)?.board;
-		const views = board?.config.views ?? [];
-		el.toggle(views.length > 1);
-		if (views.length > 1 && board) {
-			const at = views.findIndex((v) => v.id === board.config.activeView);
-			const next = views[(at + 1) % views.length];
-			if (next) el.setAttribute('aria-label', `Switch to ${next.name}`);
-		}
 	}
 
 	/** Re-render every open board, e.g. after a display setting changed. */

@@ -29,6 +29,8 @@ export class BoardView extends TextFileView {
 	private api: BoardApi;
 	/** The view-switch header action, re-iconed whenever the active view changes. */
 	private viewSwitchEl?: HTMLElement;
+	/** The view cycler beside it; hidden while the board has a single view. */
+	private viewCycleEl?: HTMLElement;
 	/** Board-change subscribers outside the board's own tree (`BoardApi.onChange`). */
 	private listeners = new Set<() => void>();
 
@@ -74,6 +76,12 @@ export class BoardView extends TextFileView {
 		// (views.md §3.1); it is created first so it sits leftmost in the header.
 		this.viewSwitchEl = this.addAction(ICONS.board, 'Views', (event) => {
 			this.openViewMenu(event);
+		});
+		// One tap to the next view, beside the menu that picks one by name. It is
+		// hidden while the board has a single view — there would be nothing to
+		// cycle — and `renderBoard` is what reveals it (views.md §3.3).
+		this.viewCycleEl = this.addAction(ICONS.switchView, 'Switch board view', () => {
+			this.nextView();
 		});
 		this.addAction(ICONS.add, 'Add stack', () => this.addStack());
 		// The archive is reached often enough to deserve the header, not only the
@@ -275,10 +283,19 @@ export class BoardView extends TextFileView {
 			render(<div class="eb-empty">Could not parse this board.</div>, el);
 			return;
 		}
+		const views = this.board.config.views;
 		const view = activeViewOf(this.board.config);
 		if (this.viewSwitchEl) {
 			setIcon(this.viewSwitchEl, viewIcon(view.type));
 			this.viewSwitchEl.setAttribute('aria-label', `View: ${view.name}`);
+		}
+		if (this.viewCycleEl) {
+			// Creating or deleting a view is what makes the cycler appear or go, and
+			// its tooltip names where it goes — a blind cycler is worth little.
+			this.viewCycleEl.toggle(views.length > 1);
+			const at = views.findIndex((v) => v.id === view.id);
+			const next = views[(at + 1) % views.length];
+			if (next) this.viewCycleEl.setAttribute('aria-label', `Switch to ${next.name}`);
 		}
 		if (view.type === 'calendar') {
 			render(
@@ -290,8 +307,6 @@ export class BoardView extends TextFileView {
 		}
 		// Anything living outside this tree (the day modal) re-reads the board here.
 		for (const listener of this.listeners) listener();
-		// Adding or deleting a view changes whether the ribbon cycler belongs.
-		this.plugin.updateSwitchRibbon();
 	}
 
 	private async openAsMarkdown(): Promise<void> {
