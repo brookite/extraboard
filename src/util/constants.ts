@@ -12,6 +12,7 @@ export const ICONS = {
 	settings: 'sliders-horizontal',
 	archive: 'archive',
 	views: 'layers',
+	switchView: 'repeat',
 	edit: 'pencil',
 	delete: 'trash-2',
 	up: 'chevron-up',

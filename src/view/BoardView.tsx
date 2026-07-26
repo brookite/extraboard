@@ -290,6 +290,8 @@ export class BoardView extends TextFileView {
 		}
 		// Anything living outside this tree (the day modal) re-reads the board here.
 		for (const listener of this.listeners) listener();
+		// Adding or deleting a view changes whether the ribbon cycler belongs.
+		this.plugin.updateSwitchRibbon();
 	}
 
 	private async openAsMarkdown(): Promise<void> {
