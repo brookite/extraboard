@@ -4,6 +4,6 @@
 	"version": "0.1.0",
 	"minAppVersion": "1.4.0",
 	"description": "Markdown-backed Kanban and calendar boards with typed card properties, checklists, and an archive. Mobile-friendly.",
-	"author": "Dmitry Shashkov",
+	"author": "Brookit",
 	"isDesktopOnly": false
 }
