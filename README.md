@@ -7,21 +7,49 @@ and card properties are stored inline. The board is deserialized on open and
 re-serialized on every change, so the underlying note stays clean and portable.
 Designed to be mobile-friendly.
 
-Planned capabilities: a card-and-stack Kanban view and a month/week calendar view,
-a typed card-property system (colors, string lists with badge colors, numbers,
-percent progress, dates, date ranges, recurrence, checkboxes, tags), per-card
-Markdown content, hierarchical checklists with auto `N/M` progress, and an
-archive.
+Inspired by [obsidian-kanban](https://github.com/obsidian-community/obsidian-kanban)
+by mgmeyers and the Obsidian community — Extraboard is an independent plugin
+with its own file format, not a fork.
+
+![The Kanban view](assets/kanban.png)
+
+![The calendar view](assets/calendar.png)
+
+## Features
+
+- **Your board is a normal note.** `## Heading` is a stack, `- item` is a card,
+  configuration lives in the frontmatter. Any other frontmatter you keep in the
+  file — including comments — survives a load/save cycle untouched.
+- **Two views over the same file:** a Kanban board and a month/week calendar. A
+  board can define several views and cycle through them from its header.
+- **Drag and drop** cards within and across stacks, whole stacks, and cards onto
+  a calendar day to move their date. Touch drag works on mobile.
+- **Typed card properties** written inline as `@{name|value}`: text, number,
+  percent, checkbox, color, single-select and multi-select lists with per-value
+  badge colors, date, date range, list of dates, and recurrence.
+- **Recurring dates** in a readable phrase — `every 2 weeks on Fri`,
+  `every month on the last Friday` — expanded onto the calendar.
+- **Date highlighting:** ordered rules color a date badge as its date approaches
+  or after it has passed; a board can override the plugin-wide list.
+- **Nested checklists** on a card with automatic `N/M` progress, shown as a ring,
+  a fraction or a percentage.
+- **A note per card:** link a card to its own note, created on demand in a folder
+  you choose, with hover previews and Obsidian's rename handling.
+- **Archive** section in the same file: archived cards remember the stack they
+  came from and can be restored or deleted from the archive view.
+- **Stacks and dividers that mean something:** a stack can mark the cards
+  entering it as done, and a named divider can color the cards in its group.
+- **Tags** with per-board colors; selecting one searches the vault for it.
+- **English and Russian interfaces**, with configurable date/time formats
+  (including relative dates and custom `moment.js` patterns) and first day of
+  the week.
 
 ## Status
 
 **Early development** — the MVP is being implemented milestone by milestone.
-The Kanban side works: boards open in their own view, and cards, stacks and
-dividers can be created, edited, dragged, given typed properties and colors,
-linked to a note, given a checklist, and archived. A stack can mark the cards
-that land in it as done, and a named divider can color the cards in its group.
-The calendar view, recurrence and localization are still ahead. This section will be replaced with
-setup and usage instructions once the MVP is complete.
+Everything listed above works; what is left before a first release is a pass
+over mobile verification, packaging and release automation. This section will be
+replaced with setup and usage instructions once the MVP is complete.
 
 ## Development
 
