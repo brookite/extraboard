@@ -45,3 +45,48 @@ export function toHexColor(value: string | undefined, host: HTMLElement): string
 			.padStart(2, '0');
 	return `#${channel(parts[0]!)}${channel(parts[1]!)}${channel(parts[2]!)}`;
 }
+
+/**
+ * Black or white, whichever reads better on `hex` (`#rrggbb`). WCAG relative
+ * luminance, compared against the point where white and black text reach the
+ * same contrast ratio; a value that is not a plain six-digit hex is treated as
+ * a light background, the safer guess for Obsidian's default themes.
+ */
+export function contrastText(hex: string): '#000000' | '#ffffff' {
+	const digits = /^#([0-9a-f]{6})$/i.exec(hex.trim())?.[1];
+	if (digits === undefined) return '#000000';
+	const packed = Number.parseInt(digits, 16);
+	const linear = (byte: number): number => {
+		const c = byte / 255;
+		return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+	};
+	const luminance =
+		0.2126 * linear((packed >> 16) & 0xff) +
+		0.7152 * linear((packed >> 8) & 0xff) +
+		0.0722 * linear(packed & 0xff);
+	return luminance > 0.179 ? '#000000' : '#ffffff';
+}
+
+const readableCache = new Map<string, string | undefined>();
+
+/**
+ * `contrastText` for any CSS color, including `var(--…)`: the value is resolved
+ * through the DOM probe once and memoized, because this runs per badge on every
+ * board render. `undefined` when the color cannot be resolved — the badge then
+ * keeps the theme's own text color.
+ */
+export function readableOn(color: string, host: HTMLElement): string | undefined {
+	if (readableCache.has(color)) return readableCache.get(color);
+	const hex = toHexColor(color, host);
+	const text = hex === null ? undefined : contrastText(hex);
+	readableCache.set(color, text);
+	return text;
+}
+
+/**
+ * Drop the memoized text colors. A theme switch can change what `var(--…)`
+ * resolves to, so the plugin clears the cache on `css-change`.
+ */
+export function clearReadableCache(): void {
+	readableCache.clear();
+}

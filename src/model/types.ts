@@ -4,6 +4,9 @@
 
 import type { Document as YamlDocument } from 'yaml';
 import type { ChecklistItem } from './checklist';
+// Type-only, so the `dateHighlights.ts` <-> `types.ts` pair stays a compile-time
+// cycle that erases away, exactly like `ChecklistItem` above.
+import type { DateHighlightRule } from './dateHighlights';
 
 export type ViewKind = 'kanban' | 'calendar';
 
@@ -74,6 +77,12 @@ export interface BoardConfig {
 	cardContentDir?: string;
 	/** Board override for the plugin's `progressStyle`; absent => follow it. */
 	progressStyle?: ProgressStyle;
+	/**
+	 * Board override for the plugin's date highlight rules; absent => follow it.
+	 * An empty list is not "absent": it means this board wants no highlights at
+	 * all (i18n-and-dates.md §3.2).
+	 */
+	dateHighlights?: DateHighlightRule[];
 }
 
 /** Ordered, discriminated card property values. Spec: properties.md. */

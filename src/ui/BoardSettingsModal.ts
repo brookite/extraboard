@@ -7,6 +7,8 @@ import { invalidatedValues } from '../model/ops';
 import type { BadgeColor, Board, BoardConfig, ProgressStyle, PropertyDef } from '../model/types';
 import { colorField } from './ColorPicker';
 import { PropertyDefsEditor, cloneDefs } from './PropertyDefsEditor';
+import { DateHighlightsEditor } from './DateHighlightsEditor';
+import { cloneRules, type DateHighlightRule } from '../model/dateHighlights';
 import { t } from '../i18n';
 
 interface TagRow {
@@ -32,6 +34,10 @@ export class BoardSettingsModal extends Modal {
 	private properties: PropertyDef[];
 	private tags: TagRow[];
 	private impactEl?: HTMLElement;
+	/** The board's own highlight rules; `undefined` = follow the plugin (§3.2). */
+	private highlights?: DateHighlightRule[];
+	private highlightsEl?: HTMLElement;
+	private highlightsEditor?: DateHighlightsEditor;
 
 	constructor(
 		app: App,
@@ -41,6 +47,7 @@ export class BoardSettingsModal extends Modal {
 		const config = options.config;
 		this.config = { ...config };
 		this.properties = cloneDefs(config.properties);
+		this.highlights = config.dateHighlights ? cloneRules(config.dateHighlights) : undefined;
 		this.tags = Object.entries(config.tagColors).map(([tag, color]) => ({
 			tag,
 			color: { ...color },
@@ -95,6 +102,26 @@ export class BoardSettingsModal extends Modal {
 					}),
 			);
 
+		new Setting(contentEl)
+			.setName(t('modal.boardSettings.dateHighlights.name'))
+			.setDesc(t('modal.boardSettings.dateHighlights.desc'))
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions({
+						'': t('modal.boardSettings.dateHighlights.followPlugin'),
+						own: t('modal.boardSettings.dateHighlights.own'),
+					})
+					.setValue(this.highlights ? 'own' : '')
+					.onChange((value) => {
+						// Switching back to "follow" keeps nothing: the board's key is
+						// deleted on save, and the rules typed here are gone with it.
+						this.highlights = value === 'own' ? (this.highlights ?? []) : undefined;
+						this.renderHighlights();
+					}),
+			);
+		this.highlightsEl = contentEl.createDiv();
+		this.renderHighlights();
+
 		new Setting(contentEl).setName(t('modal.boardSettings.properties.heading')).setHeading();
 		contentEl.createDiv({
 			cls: 'setting-item-description',
@@ -103,6 +130,8 @@ export class BoardSettingsModal extends Modal {
 		const propsEl = contentEl.createDiv();
 		const editor = new PropertyDefsEditor(this.app, propsEl, this.properties, (defs) => {
 			this.properties = defs;
+			// The rule rows pick their property from this list, so they follow it.
+			this.highlightsEditor?.render();
 			this.renderImpact();
 		});
 		editor.render();
@@ -129,6 +158,28 @@ export class BoardSettingsModal extends Modal {
 
 	override onClose(): void {
 		this.contentEl.empty();
+	}
+
+	// --- date highlights ------------------------------------------------------
+
+	private renderHighlights(): void {
+		const el = this.highlightsEl;
+		if (!el) return;
+		el.empty();
+		el.removeClass('eb-pe');
+		this.highlightsEditor = undefined;
+		const rules = this.highlights;
+		if (!rules) return;
+		this.highlightsEditor = new DateHighlightsEditor(
+			this.app,
+			el,
+			rules,
+			(next) => {
+				this.highlights = next;
+			},
+			{ properties: () => this.properties },
+		);
+		this.highlightsEditor.render();
 	}
 
 	// --- tag colors -----------------------------------------------------------
@@ -182,7 +233,12 @@ export class BoardSettingsModal extends Modal {
 			if (!row.tag || (row.color.bg === undefined && row.color.fg === undefined)) continue;
 			tagColors[row.tag] = { ...row.color };
 		}
-		return { ...this.config, properties: cloneDefs(this.properties), tagColors };
+		const config: BoardConfig = { ...this.config, properties: cloneDefs(this.properties), tagColors };
+		// An empty list is kept on purpose ("this board wants no highlights");
+		// "follow the plugin" is the absence of the key (§3.2).
+		if (this.highlights) config.dateHighlights = cloneRules(this.highlights);
+		else delete config.dateHighlights;
+		return config;
 	}
 
 	/**

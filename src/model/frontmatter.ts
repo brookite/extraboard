@@ -12,6 +12,7 @@ import {
 	BadgeColor,
 } from './types';
 import { normalizeViews, parseViews, upgradeLegacyViews } from './views';
+import type { DateHighlightRule, HighlightUnit } from './dateHighlights';
 
 const PROPERTY_TYPES: ReadonlySet<string> = new Set<PropertyType>([
 	'color', 'string', 'string-list', 'integer', 'percent',
@@ -70,6 +71,34 @@ function toBadgeColor(v: unknown): BadgeColor | undefined {
 	return { ...(bg !== undefined && { bg }), ...(fg !== undefined && { fg }) };
 }
 
+const HIGHLIGHT_UNITS: ReadonlySet<string> = new Set<HighlightUnit>([
+	'hour', 'day', 'week', 'month',
+]);
+
+/**
+ * One `dateHighlights` entry. A malformed rule is dropped rather than kept as
+ * junk the matcher would have to guard against on every render; the editor is
+ * where an incomplete rule is flagged and preserved (i18n-and-dates.md §3.3).
+ */
+function toHighlightRule(v: unknown): DateHighlightRule | null {
+	if (!isRecord(v)) return null;
+	const when = asString(v.when);
+	const unit = asString(v.unit);
+	const color = asString(v.color);
+	if (when !== 'before' && when !== 'after') return null;
+	if (unit === undefined || !HIGHLIGHT_UNITS.has(unit)) return null;
+	if (color === undefined) return null;
+	if (typeof v.amount !== 'number' || !Number.isInteger(v.amount) || v.amount < 0) return null;
+	const property = asString(v.property);
+	return {
+		...(property !== undefined && property !== '' && { property }),
+		when,
+		amount: v.amount,
+		unit: unit as HighlightUnit,
+		color,
+	};
+}
+
 function toPropertyDef(v: unknown): PropertyDef | null {
 	if (!isRecord(v)) return null;
 	const name = asString(v.name);
@@ -107,6 +136,14 @@ function toConfig(eb: unknown): BoardConfig {
 	const style = asString(eb.progressStyle);
 	if (style === 'ring' || style === 'fraction' || style === 'percent') {
 		config.progressStyle = style;
+	}
+
+	// Read only when the key is present: an empty list is a board saying "no
+	// highlights", which is different from following the plugin setting (§3.2).
+	if ('dateHighlights' in eb) {
+		config.dateHighlights = Array.isArray(eb.dateHighlights)
+			? eb.dateHighlights.map(toHighlightRule).filter((r): r is DateHighlightRule => r !== null)
+			: [];
 	}
 
 	if (Array.isArray(eb.properties)) {
@@ -182,6 +219,9 @@ function configToPlain(config: BoardConfig): Record<string, unknown> {
 	if (config.showCardCheckbox) eb.showCardCheckbox = true;
 	if (config.cardContentDir) eb.cardContentDir = config.cardContentDir;
 	if (config.progressStyle) eb.progressStyle = config.progressStyle;
+	// An empty array is written on purpose — it is how a board says "no
+	// highlights" instead of "follow the plugin setting".
+	if (config.dateHighlights) eb.dateHighlights = config.dateHighlights;
 	if (config.properties.length) eb.properties = config.properties;
 	if (Object.keys(config.tagColors).length) eb.tagColors = config.tagColors;
 	return eb;

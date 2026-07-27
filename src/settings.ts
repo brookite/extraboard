@@ -3,6 +3,7 @@
 // Spec: docs/specs/settings.md.
 
 import type { ProgressStyle, PropertyDef } from './model/types';
+import type { DateHighlightRule } from './model/dateHighlights';
 import type { Lang } from './i18n';
 import type { DateFormatMode } from './i18n/dates';
 
@@ -56,6 +57,12 @@ export interface ExtraboardSettings {
 	datePattern: string;
 	/** moment.js pattern for `timeFormat: 'custom'`; empty falls back to `built-in`. */
 	timePattern: string;
+	/**
+	 * Ordered rules coloring a date badge as its date approaches or after it has
+	 * passed; the first match wins. A board may replace the whole list in its own
+	 * frontmatter (i18n-and-dates.md §3).
+	 */
+	dateHighlights: DateHighlightRule[];
 }
 
 export const DEFAULT_SETTINGS: ExtraboardSettings = {
@@ -70,4 +77,5 @@ export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	timeFormat: 'system',
 	datePattern: '',
 	timePattern: '',
+	dateHighlights: [],
 };

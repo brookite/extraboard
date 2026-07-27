@@ -642,7 +642,8 @@
 	cursor: pointer;
 }
 
-/* The row's drag zone: the same grip the stack header carries. */
+/* The row's drag zone: the same grip the stack header carries. Shared with the
+   date highlight rule rows (`.eb-dh-grip`). */
 .eb-checklist-grip {
 	display: inline-flex;
 	align-items: center;
@@ -882,6 +883,26 @@ body.is-mobile .eb-hover-only {
 
 .eb-pe-diags:empty {
 	display: none;
+}
+
+/* Date highlight rules: the same rows, dragged by a grip (order is meaningful) */
+.eb-dh-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.eb-dh-amount {
+	width: 5em;
+	flex: 0 0 auto;
+}
+
+.eb-dh-hint {
+	margin-top: 2px;
+}
+
+.eb-pe-row .eb-pe-diags {
+	margin-top: 6px;
 }
 
 .eb-swatch-button {

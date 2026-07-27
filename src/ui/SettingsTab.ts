@@ -9,6 +9,7 @@ import { currentLanguage, setLanguage, t } from '../i18n';
 import { formatDatePart, formatTimePart, type DateFormatMode, type DateTimeOpts } from '../i18n/dates';
 import { today } from '../model/dates';
 import { PropertyDefsEditor } from './PropertyDefsEditor';
+import { DateHighlightsEditor } from './DateHighlightsEditor';
 
 function nowMinutes(): number {
 	const d = new Date();
@@ -87,6 +88,7 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName(t('settings.dates.heading')).setHeading();
 		this.renderFormatSetting(containerEl, 'date');
 		this.renderFormatSetting(containerEl, 'time');
+		this.renderDateHighlights(containerEl);
 
 		new Setting(containerEl)
 			.setName(t('settings.cardNoteFolder.name'))
@@ -167,6 +169,28 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 			(defs) => {
 				this.plugin.settings.defaultProperties = defs;
 				void this.plugin.saveSettings();
+			},
+		);
+		editor.render();
+	}
+
+	/**
+	 * The plugin-wide highlight rules (i18n-and-dates.md §3.2). A board may
+	 * replace the whole list in its own settings, so nothing here is per-board.
+	 */
+	private renderDateHighlights(containerEl: HTMLElement): void {
+		new Setting(containerEl)
+			.setName(t('settings.dateHighlights.heading'))
+			.setDesc(t('settings.dateHighlights.desc'));
+
+		const editor = new DateHighlightsEditor(
+			this.app,
+			containerEl.createDiv(),
+			this.plugin.settings.dateHighlights,
+			(rules) => {
+				this.plugin.settings.dateHighlights = rules;
+				void this.plugin.saveSettings();
+				this.plugin.refreshBoards();
 			},
 		);
 		editor.render();

@@ -2,15 +2,17 @@
 // i18n-and-dates.md §2 (the date/time formatting pipeline).
 
 import type { BoardConfig, Card, ProgressStyle, PropertyValue } from '../../model/types';
-import { parseDate, parseSpan, today } from '../../model/dates';
+import { parseDate, parseSpan, today, type CalDate, type DateSpan } from '../../model/dates';
 import { isRecurrence, nextOccurrence, parseRecurrence, type Recurrence } from '../../model/recurrence';
 import { anchorFor } from '../../model/calendar';
+import { highlightsFor, matchHighlight, type DateHighlightRule } from '../../model/dateHighlights';
 import type { ExtraboardSettings } from '../../settings';
 import { dateTimeOptsFor, formatCalDate, formatCalSpan, absoluteTooltip, type DateTimeOpts } from '../../i18n/dates';
 import { describeRecurrence } from '../../i18n/recurrenceText';
 import { t } from '../../i18n';
+import { readableOn } from '../../util/color';
 import { PercentValue } from './Progress';
-import { styleFor } from './style';
+import { safeColor, styleFor } from './style';
 
 interface Props {
 	pv: PropertyValue;
@@ -21,6 +23,32 @@ interface Props {
 	/** The card this value belongs to — a `recurrence` badge needs its siblings
 	 * to resolve an anchor-less rule's start (recurrence.md §1.2). */
 	card: Card;
+}
+
+/** What every date-family badge needs: the format settings and the rules in force. */
+interface DateOpts {
+	opts: DateTimeOpts;
+	highlights: readonly DateHighlightRule[];
+	/** Property name the rules are matched against. */
+	property: string;
+}
+
+/** A single date reads as a one-day span, so one matcher serves every shape. */
+function spanOf(date: CalDate | null): DateSpan | null {
+	return date ? { start: date, end: date } : null;
+}
+
+/**
+ * The chip color of the first matching rule (§3.4): its color becomes the
+ * background, the text color is derived from it. Layered on top of §2 — the
+ * highlight decides the color, the format setting decides the text.
+ */
+function highlightStyle(o: DateOpts, span: DateSpan | null): Record<string, string> | undefined {
+	if (o.highlights.length === 0) return undefined;
+	const rule = matchHighlight(o.highlights, o.property, span);
+	const bg = rule && safeColor(rule.color);
+	if (!bg) return undefined;
+	return styleFor(bg, readableOn(bg, document.body));
 }
 
 /** Whenever a mode can hide precision, the absolute value stays one hover away. */
@@ -34,15 +62,14 @@ function needsTooltip(opts: DateTimeOpts): boolean {
 }
 
 /**
- * The rule's next hit after today, as the badge's tooltip (recurrence.md §5).
- * `undefined` when the rule is unanchored or spent.
+ * The rule's next hit after today (recurrence.md §5): both the badge's tooltip
+ * and the date a highlight rule measures against. `null` when the rule is
+ * unanchored or spent — then there is nothing to be early or late for (§3).
  */
-function nextOccurrenceTooltip(rule: Recurrence, card: Card, propertyName: string, opts: DateTimeOpts): string | undefined {
+function nextHit(rule: Recurrence, card: Card, propertyName: string): CalDate | null {
 	const anchor = rule.start ?? anchorFor(card, propertyName);
-	if (!anchor) return undefined;
-	const next = nextOccurrence(rule, anchor, today());
-	if (!next) return undefined;
-	return t('card.nextOccurrence', { date: formatCalDate(next, opts) });
+	if (!anchor) return null;
+	return nextOccurrence(rule, anchor, today());
 }
 
 /**
@@ -52,44 +79,53 @@ function nextOccurrenceTooltip(rule: Recurrence, card: Card, propertyName: strin
  * An unparseable value still renders verbatim, same tolerance as any other
  * date-family badge.
  */
-function RecurrenceBadge({ raw, card, propertyName, opts }: { raw: string; card: Card; propertyName: string; opts: DateTimeOpts }) {
+function RecurrenceBadge({ raw, card, dates }: { raw: string; card: Card; dates: DateOpts }) {
 	const rule = parseRecurrence(raw);
 	if (!rule) return <span class="eb-badge">{raw}</span>;
+	const next = nextHit(rule, card, dates.property);
 	return (
-		<span class="eb-badge" title={nextOccurrenceTooltip(rule, card, propertyName, opts)}>
-			{describeRecurrence(rule, opts)}
+		<span
+			class="eb-badge"
+			style={highlightStyle(dates, spanOf(next))}
+			title={next ? t('card.nextOccurrence', { date: formatCalDate(next, dates.opts) }) : undefined}
+		>
+			{describeRecurrence(rule, dates.opts)}
 		</span>
 	);
 }
 
 /** A `datetime` value: the raw text unchanged when it does not parse (§2.3, never garbage). */
-function DateBadge({ raw, opts }: { raw: string; opts: DateTimeOpts }) {
+function DateBadge({ raw, dates }: { raw: string; dates: DateOpts }) {
 	const date = parseDate(raw);
 	if (!date) return <span class="eb-badge">{raw}</span>;
-	const text = formatCalDate(date, opts);
+	const text = formatCalDate(date, dates.opts);
 	return (
-		<span class="eb-badge" title={needsTooltip(opts) ? absoluteTooltip(date) : undefined}>
+		<span
+			class="eb-badge"
+			style={highlightStyle(dates, spanOf(date))}
+			title={needsTooltip(dates.opts) ? absoluteTooltip(date) : undefined}
+		>
 			{text}
 		</span>
 	);
 }
 
 /** A `date-range` value, or one element of a `date-list` (never a collapsed one-day span). */
-function SpanBadge({ raw, opts }: { raw: string; opts: DateTimeOpts }) {
+function SpanBadge({ raw, dates }: { raw: string; dates: DateOpts }) {
 	const single = parseDate(raw);
-	if (single) return <DateBadge raw={raw} opts={opts} />;
+	if (single) return <DateBadge raw={raw} dates={dates} />;
 	const span = parseSpan(raw);
 	if (!span) {
 		// A recurrence phrase (compound `date-list` element, recurrence.md §2.2)
 		// keeps its frozen English grammar — only real dates/ranges format here.
 		return <span class="eb-badge">{raw}</span>;
 	}
-	const text = formatCalSpan(span, opts);
-	const tooltip = needsTooltip(opts)
+	const text = formatCalSpan(span, dates.opts);
+	const tooltip = needsTooltip(dates.opts)
 		? `${absoluteTooltip(span.start)} → ${absoluteTooltip(span.end)}`
 		: undefined;
 	return (
-		<span class="eb-badge" title={tooltip}>
+		<span class="eb-badge" style={highlightStyle(dates, span)} title={tooltip}>
 			{text}
 		</span>
 	);
@@ -97,6 +133,13 @@ function SpanBadge({ raw, opts }: { raw: string; opts: DateTimeOpts }) {
 
 export function PropertyBadge({ pv, config, progress, settings, card }: Props) {
 	const def = config.properties.find((p) => p.name === pv.name);
+	// Built only for the date family, and only once per badge: the board's own
+	// rule list replaces the plugin's rather than merging with it (§3.2).
+	const dateOpts = (): DateOpts => ({
+		opts: dateTimeOptsFor(settings),
+		highlights: highlightsFor(config, settings.dateHighlights),
+		property: pv.name,
+	});
 
 	switch (pv.type) {
 		case 'string-list': {
@@ -134,20 +177,22 @@ export function PropertyBadge({ pv, config, progress, settings, card }: Props) {
 				</span>
 			);
 		case 'datetime':
-			return <DateBadge raw={pv.raw} opts={dateTimeOptsFor(settings)} />;
+			return <DateBadge raw={pv.raw} dates={dateOpts()} />;
 		case 'date-range':
-			return <SpanBadge raw={pv.raw} opts={dateTimeOptsFor(settings)} />;
+			return <SpanBadge raw={pv.raw} dates={dateOpts()} />;
 		case 'recurrence':
-			return <RecurrenceBadge raw={pv.raw} card={card} propertyName={pv.name} opts={dateTimeOptsFor(settings)} />;
+			return <RecurrenceBadge raw={pv.raw} card={card} dates={dateOpts()} />;
 		case 'date-list': {
-			const opts = dateTimeOptsFor(settings);
+			// Every element is matched on its own, so a list can carry one
+			// approaching date and one long past.
+			const dates = dateOpts();
 			return (
 				<>
 					{pv.raw.map((r, i) =>
 						isRecurrence(r) ? (
-							<RecurrenceBadge raw={r} card={card} propertyName={pv.name} opts={opts} key={i} />
+							<RecurrenceBadge raw={r} card={card} dates={dates} key={i} />
 						) : (
-							<SpanBadge raw={r} opts={opts} key={i} />
+							<SpanBadge raw={r} dates={dates} key={i} />
 						),
 					)}
 				</>

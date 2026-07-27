@@ -14,6 +14,7 @@ import { cloneDefs } from './ui/PropertyDefsEditor';
 import { ExtraboardSettingTab } from './ui/SettingsTab';
 import { BoardView } from './view/BoardView';
 import { ICONS, VIEW_TYPE_BOARD } from './util/constants';
+import { clearReadableCache } from './util/color';
 import { NEW_BOARD_BASENAME, newBoardConfig, newBoardText } from './util/newBoard';
 import { parseFrontmatter } from './model/frontmatter';
 import type { BoardConfig } from './model/types';
@@ -178,6 +179,15 @@ export default class ExtraboardPlugin extends Plugin {
 		// switching back to a board tab also catches up immediately.
 		this.registerInterval(window.setInterval(() => this.refreshBoards(), 60_000));
 		this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.refreshBoards()));
+
+		// A highlight's text color is derived from its background, which may be a
+		// theme variable — so what it resolves to changes with the theme.
+		this.registerEvent(
+			this.app.workspace.on('css-change', () => {
+				clearReadableCache();
+				this.refreshBoards();
+			}),
+		);
 	}
 
 	onunload() {}

@@ -344,6 +344,12 @@ export const en = {
 				desc: 'Shape of the checklist count and percent properties on this board.',
 				followPlugin: 'Follow plugin settings',
 			},
+			dateHighlights: {
+				name: 'Date highlights',
+				desc: 'Rules coloring the date badges of this board. A board list replaces the plugin one instead of adding to it — an empty list means no highlights at all.',
+				followPlugin: 'Follow plugin settings',
+				own: "Use this board's own rules",
+			},
 			properties: {
 				heading: 'Properties',
 				desc: 'Property order here is the order of tokens on a card. Changing a definition never rewrites cards.',
@@ -440,6 +446,10 @@ export const en = {
 			heading: 'Default properties',
 			desc: 'Properties written into every new board. Editing them never touches boards that already exist — use Board settings for those.',
 		},
+		dateHighlights: {
+			heading: 'Date highlights',
+			desc: 'Color a date badge as its date approaches or after it has passed. A board can replace this whole list in its own settings.',
+		},
 	},
 	common: {
 		cancel: 'Cancel',
@@ -483,6 +493,35 @@ export const en = {
 			strictOptionsWrongType: 'Property "{name}": strict/options are only valid on string-list.',
 			timeWrongType: 'Property "{name}": time is only valid on datetime.',
 			tooManyColors: 'At most one color property is allowed per board.',
+		},
+	},
+	dateHighlights: {
+		empty: 'No highlight rules yet.',
+		addRule: 'Add rule',
+		removeRule: 'Remove rule',
+		dragToReorder: 'Drag to reorder',
+		anyProperty: 'Any date property',
+		property: 'Property',
+		when: {
+			label: 'When',
+			before: 'Before',
+			after: 'After',
+		},
+		amount: 'Amount',
+		unit: {
+			label: 'Unit',
+			hour: 'hours',
+			day: 'days',
+			week: 'weeks',
+			month: 'months',
+		},
+		color: 'Color',
+		orderHint:
+			'Rules are checked from the top down and the first match colors the badge, so put the most urgent one first. A date without a time counts as the end of its day.',
+		diagnostic: {
+			noColor: 'Rule {index} has no color.',
+			badAmount: 'Rule {index}: the amount must be a whole number, 0 or more.',
+			unknownProperty: 'Rule {index}: this board has no date property "{name}".',
 		},
 	},
 	colorPicker: {
