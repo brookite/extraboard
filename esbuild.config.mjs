@@ -64,6 +64,11 @@ const context = await esbuild.context({
 	jsxImportSource: 'preact',
 	format: 'cjs',
 	target: 'es2021',
+	// esbuild defaults to `charset: 'ascii'`, which escapes every non-ASCII
+	// character as `\uXXXX` — six bytes where UTF-8 needs two. The Russian
+	// locale table alone pays ~29 KB for that (docs/plans/m10-perf.md §6).
+	// Obsidian reads main.js as UTF-8.
+	charset: 'utf8',
 	logLevel: 'info',
 	sourcemap: prod ? false : 'inline',
 	treeShaking: true,
