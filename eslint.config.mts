@@ -13,6 +13,11 @@ export default defineConfig(
 		'package.json',
 		'package-lock.json',
 		'tsconfig.json',
+		// Development-only harness for the M10 Part B measurements: a Node
+		// generator and a script pasted into Obsidian's console. Neither ships in
+		// the bundle, so the plugin rules (no Node built-ins, no console) do not
+		// apply to them. See docs/plans/m10-perf.md §1.
+		'tests/perf',
 	]),
 	{
 		languageOptions: {
