@@ -13,6 +13,7 @@
 import type { Recurrence } from '../model/recurrence';
 import { formatCalDate, type DateTimeOpts } from './dates';
 import { t } from './index';
+import { pluralRules } from './intl';
 
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday..Sunday, matching formatRecurrence's own order
 
@@ -166,13 +167,13 @@ const FREQ_MANY = {
 function freqClause(rule: Recurrence, lang: 'en' | 'ru', compact: boolean): string {
 	const form = compact ? 'compact' : 'full';
 	if (rule.interval === 1) return t(FREQ_ONE[form][rule.freq]);
-	const category = new Intl.PluralRules(lang).select(rule.interval);
+	const category = pluralRules(lang).select(rule.interval);
 	const bucket = category === 'few' ? 'few' : 'many';
 	return t(FREQ_MANY[form][rule.freq][bucket], { n: rule.interval });
 }
 
 function timesClause(count: number, lang: 'en' | 'ru'): string {
-	const category = new Intl.PluralRules(lang).select(count);
+	const category = pluralRules(lang).select(count);
 	if (category === 'one') return t('recurrenceText.timesOne');
 	if (category === 'few') return t('recurrenceText.timesFew', { n: count });
 	return t('recurrenceText.timesMany', { n: count });

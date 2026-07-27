@@ -1,10 +1,12 @@
 import { Menu } from 'obsidian';
-import { useRef, useState } from 'preact/hooks';
+import { useCallback, useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
-import type { Board } from '../../model/types';
+import type { BoardConfig, Stack } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
 import { editStack } from '../../ui/StackModal';
 import type { BoardApi } from '../api';
+import { memo } from '../memo';
+import { useCloseOnReload } from '../reload';
 import { useSortable } from '../useSortable';
 import { CardTile } from './Card';
 import { DividerRow } from './Divider';
@@ -12,9 +14,13 @@ import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
 import { t } from '../../i18n';
 
+/** Identity-stable props, so the memo below holds across an edit in another
+ * stack (m10-perf.md §2) — the stack object and the board's config, never the
+ * board, which every edit replaces. */
 interface Props {
-	board: Board;
+	stack: Stack;
 	index: number;
+	config: BoardConfig;
 	api: BoardApi;
 	settings: ExtraboardSettings;
 }
@@ -26,11 +32,17 @@ function countHiddenAfter(hidden: Set<number>, index: number): number {
 	return count;
 }
 
-export function StackColumn({ board, index, api, settings }: Props) {
+function StackColumnInner({ stack, index, config, api, settings }: Props) {
 	const [renaming, setRenaming] = useState(false);
 	// Set right after a fresh card is inserted at the top, so that card's tile
 	// opens itself for editing once, then clears this back.
 	const [pendingNewCard, setPendingNewCard] = useState(false);
+	// Stable across renders: an inline lambda here would change on every render of
+	// this column and defeat every card's memo (m10-perf.md §2).
+	const clearPendingNewCard = useCallback(() => setPendingNewCard(false), []);
+	// As for a card or a divider: the rename is the slot's state, and an external
+	// reload can put a different stack at this index (view/reload.ts).
+	useCloseOnReload(() => setRenaming(false));
 	const bodyRef = useRef<HTMLDivElement>(null);
 
 	useSortable(bodyRef, { group: 'eb-items', draggable: '.eb-item' }, (drop) => {
@@ -42,9 +54,6 @@ export function StackColumn({ board, index, api, settings }: Props) {
 		}
 		api.update((b) => ops.moveItem(b, from, drop.toList, drop.before));
 	});
-
-	const stack = board.stacks[index];
-	if (!stack) return null;
 
 	const collapsed = stack.collapsed;
 	const hidden = ops.hiddenItems(stack);
@@ -237,18 +246,20 @@ export function StackColumn({ board, index, api, settings }: Props) {
 					hidden.has(i) ? null : item.kind === 'card' ? (
 						<CardTile
 							key={i}
-							board={board}
+							card={item.card}
 							stackIndex={index}
 							index={i}
+							config={config}
+							groupColor={ops.groupColor(stack, i)}
 							api={api}
 							settings={settings}
 							forceEdit={i === 0 && pendingNewCard}
-							onForceEditConsumed={() => setPendingNewCard(false)}
+							onForceEditConsumed={clearPendingNewCard}
 						/>
 					) : (
 						<DividerRow
 							key={i}
-							board={board}
+							divider={item.divider}
 							stackIndex={index}
 							index={i}
 							api={api}
@@ -260,3 +271,5 @@ export function StackColumn({ board, index, api, settings }: Props) {
 		</div>
 	);
 }
+
+export const StackColumn = memo(StackColumnInner);

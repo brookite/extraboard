@@ -75,7 +75,7 @@ function ArchiveRow({ entry, board, api, settings, onRestore, onDelete, onOpenLi
 						key={i}
 						pv={pv}
 						config={board.config}
-						progress={progressStyleFor(board, settings)}
+						progress={progressStyleFor(board.config, settings)}
 						settings={settings}
 						card={card}
 					/>
@@ -98,7 +98,7 @@ function ArchiveRow({ entry, board, api, settings, onRestore, onDelete, onOpenLi
 					<ChecklistProgress
 						done={progress.done}
 						total={progress.total}
-						style={progressStyleFor(board, settings)}
+						style={progressStyleFor(board.config, settings)}
 					/>
 				</div>
 			) : null}

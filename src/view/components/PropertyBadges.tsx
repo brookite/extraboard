@@ -9,7 +9,7 @@ import { useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import { escapeValue, formatValue, parseValue } from '../../model/properties';
 import { parseRecurrence } from '../../model/recurrence';
-import type { Board, Card, PropertyDef, PropertyValue } from '../../model/types';
+import type { BoardConfig, Card, PropertyDef, PropertyValue } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
 import { dateTimeOptsFor, type DateTimeOpts } from '../../i18n/dates';
 import { describeRecurrence } from '../../i18n/recurrenceText';
@@ -26,7 +26,7 @@ const TEXT_TYPES = new Set(['string', 'datetime', 'date-range']);
 const LIST_TEXT_TYPES = new Set(['date-list', 'raw']);
 
 interface Props {
-	board: Board;
+	config: BoardConfig;
 	card: Card;
 	target: ops.ItemRef;
 	api: BoardApi;
@@ -34,12 +34,12 @@ interface Props {
 	settings: ExtraboardSettings;
 }
 
-export function PropertyBadges({ board, card, target, api, settings }: Props) {
+export function PropertyBadges({ config, card, target, api, settings }: Props) {
 	// Name of the property whose editor is open; it need not be on the card yet.
 	const [open, setOpen] = useState<string | null>(null);
 
 	const defFor = (name: string): PropertyDef | undefined =>
-		board.config.properties.find((d) => d.name === name);
+		config.properties.find((d) => d.name === name);
 	const valueFor = (name: string): PropertyValue | undefined =>
 		card.properties.find((pv) => pv.name === name);
 
@@ -55,7 +55,7 @@ export function PropertyBadges({ board, card, target, api, settings }: Props) {
 	};
 
 	const addMenu = (evt: MouseEvent): void => {
-		const missing = board.config.properties.filter((d) => !valueFor(d.name));
+		const missing = config.properties.filter((d) => !valueFor(d.name));
 		const menu = new Menu();
 		if (!missing.length) {
 			menu.addItem((item) => item.setTitle(t('propertyBadges.noOtherProperties')).setDisabled(true));

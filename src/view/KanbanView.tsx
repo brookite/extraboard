@@ -102,8 +102,15 @@ export function KanbanView({ board, api, settings }: BoardProps) {
 
 	return (
 		<div class="eb-board" ref={boardRef} data-list={0}>
-			{board.stacks.map((_, i) => (
-				<StackColumn key={i} board={board} index={i} api={api} settings={settings} />
+			{board.stacks.map((stack, i) => (
+				<StackColumn
+					key={i}
+					stack={stack}
+					index={i}
+					config={board.config}
+					api={api}
+					settings={settings}
+				/>
 			))}
 			<AddStack api={api} />
 		</div>

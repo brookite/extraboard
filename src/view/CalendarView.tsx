@@ -6,10 +6,11 @@
 // must stay cheap — and every click in a cell opens the day modal, which is
 // where the day's cards are actually edited (§5).
 
-import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { RefObject } from 'preact';
 import {
 	Occurrence,
+	Placement,
 	clearOccurrence,
 	moveOccurrence,
 	placeCards,
@@ -36,7 +37,9 @@ import type { BoardApi } from './api';
 import { Icon } from './components/Icon';
 import { safeColor } from './components/style';
 import { DropInfo, isDragging, useSortable } from './useSortable';
+import { useNow } from './now';
 import { currentLanguage, t } from '../i18n';
+import { dateTimeFormat } from '../i18n/intl';
 import {
 	dateTimeOptsFor,
 	formatTimePart,
@@ -83,13 +86,16 @@ interface Props {
 
 const asDate = (d: CalDate): Date => new Date(d.y, d.m - 1, d.d);
 
+/** The property types a calendar can be computed from (§7). */
+const DATE_PROPERTY_TYPES: readonly PropertyType[] = ['datetime', 'date-range', 'date-list', 'recurrence'];
+
 function periodLabel(anchor: CalDate, mode: 'month' | 'week', start: CalDate): string {
 	const lang = currentLanguage();
 	if (mode === 'month') {
-		return new Intl.DateTimeFormat(lang, { month: 'long', year: 'numeric' }).format(asDate(anchor));
+		return dateTimeFormat(lang, { month: 'long', year: 'numeric' }).format(asDate(anchor));
 	}
 	const end = addDays(start, 6);
-	const fmt = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'long', year: 'numeric' });
+	const fmt = dateTimeFormat(lang, { day: 'numeric', month: 'long', year: 'numeric' });
 	try {
 		return fmt.formatRange(asDate(start), asDate(end));
 	} catch {
@@ -293,9 +299,32 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	const def = board.config.properties.find((p) => p.name === view.dateProperty);
 	const propertyType: PropertyType = def?.type ?? 'datetime';
 	const dateTimeOpts = dateTimeOptsFor(settings);
+	const usable = def !== undefined && DATE_PROPERTY_TYPES.includes(def.type);
+
+	// The drawn window, computed before the broken-view return below so the hooks
+	// that depend on it keep their order.
+	const first = resolveWeekStart(settings.weekStart);
+	const start = view.mode === 'month' ? startOfWeek(startOfMonth(anchor), first) : startOfWeek(anchor, first);
+	const rows = view.mode === 'month' ? 6 : 1;
+	const days: CalDate[] = Array.from({ length: rows * 7 }, (_, i) => addDays(start, i));
+
+	// Recurrences are unbounded, so placement is asked for this window only
+	// (recurrence.md §3); a rule with no hit here is still a dated card.
+	//
+	// Memoized on the board's identity plus the window (m10-perf.md §4): the
+	// board object changes exactly when its content does, so this re-expands
+	// every rule only when there is a reason to — not on a minute tick, and not
+	// when an unrelated piece of view state changes.
+	const { occurrences, undated }: Placement = useMemo(
+		() =>
+			usable
+				? placeCards(board, view.dateProperty, { from: start, to: days[days.length - 1]! })
+				: { occurrences: [], undated: [] },
+		[board, view.dateProperty, usable, dayKey(start), days.length],
+	);
 
 	// A view whose property is gone renders its reason, not an empty grid (§7).
-	if (!def || !['datetime', 'date-range', 'date-list', 'recurrence'].includes(def.type)) {
+	if (!usable) {
 		const [before, after] = t('calendar.brokenMessage').split('{property}');
 		return (
 			<div class="eb-cal-broken">
@@ -317,18 +346,10 @@ export function CalendarView({ board, view, api, settings }: Props) {
 		);
 	}
 
-	const first = resolveWeekStart(settings.weekStart);
-	const start = view.mode === 'month' ? startOfWeek(startOfMonth(anchor), first) : startOfWeek(anchor, first);
-	const rows = view.mode === 'month' ? 6 : 1;
-	const days: CalDate[] = Array.from({ length: rows * 7 }, (_, i) => addDays(start, i));
-	const now = today();
+	// The clock, from the context rather than `today()`, so midnight moves the
+	// "today" cell without a full board refresh (m10-perf.md §2.3).
+	const now = useNow().date;
 
-	// Recurrences are unbounded, so placement is asked for this window only
-	// (recurrence.md §3); a rule with no hit here is still a dated card.
-	const { occurrences, undated } = placeCards(board, view.dateProperty, {
-		from: start,
-		to: days[days.length - 1]!,
-	});
 	const indexOf = new Map(occurrences.map((o, i) => [o, i]));
 
 	const byDay = new Map<string, Occurrence[]>();

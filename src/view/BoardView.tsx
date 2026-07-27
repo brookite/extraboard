@@ -6,6 +6,8 @@ import { HoverPopover, Menu, Notice, Platform, TextFileView, WorkspaceLeaf, setI
 import { render } from 'preact';
 import type ExtraboardPlugin from '../main';
 import type { Board } from '../model/types';
+import { highlightsFor } from '../model/dateHighlights';
+import type { ExtraboardSettings } from '../settings';
 import * as ops from '../model/ops';
 import { parseBoard } from '../model/parse';
 import { serializeBoard } from '../model/serialize';
@@ -19,6 +21,8 @@ import { ICONS, VIEW_TYPE_BOARD, viewIcon } from '../util/constants';
 import { BoardApi, confirmDestructive, searchTag } from './api';
 import { CalendarView } from './CalendarView';
 import { KanbanView, addStack } from './KanbanView';
+import { NowContext, currentNow } from './now';
+import { ReloadContext } from './reload';
 import { t } from '../i18n';
 
 export class BoardView extends TextFileView {
@@ -37,10 +41,25 @@ export class BoardView extends TextFileView {
 	private indicatorTimer?: number;
 	/** Board-change subscribers outside the board's own tree (`BoardApi.onChange`). */
 	private listeners = new Set<() => void>();
+	/**
+	 * The settings as the rendered tree last saw them. Its **identity** is how a
+	 * display-setting change reaches memoized components: `refresh()` replaces the
+	 * snapshot, every `memo` misses and the board redraws in full, while the
+	 * minute tick leaves it alone and redraws only the date badges
+	 * (m10-perf.md §2, §5). Never written to.
+	 */
+	private settingsSnapshot: ExtraboardSettings;
+	/**
+	 * Advanced only by a re-parse in `setViewData` — an *external* change to the
+	 * file. Open inline editors close on it, because their position-keyed state
+	 * would otherwise point at whatever landed at their index (`view/reload.ts`).
+	 */
+	private reloadToken = 0;
 
 	constructor(leaf: WorkspaceLeaf, plugin: ExtraboardPlugin) {
 		super(leaf);
 		this.plugin = plugin;
+		this.settingsSnapshot = { ...plugin.settings };
 		this.api = {
 			app: this.app,
 			hoverParent: this,
@@ -126,6 +145,7 @@ export class BoardView extends TextFileView {
 		// then would throw away in-progress UI state for no reason.
 		if (!clear && data === this.data && this.board) return;
 		this.data = data;
+		this.reloadToken++;
 		try {
 			this.board = parseBoard(data);
 		} catch (err) {
@@ -140,9 +160,38 @@ export class BoardView extends TextFileView {
 		if (this.mountEl) render(null, this.mountEl);
 	}
 
-	/** Re-render with the current plugin settings (after the settings tab changes). */
+	/**
+	 * Re-render with the current plugin settings (after the settings tab or the
+	 * theme changed). A fresh snapshot is what makes this a *full* redraw rather
+	 * than the memoized near-no-op `tick()` is.
+	 */
 	refresh(): void {
+		this.settingsSnapshot = { ...this.plugin.settings };
 		this.renderBoard();
+	}
+
+	/**
+	 * The minute tick (i18n-and-dates.md §2.5): re-render so the `NowContext`
+	 * value can advance. Everything memoized stays skipped, so this costs the
+	 * date badges and nothing else.
+	 */
+	tick(): void {
+		this.renderBoard();
+	}
+
+	/**
+	 * Whether a tick can change a pixel on this board. Relative formats and date
+	 * highlights are the two things that move on their own; a calendar also marks
+	 * today, which turns over at midnight. Nothing else is time-dependent, so
+	 * nothing else is worth a re-render (m10-perf.md §5).
+	 */
+	isTimeDependent(): boolean {
+		const board = this.board;
+		if (!board) return false;
+		const settings = this.plugin.settings;
+		if (settings.dateFormat === 'relative' || settings.timeFormat === 'relative') return true;
+		if (highlightsFor(board.config, settings.dateHighlights).length > 0) return true;
+		return activeViewOf(board.config).type === 'calendar';
 	}
 
 	/**
@@ -434,14 +483,22 @@ export class BoardView extends TextFileView {
 				this.viewCycleEl.setAttribute('aria-label', t('action.switchToAria', { name: next.name }));
 			}
 		}
-		if (view.type === 'calendar') {
-			render(
-				<CalendarView board={this.board} view={view} api={this.api} settings={this.plugin.settings} />,
-				el,
-			);
-		} else {
-			render(<KanbanView board={this.board} api={this.api} settings={this.plugin.settings} />, el);
-		}
+		// One provider around whichever view is mounted: the clock is read by the
+		// date badges and the calendar's "today", both of them under a `memo`
+		// that would otherwise freeze them (m10-perf.md §2.3).
+		const settings = this.settingsSnapshot;
+		render(
+			<NowContext.Provider value={currentNow()}>
+				<ReloadContext.Provider value={this.reloadToken}>
+					{view.type === 'calendar' ? (
+						<CalendarView board={this.board} view={view} api={this.api} settings={settings} />
+					) : (
+						<KanbanView board={this.board} api={this.api} settings={settings} />
+					)}
+				</ReloadContext.Provider>
+			</NowContext.Provider>,
+			el,
+		);
 		// Anything living outside this tree (the day modal) re-reads the board here.
 		for (const listener of this.listeners) listener();
 	}

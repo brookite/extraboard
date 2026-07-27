@@ -5,6 +5,7 @@
 import type { CalDate, DateSpan } from '../model/dates';
 import { RANGE_SEPARATOR, dayKey, daysBetween, formatDate as formatBuiltIn, today } from '../model/dates';
 import { currentLanguage, type Lang } from './index';
+import { dateTimeFormat, relativeTimeFormat } from './intl';
 
 export type DateFormatMode = 'system' | 'built-in' | 'relative' | 'custom';
 
@@ -99,7 +100,7 @@ export function resolveWeekStart(setting: WeekStart | undefined, lang: Lang = cu
 /** A weekday's name in the given language. `day` is 0 = Sunday … 6 = Saturday. */
 export function weekdayName(day: number, lang: Lang, width: 'long' | 'short' = 'long'): string {
 	// 2024-01-07 was a Sunday, so it anchors the names to weekday numbers.
-	return new Intl.DateTimeFormat(lang, { weekday: width }).format(new Date(2024, 0, 7 + day));
+	return dateTimeFormat(lang, { weekday: width }).format(new Date(2024, 0, 7 + day));
 }
 
 function formatCustomDate(date: CalDate, pattern: string | undefined): string {
@@ -144,7 +145,7 @@ const YEAR_APPROX = 365 * DAY;
  * today can read "in 3 hours".
  */
 function formatRelativeDate(date: CalDate, lang: Lang): string {
-	const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
+	const rtf = relativeTimeFormat(lang);
 	if (date.minutes === undefined) {
 		const diffDays = daysBetween(date, today());
 		const abs = Math.abs(diffDays);
@@ -167,7 +168,7 @@ function formatRelativeDate(date: CalDate, lang: Lang): string {
 export function formatDatePart(date: CalDate, opts: DateTimeOpts): string {
 	switch (opts.dateFormat) {
 		case 'system':
-			return new Intl.DateTimeFormat(opts.lang, { dateStyle: 'medium' }).format(toNativeDate(date));
+			return dateTimeFormat(opts.lang, { dateStyle: 'medium' }).format(toNativeDate(date));
 		case 'built-in':
 			return dayKey(date);
 		case 'relative':
@@ -182,7 +183,7 @@ export function formatDatePart(date: CalDate, opts: DateTimeOpts): string {
 export function formatTimePart(minutes: number, opts: DateTimeOpts): string {
 	switch (opts.timeFormat) {
 		case 'system':
-			return new Intl.DateTimeFormat(opts.lang, { timeStyle: 'short' }).format(toNativeTime(minutes));
+			return dateTimeFormat(opts.lang, { timeStyle: 'short' }).format(toNativeTime(minutes));
 		case 'built-in':
 			return builtInTime(minutes);
 		case 'relative':

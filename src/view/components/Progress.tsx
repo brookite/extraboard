@@ -1,14 +1,17 @@
 // Checklist `N/M` and `percent` values, drawn in the board's progress style.
 // Spec: docs/specs/kanban-view.md §5.5, settings.md §progressStyle.
 
-import type { Board, ProgressStyle } from '../../model/types';
+import type { BoardConfig, ProgressStyle } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
 import { ProgressRing } from './ProgressRing';
 import { t } from '../../i18n';
 
-/** Board config first, then the plugin setting — two levels, board wins. */
-export function progressStyleFor(board: Board, settings: ExtraboardSettings): ProgressStyle {
-	return board.config.progressStyle ?? settings.progressStyle;
+/** Board config first, then the plugin setting — two levels, board wins.
+ * Takes the config rather than the board: a memoized card is handed the config
+ * (whose identity survives every edit that does not change it), never the board
+ * object, which every edit replaces (m10-perf.md §2). */
+export function progressStyleFor(config: BoardConfig, settings: ExtraboardSettings): ProgressStyle {
+	return config.progressStyle ?? settings.progressStyle;
 }
 
 interface ChecklistProps {

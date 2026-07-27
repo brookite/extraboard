@@ -1,15 +1,19 @@
 import { Menu } from 'obsidian';
 import { useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
-import type { Board } from '../../model/types';
+import type { Divider } from '../../model/types';
 import type { BoardApi } from '../api';
+import { memo } from '../memo';
+import { useCloseOnReload } from '../reload';
 import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
 import { safeColor } from './style';
 import { t } from '../../i18n';
 
+/** Identity-stable props, so the memo below holds across an unrelated edit
+ * (m10-perf.md §2) — the divider object, never the board. */
 interface Props {
-	board: Board;
+	divider: Divider;
 	stackIndex: number;
 	index: number;
 	api: BoardApi;
@@ -17,12 +21,11 @@ interface Props {
 	hiddenCount: number;
 }
 
-export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props) {
+function DividerRowInner({ divider, stackIndex, index, api, hiddenCount }: Props) {
 	const [editing, setEditing] = useState(false);
-	const entry = board.stacks[stackIndex]?.items[index];
-	if (entry?.kind !== 'divider') return null;
-
-	const divider = entry.divider;
+	// A rename in flight belongs to this position, not to this divider — an
+	// external reload can put another one here (view/reload.ts).
+	useCloseOnReload(() => setEditing(false));
 	const ref = { stack: stackIndex, item: index };
 	const named = divider.name !== undefined;
 	const toggleLabel = divider.collapsed ? t('divider.expand') : t('divider.collapse');
@@ -147,3 +150,5 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 		</div>
 	);
 }
+
+export const DividerRow = memo(DividerRowInner);

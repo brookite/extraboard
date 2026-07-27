@@ -2,12 +2,13 @@ import { Menu } from 'obsidian';
 import { useEffect, useState } from 'preact/hooks';
 import { parseCardLink, unlinkedTitle } from '../../model/link';
 import * as ops from '../../model/ops';
-import type { Board, Card } from '../../model/types';
+import type { BoardConfig, Card } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
 import { ChecklistModal } from '../../ui/ChecklistModal';
 import type { BoardApi } from '../api';
 import { CardEditor } from '../CardEditor';
 import { hoverLinkText, openLinkText, resolveCardLink } from '../links';
+import { memo } from '../memo';
 import { isDragging } from '../useSortable';
 import { IconButton } from './Icon';
 import { MarkdownText, hasMarkdown } from './MarkdownText';
@@ -17,15 +18,26 @@ import { safeColor } from './style';
 import { Tag } from './Tag';
 import { t } from '../../i18n';
 
+/**
+ * Every prop is identity-stable across an edit that did not touch this card,
+ * which is what lets `memo` below turn a one-card edit into a one-card render
+ * (m10-perf.md §2). Hence `card` and `config` rather than the board object,
+ * which every edit replaces, and hence `groupColor` pre-resolved by the stack.
+ */
 interface Props {
-	board: Board;
+	card: Card;
 	stackIndex: number;
 	index: number;
+	config: BoardConfig;
+	/** The color inherited from the card's divider group, already resolved
+	 * (stack-completion-and-divider-colors.md §4.1). */
+	groupColor: string | undefined;
 	api: BoardApi;
 	settings: ExtraboardSettings;
 	/** Open this card for editing as soon as it mounts (a freshly created card). */
 	forceEdit?: boolean;
-	/** Called once `forceEdit` has been acted on, so the caller can clear it. */
+	/** Called once `forceEdit` has been acted on, so the caller can clear it.
+	 * Must be stable (`useCallback`) or it defeats the memo for every card. */
 	onForceEditConsumed?: () => void;
 }
 
@@ -35,10 +47,12 @@ function cardColor(card: Card): string {
 	return pv?.type === 'color' ? pv.value : '';
 }
 
-export function CardTile({
-	board,
+function CardTileInner({
+	card,
 	stackIndex,
 	index,
+	config,
+	groupColor,
 	api,
 	settings,
 	forceEdit,
@@ -52,17 +66,13 @@ export function CardTile({
 		onForceEditConsumed?.();
 	}, [forceEdit]);
 
-	const entry = board.stacks[stackIndex]?.items[index];
-	if (entry?.kind !== 'card') return null;
-
-	const card = entry.card;
 	const ref = { stack: stackIndex, item: index };
 
 	if (editing) {
 		return (
 			<div class="eb-item eb-card is-editing" data-index={index}>
 				<CardEditor
-					board={board}
+					config={config}
 					card={card}
 					target={ref}
 					api={api}
@@ -77,7 +87,7 @@ export function CardTile({
 	// A card in a colored divider's group inherits that color, in the same place
 	// the card's own would paint; its own always wins
 	// (stack-completion-and-divider-colors.md §4.1).
-	const color = safeColor(rawColor) ?? safeColor(ops.groupColor(board.stacks[stackIndex]!, index));
+	const color = safeColor(rawColor) ?? safeColor(groupColor);
 	// The content note is derived from the title, never stored (§4.4): it is the
 	// first link in it. Only a title that is *nothing but* that link renders as
 	// one anchor; a title that merely contains it is rendered as Markdown, links
@@ -176,9 +186,12 @@ export function CardTile({
 
 		// A flat "Move to" section, one item per stack — no submenu, so it works
 		// the same way on mobile (kanban-view.md §5.3).
-		if (board.stacks.length > 1) {
+		// Read through the live board rather than a captured one: the menu is built
+		// at click time, and this card is not handed the board (see `Props`).
+		const stacks = api.getBoard()?.stacks ?? [];
+		if (stacks.length > 1) {
 			menu.addSeparator();
-			board.stacks.forEach((stack, i) => {
+			stacks.forEach((stack, i) => {
 				menu.addItem((item) =>
 					item
 						.setTitle(t('card.moveTo', { name: stack.name || t('modal.archive.untitled') }))
@@ -215,7 +228,7 @@ export function CardTile({
 	// The color property is chrome, not a badge (kanban-view.md §3).
 	const badges = card.properties.filter((pv) => pv.type !== 'color');
 	const done = ops.isCardDone(card);
-	const hasCheckbox = card.task !== undefined || board.config.showCardCheckbox === true;
+	const hasCheckbox = card.task !== undefined || config.showCardCheckbox === true;
 	const classes = [
 		'eb-item',
 		'eb-card',
@@ -303,8 +316,8 @@ export function CardTile({
 						<PropertyBadge
 							key={i}
 							pv={pv}
-							config={board.config}
-							progress={progressStyleFor(board, settings)}
+							config={config}
+							progress={progressStyleFor(config, settings)}
 							settings={settings}
 							card={card}
 						/>
@@ -315,13 +328,13 @@ export function CardTile({
 				<div class="eb-card-foot">
 					<div class="eb-card-tags">
 						{card.tags.map((t) => (
-							<Tag key={t} tag={t} config={board.config} api={api} />
+							<Tag key={t} tag={t} config={config} api={api} />
 						))}
 					</div>
 					<ChecklistProgress
 						done={progress.done}
 						total={progress.total}
-						style={progressStyleFor(board, settings)}
+						style={progressStyleFor(config, settings)}
 						onOpen={openChecklist}
 					/>
 				</div>
@@ -329,3 +342,10 @@ export function CardTile({
 		</div>
 	);
 }
+
+/**
+ * The memoized tile is what the board renders. With `ops`' identity
+ * preservation behind it, an edit to one card re-renders that card alone
+ * instead of every card on the board (m10-perf.md §2).
+ */
+export const CardTile = memo(CardTileInner);

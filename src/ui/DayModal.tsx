@@ -18,6 +18,7 @@ import { CardTile } from '../view/components/Card';
 import { Icon } from '../view/components/Icon';
 import { safeColor } from '../view/components/style';
 import { currentLanguage, t } from '../i18n';
+import { dateTimeFormat } from '../i18n/intl';
 
 type CalendarDef = Extract<ViewDef, { type: 'calendar' }>;
 
@@ -42,7 +43,7 @@ export function openDayModal(app: App, options: DayModalOptions): void {
 function dayTitle(day: CalDate | null): string {
 	if (!day) return t('modal.day.noDate');
 	const date = new Date(day.y, day.m - 1, day.d);
-	return new Intl.DateTimeFormat(currentLanguage(), {
+	return dateTimeFormat(currentLanguage(), {
 		weekday: 'long',
 		day: 'numeric',
 		month: 'long',
@@ -94,7 +95,8 @@ interface RowProps {
 function DayRow({ board, refItem, api, settings }: RowProps) {
 	const stack = board.stacks[refItem.stack];
 	const divider = dividerOf(board, refItem);
-	if (!stack) return null;
+	const entry = stack?.items[refItem.item];
+	if (!stack || entry?.kind !== 'card') return null;
 
 	const chooseStack = (event: MouseEvent): void => {
 		const menu = new Menu();
@@ -148,9 +150,11 @@ function DayRow({ board, refItem, api, settings }: RowProps) {
 	return (
 		<div class="eb-day-row">
 			<CardTile
-				board={board}
+				card={entry.card}
 				stackIndex={refItem.stack}
 				index={refItem.item}
+				config={board.config}
+				groupColor={ops.groupColor(stack, refItem.item)}
 				api={api}
 				settings={settings}
 			/>

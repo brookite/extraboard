@@ -390,6 +390,7 @@ export const en = {
 		archivedMany: 'Archived {count} cards.',
 		badNoteFolder: 'Extraboard: could not use the folder "{folder}".',
 		createNoteFailed: 'Extraboard: could not create the note.',
+		editDiscarded: 'The board file changed elsewhere — the unsaved card edit was discarded.',
 	},
 	settings: {
 		language: {

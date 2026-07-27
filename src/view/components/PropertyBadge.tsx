@@ -2,10 +2,10 @@
 // i18n-and-dates.md §2 (the date/time formatting pipeline).
 
 import type { BoardConfig, Card, ProgressStyle, PropertyValue } from '../../model/types';
-import { parseDate, parseSpan, today, type CalDate, type DateSpan } from '../../model/dates';
+import { parseDate, parseSpan, type CalDate, type DateSpan } from '../../model/dates';
 import { isRecurrence, nextOccurrence, parseRecurrence, type Recurrence } from '../../model/recurrence';
 import { anchorFor } from '../../model/calendar';
-import { highlightsFor, matchHighlight, type DateHighlightRule } from '../../model/dateHighlights';
+import { highlightsFor, matchHighlight, type DateHighlightRule, type Now } from '../../model/dateHighlights';
 import type { ExtraboardSettings } from '../../settings';
 import { dateTimeOptsFor, formatCalDate, formatCalSpan, absoluteTooltip, type DateTimeOpts } from '../../i18n/dates';
 import { describeRecurrence } from '../../i18n/recurrenceText';
@@ -14,6 +14,7 @@ import { readableOn } from '../../util/color';
 import { Icon } from './Icon';
 import { PercentValue } from './Progress';
 import { safeColor, styleFor } from './style';
+import { useNow } from '../now';
 
 interface Props {
 	pv: PropertyValue;
@@ -26,12 +27,16 @@ interface Props {
 	card: Card;
 }
 
-/** What every date-family badge needs: the format settings and the rules in force. */
+/** What every date-family badge needs: the format settings, the rules in force,
+ * and the instant they are measured against. `now` comes from the context rather
+ * than the clock so a memoized card still updates on the minute tick — and only
+ * then (m10-perf.md §2.3). */
 interface DateOpts {
 	opts: DateTimeOpts;
 	highlights: readonly DateHighlightRule[];
 	/** Property name the rules are matched against. */
 	property: string;
+	now: Now;
 }
 
 /** A single date reads as a one-day span, so one matcher serves every shape. */
@@ -46,7 +51,7 @@ function spanOf(date: CalDate | null): DateSpan | null {
  */
 function highlightStyle(o: DateOpts, span: DateSpan | null): Record<string, string> | undefined {
 	if (o.highlights.length === 0) return undefined;
-	const rule = matchHighlight(o.highlights, o.property, span);
+	const rule = matchHighlight(o.highlights, o.property, span, o.now);
 	const bg = rule && safeColor(rule.color);
 	if (!bg) return undefined;
 	return styleFor(bg, readableOn(bg, document.body));
@@ -67,10 +72,10 @@ function needsTooltip(opts: DateTimeOpts): boolean {
  * and the date a highlight rule measures against. `null` when the rule is
  * unanchored or spent — then there is nothing to be early or late for (§3).
  */
-function nextHit(rule: Recurrence, card: Card, propertyName: string): CalDate | null {
+function nextHit(rule: Recurrence, card: Card, propertyName: string, from: CalDate): CalDate | null {
 	const anchor = rule.start ?? anchorFor(card, propertyName);
 	if (!anchor) return null;
-	return nextOccurrence(rule, anchor, today());
+	return nextOccurrence(rule, anchor, from);
 }
 
 /**
@@ -83,7 +88,7 @@ function nextHit(rule: Recurrence, card: Card, propertyName: string): CalDate | 
 function RecurrenceBadge({ raw, card, dates }: { raw: string; card: Card; dates: DateOpts }) {
 	const rule = parseRecurrence(raw);
 	if (!rule) return <span class="eb-badge">{raw}</span>;
-	const next = nextHit(rule, card, dates.property);
+	const next = nextHit(rule, card, dates.property, dates.now.date);
 	// The chip carries the compact form; the tooltip carries everything the
 	// compaction left out — the dates and the next hit (recurrence.md §5).
 	const full = describeRecurrence(rule, dates.opts);
@@ -140,6 +145,10 @@ function SpanBadge({ raw, dates }: { raw: string; dates: DateOpts }) {
 }
 
 export function PropertyBadge({ pv, config, progress, settings, card }: Props) {
+	// Subscribing to the clock here is what keeps relative labels and highlights
+	// live under the card's `memo`: a context change re-renders exactly the badges
+	// that read it, and nothing else on the board (m10-perf.md §2.3).
+	const now = useNow();
 	const def = config.properties.find((p) => p.name === pv.name);
 	// Built only for the date family, and only once per badge: the board's own
 	// rule list replaces the plugin's rather than merging with it (§3.2).
@@ -147,6 +156,7 @@ export function PropertyBadge({ pv, config, progress, settings, card }: Props) {
 		opts: dateTimeOptsFor(settings),
 		highlights: highlightsFor(config, settings.dateHighlights),
 		property: pv.name,
+		now,
 	});
 
 	switch (pv.type) {

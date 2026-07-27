@@ -8,12 +8,13 @@ import { Notice, type App } from 'obsidian';
 import { processCardText, type DroppedKind } from '../model/cardText';
 import * as ops from '../model/ops';
 import { cardLineContent } from '../model/serialize';
-import type { Board, Card } from '../model/types';
+import type { BoardConfig, Card } from '../model/types';
 import type { ExtraboardSettings } from '../settings';
 import type { BoardApi } from './api';
 import { InlineEditor } from './components/InlineEditor';
 import { PropertyBadges } from './components/PropertyBadges';
 import { createEmbeddedEditor } from './embeddedEditor';
+import { useCloseOnReload } from './reload';
 import { t } from '../i18n';
 
 function droppedLabel(kind: DroppedKind): string {
@@ -55,8 +56,8 @@ function describeDropped(dropped: DroppedKind[]): string {
  * only, and the property values are carried over by the op; with them shown it
  * holds the card's whole line and is parsed exactly like the file is.
  */
-export function cardEditText(card: Card, board: Board, showRaw: boolean): string {
-	if (showRaw) return cardLineContent(card, board.config);
+export function cardEditText(card: Card, config: BoardConfig, showRaw: boolean): string {
+	if (showRaw) return cardLineContent(card, config);
 	return [card.title, ...card.tags.map((t) => `#${t}`)].filter(Boolean).join(' ');
 }
 
@@ -129,7 +130,9 @@ function RichField({ app, value, placeholder, scope, onReady, onSubmit, onCommit
 }
 
 interface Props {
-	board: Board;
+	/** The board's configuration, not the board: an editor is mounted inside a
+	 * memoized card, which is never handed the board object (m10-perf.md §2). */
+	config: BoardConfig;
 	card: Card;
 	target: ops.ItemRef;
 	api: BoardApi;
@@ -140,7 +143,7 @@ interface Props {
 /** Obsidian surfaces that float above the board and must not close the editor. */
 const FLOATING = '.modal-container, .menu, .suggestion-container, .notice-container';
 
-export function CardEditor({ board, card, target, api, settings, onClose }: Props) {
+export function CardEditor({ config, card, target, api, settings, onClose }: Props) {
 	const showRaw = settings.showRawPropertyTokens;
 	const rootRef = useRef<HTMLDivElement>(null);
 	const save = (text: string): void => {
@@ -158,6 +161,21 @@ export function CardEditor({ board, card, target, api, settings, onClose }: Prop
 	// Set while the field is mounted, so its current text can be read
 	// synchronously — see the pointerdown handler below.
 	const fieldValue = useRef<(() => string) | null>(null);
+	// What the field was seeded with, so an interrupted edit can tell whether
+	// anything was actually typed.
+	const openedWith = useRef(cardEditText(card, config, showRaw));
+
+	// The board was re-parsed from the file underneath this editor (view/reload.ts).
+	// The field still holds the *old* card's text while `target` is an index that
+	// may now hold a different card, so committing is the one thing that must not
+	// happen: close, discarding the text, and say so when there was any.
+	useCloseOnReload(() => {
+		const current = fieldValue.current?.();
+		if (current !== undefined && current !== openedWith.current) {
+			new Notice(t('notice.editDiscarded'));
+		}
+		onClose();
+	});
 
 	// Pointing anywhere outside the editor closes it. The field's own blur
 	// commits asynchronously (it defers to let a completion click land first),
@@ -182,7 +200,7 @@ export function CardEditor({ board, card, target, api, settings, onClose }: Prop
 		<div class="eb-card-editor" ref={rootRef} onClick={(e) => e.stopPropagation()}>
 			<RichField
 				app={api.app}
-				value={cardEditText(card, board, showRaw)}
+				value={cardEditText(card, config, showRaw)}
 				placeholder={showRaw ? t('cardEditor.placeholderRaw') : t('cardEditor.placeholder')}
 				scope={rootRef}
 				onReady={(getValue) => {
@@ -195,7 +213,7 @@ export function CardEditor({ board, card, target, api, settings, onClose }: Prop
 				onCommit={save}
 				onCancel={onClose}
 			/>
-			<PropertyBadges board={board} card={card} target={target} api={api} settings={settings} />
+			<PropertyBadges config={config} card={card} target={target} api={api} settings={settings} />
 		</div>
 	);
 }

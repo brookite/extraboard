@@ -392,6 +392,7 @@ export const ru: DeepPartial<typeof en> = {
 		archivedMany: 'Архивировано карточек: {count}.',
 		badNoteFolder: 'Extraboard: не удалось использовать папку «{folder}».',
 		createNoteFailed: 'Extraboard: не удалось создать заметку.',
+		editDiscarded: 'Файл доски изменился извне — несохранённая правка карточки отброшена.',
 	},
 	settings: {
 		language: {

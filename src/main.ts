@@ -157,8 +157,8 @@ export default class ExtraboardPlugin extends Plugin {
 		// re-render, never a save (i18n-and-dates.md §4). A minute is the finest
 		// unit a relative label ever shows, so that is how often this needs to run;
 		// switching back to a board tab also catches up immediately.
-		this.registerInterval(window.setInterval(() => this.refreshBoards(), 60_000));
-		this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.refreshBoards()));
+		this.registerInterval(window.setInterval(() => this.tickBoards(), 60_000));
+		this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.tickBoards()));
 
 		// A highlight's text color is derived from its background, which may be a
 		// theme variable — so what it resolves to changes with the theme.
@@ -183,11 +183,28 @@ export default class ExtraboardPlugin extends Plugin {
 		window.setTimeout(() => this.suppressed.delete(path), 1000);
 	}
 
-	/** Re-render every open board, e.g. after a display setting changed. */
+	/** Re-render every open board in full, e.g. after a display setting or the
+	 * theme changed. Every memoized component misses, by design. */
 	refreshBoards(): void {
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_BOARD)) {
 			const view = leaf.view;
 			if (view instanceof BoardView) view.refresh();
+		}
+	}
+
+	/**
+	 * The minute tick. Unlike `refreshBoards` it is skipped wherever it cannot
+	 * change a pixel — a board nobody is looking at, or one with no relative
+	 * format, no highlight rule and no calendar (m10-perf.md §5). What survives
+	 * the filter costs only the date badges: everything else is memoized.
+	 */
+	tickBoards(): void {
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_BOARD)) {
+			const view = leaf.view;
+			if (!(view instanceof BoardView)) continue;
+			if (!view.containerEl.isShown()) continue;
+			if (!view.isTimeDependent()) continue;
+			view.tick();
 		}
 	}
 
