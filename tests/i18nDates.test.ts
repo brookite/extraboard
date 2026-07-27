@@ -8,6 +8,8 @@ import {
 	formatCalSpan,
 	absoluteTooltip,
 	dateTimeOptsFor,
+	resolveWeekStart,
+	weekdayName,
 	type DateTimeOpts,
 } from '../src/i18n/dates';
 import type { CalDate } from '../src/model/dates';
@@ -126,6 +128,58 @@ describe('formatCalSpan', () => {
 describe('absoluteTooltip', () => {
 	it('is always the built-in form, regardless of the configured mode', () => {
 		expect(absoluteTooltip(DUE_TIMED)).toBe('2026-07-27 09:05');
+	});
+});
+
+describe('resolveWeekStart', () => {
+	/** A stand-in for Obsidian's bundled moment, which plain Node does not have. */
+	function withMoment(firstDay: number | undefined, run: () => void): void {
+		vi.stubGlobal('window', {
+			moment: {
+				localeData: () => (firstDay === undefined ? null : { firstDayOfWeek: () => firstDay }),
+			},
+		});
+		try {
+			run();
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	}
+
+	it('an explicit weekday is used verbatim', () => {
+		expect(resolveWeekStart(0, 'ru')).toBe(0);
+		expect(resolveWeekStart(6, 'en')).toBe(6);
+		withMoment(0, () => {
+			expect(resolveWeekStart(1, 'en')).toBe(1);
+		});
+	});
+
+	it('auto reads the locale of the requested language', () => {
+		withMoment(0, () => {
+			expect(resolveWeekStart('auto', 'en')).toBe(0);
+		});
+		withMoment(1, () => {
+			expect(resolveWeekStart('auto', 'ru')).toBe(1);
+		});
+	});
+
+	it('falls back to Monday without moment, without locale data, or on a bad stored value', () => {
+		expect(resolveWeekStart('auto', 'en')).toBe(1);
+		withMoment(undefined, () => {
+			expect(resolveWeekStart('auto', 'en')).toBe(1);
+		});
+		expect(resolveWeekStart(7 as unknown as 0, 'en')).toBe(1);
+		expect(resolveWeekStart('monday' as unknown as 'auto', 'en')).toBe(1);
+	});
+});
+
+describe('weekdayName', () => {
+	it('numbers weekdays the way Date.getDay does, in the requested language', () => {
+		expect(weekdayName(0, 'en')).toBe('Sunday');
+		expect(weekdayName(1, 'en')).toBe('Monday');
+		expect(weekdayName(6, 'en')).toBe('Saturday');
+		expect(weekdayName(1, 'en', 'short')).toBe('Mon');
+		expect(weekdayName(1, 'ru')).not.toBe(weekdayName(1, 'en'));
 	});
 });
 

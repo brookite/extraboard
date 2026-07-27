@@ -6,7 +6,6 @@
 // must stay cheap — and every click in a cell opens the day modal, which is
 // where the day's cards are actually edited (§5).
 
-import { moment } from 'obsidian';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { RefObject } from 'preact';
 import {
@@ -38,7 +37,13 @@ import { Icon } from './components/Icon';
 import { safeColor } from './components/style';
 import { DropInfo, isDragging, useSortable } from './useSortable';
 import { currentLanguage, t } from '../i18n';
-import { dateTimeOptsFor, formatTimePart, type DateTimeOpts } from '../i18n/dates';
+import {
+	dateTimeOptsFor,
+	formatTimePart,
+	resolveWeekStart,
+	weekdayName,
+	type DateTimeOpts,
+} from '../i18n/dates';
 
 /** `data-list` of the "No date" tray — the one container that is not a day. */
 const TRAY = -1;
@@ -60,17 +65,11 @@ interface Props {
 // is always shown in full, absolute form — there is no "relative July 2026" —
 // so only its **locale source** moves onto the shared resolver (i18n-and-dates.md
 // §2): the plugin's own `language` setting, not whatever Obsidian's app-wide
-// locale happens to be, so the two cannot silently disagree. Chip/tooltip
+// locale happens to be, so the two cannot silently disagree. The week start is
+// the one piece of that chrome the user can override outright, through the
+// `weekStart` setting (§2.6); `auto` keeps the locale's own convention. Chip/tooltip
 // *time* values do go through the full `dateFormat`/`timeFormat` pipeline
 // below, since those are the same kind of value a property badge shows.
-
-function firstDayOfWeek(): number {
-	try {
-		return moment.localeData(currentLanguage())?.firstDayOfWeek() ?? 1;
-	} catch {
-		return 1;
-	}
-}
 
 const asDate = (d: CalDate): Date => new Date(d.y, d.m - 1, d.d);
 
@@ -89,9 +88,8 @@ function periodLabel(anchor: CalDate, mode: 'month' | 'week', start: CalDate): s
 }
 
 function weekdayNames(first: number): string[] {
-	const fmt = new Intl.DateTimeFormat(currentLanguage(), { weekday: 'short' });
-	// 2024-01-07 was a Sunday, so it anchors the names to weekday numbers.
-	return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2024, 0, 7 + ((first + i) % 7))));
+	const lang = currentLanguage();
+	return Array.from({ length: 7 }, (_, i) => weekdayName((first + i) % 7, lang, 'short'));
 }
 
 // --- cell budget ------------------------------------------------------------
@@ -269,7 +267,7 @@ export function CalendarView({ board, view, api, settings }: Props) {
 		);
 	}
 
-	const first = firstDayOfWeek();
+	const first = resolveWeekStart(settings.weekStart);
 	const start = view.mode === 'month' ? startOfWeek(startOfMonth(anchor), first) : startOfWeek(anchor, first);
 	const rows = view.mode === 'month' ? 6 : 1;
 	const days: CalDate[] = Array.from({ length: rows * 7 }, (_, i) => addDays(start, i));

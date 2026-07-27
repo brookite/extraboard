@@ -5,7 +5,7 @@
 import type { ProgressStyle, PropertyDef } from './model/types';
 import type { DateHighlightRule } from './model/dateHighlights';
 import type { Lang } from './i18n';
-import type { DateFormatMode } from './i18n/dates';
+import type { DateFormatMode, WeekStart } from './i18n/dates';
 
 export interface ExtraboardSettings {
 	/**
@@ -58,6 +58,12 @@ export interface ExtraboardSettings {
 	/** moment.js pattern for `timeFormat: 'custom'`; empty falls back to `built-in`. */
 	timePattern: string;
 	/**
+	 * Which day a calendar's week grid starts on: an explicit weekday
+	 * (0 = Sunday … 6 = Saturday) or `auto`, the locale's own convention
+	 * (i18n-and-dates.md §2.6). Display only, like every setting around it.
+	 */
+	weekStart: WeekStart;
+	/**
 	 * Ordered rules coloring a date badge as its date approaches or after it has
 	 * passed; the first match wins. A board may replace the whole list in its own
 	 * frontmatter (i18n-and-dates.md §3).
@@ -77,5 +83,6 @@ export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	timeFormat: 'system',
 	datePattern: '',
 	timePattern: '',
+	weekStart: 'auto',
 	dateHighlights: [],
 };

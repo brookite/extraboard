@@ -58,6 +58,8 @@ interface MomentFactory {
 		hour?: number;
 		minute?: number;
 	}): { format(pattern: string): string };
+	/** Present in Obsidian's bundled moment; absent under plain Node (tests). */
+	localeData?(lang?: string): { firstDayOfWeek(): number } | null;
 }
 
 /** `window.moment`, guarded so this module stays importable under plain Node (tests). */
@@ -65,6 +67,39 @@ function hostMoment(): MomentFactory | undefined {
 	return typeof window !== 'undefined'
 		? (window as { moment?: MomentFactory }).moment
 		: undefined;
+}
+
+/**
+ * The `weekStart` setting: an explicit weekday number (0 = Sunday … 6 =
+ * Saturday, the `Date.getDay()` numbering the model already uses) or `auto`,
+ * which follows the locale's own convention (i18n-and-dates.md §2.6).
+ */
+export type WeekStart = 'auto' | 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+const isWeekday = (value: unknown): value is number =>
+	typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 6;
+
+/**
+ * Which day the calendar's week grid starts on. `auto` reads the locale of the
+ * **plugin's** language rather than Obsidian's ambient one, like the rest of
+ * this module, and falls back to Monday when moment is unavailable (tests) or
+ * the locale carries no data. Anything unexpected in the stored setting is
+ * treated as `auto` rather than allowed to skew the grid.
+ */
+export function resolveWeekStart(setting: WeekStart | undefined, lang: Lang = currentLanguage()): number {
+	if (isWeekday(setting)) return setting;
+	try {
+		const day = hostMoment()?.localeData?.(lang)?.firstDayOfWeek();
+		return isWeekday(day) ? day : 1;
+	} catch {
+		return 1;
+	}
+}
+
+/** A weekday's name in the given language. `day` is 0 = Sunday … 6 = Saturday. */
+export function weekdayName(day: number, lang: Lang, width: 'long' | 'short' = 'long'): string {
+	// 2024-01-07 was a Sunday, so it anchors the names to weekday numbers.
+	return new Intl.DateTimeFormat(lang, { weekday: width }).format(new Date(2024, 0, 7 + day));
 }
 
 function formatCustomDate(date: CalDate, pattern: string | undefined): string {

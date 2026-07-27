@@ -431,6 +431,11 @@ export const en = {
 			name: 'Pattern',
 			desc: 'See momentjs.com/docs/#/displaying/format/ for the token syntax.',
 		},
+		weekStart: {
+			name: 'First day of week',
+			desc: 'Which day a calendar view starts its week on. "Automatic" follows the interface language — Sunday for English, Monday for Russian.',
+			auto: 'Automatic',
+		},
 		cardNoteFolder: {
 			name: 'Card note folder',
 			desc: 'Where card notes are created for boards that do not set a folder of their own. Empty uses the vault root.',

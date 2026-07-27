@@ -6,7 +6,14 @@ import type ExtraboardPlugin from '../main';
 import type { ProgressStyle } from '../model/types';
 import type { Lang } from '../i18n';
 import { currentLanguage, setLanguage, t } from '../i18n';
-import { formatDatePart, formatTimePart, type DateFormatMode, type DateTimeOpts } from '../i18n/dates';
+import {
+	formatDatePart,
+	formatTimePart,
+	weekdayName,
+	type DateFormatMode,
+	type DateTimeOpts,
+	type WeekStart,
+} from '../i18n/dates';
 import { today } from '../model/dates';
 import { PropertyDefsEditor } from './PropertyDefsEditor';
 import { DateHighlightsEditor } from './DateHighlightsEditor';
@@ -88,6 +95,7 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName(t('settings.dates.heading')).setHeading();
 		this.renderFormatSetting(containerEl, 'date');
 		this.renderFormatSetting(containerEl, 'time');
+		this.renderWeekStart(containerEl);
 		this.renderDateHighlights(containerEl);
 
 		new Setting(containerEl)
@@ -172,6 +180,36 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 			},
 		);
 		editor.render();
+	}
+
+	/**
+	 * Which day a calendar's week grid starts on (i18n-and-dates.md §2.6). The
+	 * weekday labels come from `Intl` in the current language rather than the
+	 * string tables — the same names the grid's own header shows — capitalized
+	 * because locales like Russian write them lower-case mid-sentence, which a
+	 * dropdown item is not.
+	 */
+	private renderWeekStart(containerEl: HTMLElement): void {
+		const lang = currentLanguage();
+		const options: Record<string, string> = { auto: t('settings.weekStart.auto') };
+		for (let day = 0; day < 7; day++) {
+			const name = weekdayName(day, lang);
+			options[String(day)] = name.charAt(0).toUpperCase() + name.slice(1);
+		}
+
+		new Setting(containerEl)
+			.setName(t('settings.weekStart.name'))
+			.setDesc(t('settings.weekStart.desc'))
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions(options)
+					.setValue(String(this.plugin.settings.weekStart))
+					.onChange((value) => {
+						this.plugin.settings.weekStart = (value === 'auto' ? 'auto' : Number(value)) as WeekStart;
+						void this.plugin.saveSettings();
+						this.plugin.refreshBoards();
+					}),
+			);
 	}
 
 	/**
