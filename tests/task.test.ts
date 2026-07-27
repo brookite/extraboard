@@ -237,3 +237,29 @@ describe('property definition validation', () => {
 		expect(diags).toHaveLength(2);
 	});
 });
+
+// The tag charset follows Obsidian's, not ASCII's — markdown-format.md §4.2.
+describe('tags: the Obsidian charset', () => {
+	it('reads tags written in a non-Latin script', () => {
+		const card = parseCardContent('Банк #дом #свободное_время', config);
+		expect(card.tags).toEqual(['дом', 'свободное_время']);
+		expect(card.title).toBe('Банк');
+	});
+
+	it('still reads Latin, nested and digit-carrying tags', () => {
+		const card = parseCardContent('Ship it #backend/api #v2 #chore-2', config);
+		expect(card.tags).toEqual(['backend/api', 'v2', 'chore-2']);
+		expect(card.title).toBe('Ship it');
+	});
+
+	it('leaves an all-digit token in the title, the way Obsidian does', () => {
+		const card = parseCardContent('Plan for #2026', config);
+		expect(card.tags).toEqual([]);
+		expect(card.title).toBe('Plan for #2026');
+	});
+
+	it('round-trips a non-Latin tag through serialization', () => {
+		const board = boardFromBody('## Очередь\n- Банк #дом\n');
+		expect(serializeBody(board)).toBe('## Очередь\n- Банк #дом\n');
+	});
+});

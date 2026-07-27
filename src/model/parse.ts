@@ -88,12 +88,22 @@ export function extractTask(content: string): { task?: string; rest: string } {
 	return { task: m[1]!, rest: m[2] ?? '' };
 }
 
-const TAG_RE = /(^|\s)#([A-Za-z0-9/_-]+)/g;
+/**
+ * Obsidian's tag charset, not ASCII's: letters from **any** script, digits,
+ * `_`, `-`, and `/` for nesting. `#важно` and `#プロジェクト` are tags Obsidian
+ * itself indexes, so a board that left them in the title would disagree with
+ * the app around it.
+ */
+const TAG_RE = /(^|\s)#([\p{L}\p{N}_][\p{L}\p{N}/_-]*)/gu;
+
+/** Obsidian rejects an all-digits tag: `#2026` in running text is a number. */
+const ALL_DIGITS = /^\d+$/;
 
 /** Extract `#tag` tokens, returning deduped tags and the text with tags removed. */
 export function extractTags(s: string): { tags: string[]; rest: string } {
 	const tags: string[] = [];
-	const rest = s.replace(TAG_RE, (_m, pre: string, tag: string) => {
+	const rest = s.replace(TAG_RE, (match, pre: string, tag: string) => {
+		if (ALL_DIGITS.test(tag)) return match;
 		if (!tags.includes(tag)) tags.push(tag);
 		return pre;
 	});
