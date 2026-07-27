@@ -2,7 +2,7 @@
 // manages the underlying Markdown file (load/save, tab, rename, delete).
 // Spec: docs/specs/kanban-view.md §1, §6.
 
-import { HoverPopover, Menu, Notice, TextFileView, WorkspaceLeaf, setIcon } from 'obsidian';
+import { HoverPopover, Menu, Notice, Platform, TextFileView, WorkspaceLeaf, setIcon } from 'obsidian';
 import { render } from 'preact';
 import type ExtraboardPlugin from '../main';
 import type { Board } from '../model/types';
@@ -32,6 +32,9 @@ export class BoardView extends TextFileView {
 	private viewSwitchEl?: HTMLElement;
 	/** The view cycler beside it; hidden while the board has a single view. */
 	private viewCycleEl?: HTMLElement;
+	/** The in-board "now showing <view>" indicator, and the timer that fades it. */
+	private indicatorEl?: HTMLElement;
+	private indicatorTimer?: number;
 	/** Board-change subscribers outside the board's own tree (`BoardApi.onChange`). */
 	private listeners = new Set<() => void>();
 
@@ -73,26 +76,41 @@ export class BoardView extends TextFileView {
 
 	override async onOpen(): Promise<void> {
 		this.ensureMount();
+		// Six actions do not fit a phone's header, so on mobile only the view swap
+		// stays and the other five live in the ⋯ menu — which `fillMenu` builds,
+		// from the same list the file menu gets. No action is lost, only moved
+		// (mobile.md §4).
+		const full = !Platform.isMobile;
+
 		// The switch wears the active view's own icon and opens the view menu
 		// (views.md §3.1); it is created first so it sits leftmost in the header.
-		this.viewSwitchEl = this.addAction(ICONS.board, t('action.views'), (event) => {
-			this.openViewMenu(event);
-		});
+		if (full) {
+			this.viewSwitchEl = this.addAction(ICONS.board, t('action.views'), (event) => {
+				this.openViewMenu(event);
+			});
+		}
 		// One tap to the next view, beside the menu that picks one by name. It is
 		// hidden while the board has a single view — there would be nothing to
-		// cycle — and `renderBoard` is what reveals it (views.md §3.3).
+		// cycle — and `renderBoard` is what reveals it (views.md §3.3). This is the
+		// action that stays on a phone: switching views is the most frequent thing
+		// a board is asked for.
 		this.viewCycleEl = this.addAction(ICONS.switchView, t('action.switchBoardView'), () => {
 			this.nextView();
 		});
+		if (!full) return;
+
 		this.addAction(ICONS.add, t('action.addStack'), () => this.addStack());
 		// The archive is reached often enough to deserve the header, not only the
 		// file menu (user decision, 2026-07-26).
 		this.addAction(ICONS.archive, t('menu.file.openArchive'), () => this.openArchive());
 		this.addAction(ICONS.settings, t('command.boardSettings'), () => this.openBoardSettings());
-		this.addAction(ICONS.markdown, t('action.openAsMarkdown'), () => this.openAsMarkdown());
+		this.addAction(ICONS.markdown, t('action.openAsMarkdown'), () => {
+			void this.openAsMarkdown();
+		});
 	}
 
 	override async onClose(): Promise<void> {
+		this.clearViewIndicator();
 		if (this.mountEl) render(null, this.mountEl);
 	}
 
@@ -164,9 +182,23 @@ export class BoardView extends TextFileView {
 	 * into the manage-views modal (views.md §3.1).
 	 */
 	private openViewMenu(event: MouseEvent): void {
+		if (!this.board) return;
+		const menu = new Menu();
+		this.addViewItems(menu);
+		menu.addSeparator();
+		menu.addItem((item) =>
+			item
+				.setTitle(t('menu.file.manageViews'))
+				.setIcon(ICONS.views)
+				.onClick(() => this.manageViews()),
+		);
+		menu.showAtMouseEvent(event);
+	}
+
+	/** One item per view, the active one checked. Flat, so it reads the same on a phone. */
+	private addViewItems(menu: Menu): void {
 		const board = this.board;
 		if (!board) return;
-		const menu = new Menu();
 		for (const view of board.config.views) {
 			menu.addItem((item) =>
 				item
@@ -178,6 +210,17 @@ export class BoardView extends TextFileView {
 					}),
 			);
 		}
+	}
+
+	/**
+	 * Every board-wide action, in one place. Obsidian's own `onPaneMenu` raises
+	 * the `file-menu` event for the ⋯ button too, so the single handler in
+	 * `main.ts` feeds both menus from here — which is what makes the five actions
+	 * the mobile header gives up reachable (mobile.md §4).
+	 */
+	fillMenu(menu: Menu): void {
+		if (!this.board) return;
+		this.addViewItems(menu);
 		menu.addSeparator();
 		menu.addItem((item) =>
 			item
@@ -185,7 +228,45 @@ export class BoardView extends TextFileView {
 				.setIcon(ICONS.views)
 				.onClick(() => this.manageViews()),
 		);
-		menu.showAtMouseEvent(event);
+		menu.addItem((item) =>
+			item
+				.setTitle(t('action.addStack'))
+				.setIcon(ICONS.add)
+				.onClick(() => this.addStack()),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t('menu.file.openArchive'))
+				.setIcon('archive')
+				.onClick(() => this.openArchive()),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t('menu.file.archiveCompletedCards'))
+				.setIcon('check-check')
+				.onClick(() => this.archiveCompletedCards()),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t('menu.file.deleteUntitledCards'))
+				.setIcon('eraser')
+				.onClick(() => this.deleteUntitledCards()),
+		);
+		menu.addSeparator();
+		menu.addItem((item) =>
+			item
+				.setTitle(t('command.boardSettings'))
+				.setIcon(ICONS.settings)
+				.onClick(() => this.openBoardSettings()),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t('action.openAsMarkdown'))
+				.setIcon(ICONS.markdown)
+				.onClick(() => {
+					void this.openAsMarkdown();
+				}),
+		);
 	}
 
 	/** Open the manage-views modal (menu item, file menu and command). */
@@ -198,14 +279,46 @@ export class BoardView extends TextFileView {
 	}
 
 	/**
-	 * Activate the next view (the `next-view` command). The notice is the whole
+	 * Activate the next view (the `next-view` command). The indicator is the whole
 	 * feedback a palette user gets that the switch happened.
 	 */
 	nextView(): void {
 		const board = this.board;
 		if (!board || board.config.views.length < 2) return;
 		this.applyEdit((b) => ops.nextView(b));
-		if (this.board) new Notice(activeViewOf(this.board.config).name);
+		if (this.board) this.showViewIndicator(activeViewOf(this.board.config).name);
+	}
+
+	/**
+	 * Name the view that just became active, inside the board itself. A `Notice`
+	 * covers the whole top button bar on a phone, so this replaces it on both
+	 * platforms — one behaviour to reason about (mobile.md §4). It lives beside
+	 * the Preact mount rather than inside it, so a re-render cannot drop it
+	 * mid-fade.
+	 */
+	private showViewIndicator(name: string): void {
+		if (!this.indicatorEl) {
+			this.indicatorEl = this.contentEl.createDiv({ cls: 'eb-view-indicator' });
+		}
+		const el = this.indicatorEl;
+		el.setText(name);
+		window.clearTimeout(this.indicatorTimer);
+		// Restart the fade even when the same element is reused: dropping the class
+		// and forcing a reflow is what makes a second switch animate again.
+		el.removeClass('is-visible');
+		void el.offsetWidth;
+		el.addClass('is-visible');
+		this.indicatorTimer = window.setTimeout(() => {
+			el.removeClass('is-visible');
+			this.indicatorTimer = undefined;
+		}, 1200);
+	}
+
+	private clearViewIndicator(): void {
+		window.clearTimeout(this.indicatorTimer);
+		this.indicatorTimer = undefined;
+		this.indicatorEl?.remove();
+		this.indicatorEl = undefined;
 	}
 
 	/** Edit this board's `extraboard` configuration (header action + command). */
@@ -259,9 +372,26 @@ export class BoardView extends TextFileView {
 
 	private ensureMount(): HTMLElement {
 		if (!this.mountEl) {
+			// The indicator is positioned against this, so the container it sits in
+			// has to be the positioned one.
+			this.contentEl.addClass('eb-content');
 			this.mountEl = this.contentEl.createDiv({ cls: 'eb-root' });
+			this.collapseRightSidebar();
 		}
 		return this.mountEl;
+	}
+
+	/**
+	 * Backlinks and outline say nothing useful about a board and cost width plus
+	 * an edge swipe that competes with the stack row, so the right split folds
+	 * when a board opens on mobile (mobile.md §4). Once per leaf and mobile only:
+	 * the user may open it again and the plugin does not fight that.
+	 */
+	private collapseRightSidebar(): void {
+		if (!Platform.isMobile) return;
+		this.app.workspace.onLayoutReady(() => {
+			this.app.workspace.rightSplit?.collapse();
+		});
 	}
 
 	/**
@@ -316,7 +446,7 @@ export class BoardView extends TextFileView {
 		for (const listener of this.listeners) listener();
 	}
 
-	private async openAsMarkdown(): Promise<void> {
+	async openAsMarkdown(): Promise<void> {
 		const file = this.file;
 		if (!file) return;
 		this.plugin.suppressAutoOpen(file.path);

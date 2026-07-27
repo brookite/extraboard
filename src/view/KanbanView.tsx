@@ -1,5 +1,6 @@
 // Top-level Kanban render plus stack drag & drop. Spec: docs/specs/kanban-view.md.
 
+import { Platform } from 'obsidian';
 import { useRef } from 'preact/hooks';
 import * as ops from '../model/ops';
 import type { Board } from '../model/types';
@@ -82,9 +83,17 @@ export function KanbanView({ board, api, settings }: BoardProps) {
 		{
 			group: 'eb-stacks',
 			draggable: '.eb-stack',
-			// A dedicated grip, so the header stays clickable and the drag zone is
-			// visible instead of guessed (kanban-view.md §6.4).
-			handle: '.eb-stack-grip',
+			// Desktop: a dedicated grip, so the header stays clickable and the drag
+			// zone is visible instead of guessed (kanban-view.md §6.4). Touch: a
+			// 16 px grip is the wrong target for a finger, so the whole stack body
+			// is the pickup area and the grip stays only as the cue that a stack
+			// moves at all (mobile.md §3).
+			//
+			// An item still wins over its stack: the card list's Sortable sits
+			// deeper in the tree, so it receives the bubbling touch first and claims
+			// the drag, and Sortable's module-level `dragEl` guard then makes this
+			// instance stand down for the same gesture.
+			handle: Platform.isMobile ? undefined : '.eb-stack-grip',
 		},
 		(drop) => {
 			api.update((b) => ops.moveStack(b, drop.fromIndex, drop.before));

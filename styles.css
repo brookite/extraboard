@@ -35,6 +35,42 @@
 	border-radius: var(--radius-m, 8px);
 }
 
+/* Layout invariant: nothing inside a stack may widen it (mobile.md §2).
+   A flex item's automatic minimum size is its content's intrinsic minimum, so
+   any descendant with one — the embedded CodeMirror editor above all, under
+   mobile theme metrics — pushes the fixed-width stack open from the inside.
+   Every flex/grid link from the stack down to an editor therefore carries
+   `min-width: 0`, which is what turns "grow the box" into "shrink the content".
+   A new nested component must be added here, not patched around. */
+.eb-stack,
+.eb-stack-body,
+.eb-item,
+.eb-card,
+.eb-card-head,
+.eb-card-title,
+.eb-card-props,
+.eb-card-tags,
+.eb-card-foot,
+.eb-card-editor,
+.eb-card-editor-props,
+.eb-card-field,
+.eb-badge-row,
+.eb-checklist-row,
+.eb-divider-row {
+	min-width: 0;
+}
+
+/* ...and a mounted editor is additionally bounded, because CodeMirror sizes
+   its scroller from the content rather than from the box it was given. */
+.eb-card-editor,
+.eb-card-editor .eb-card-field,
+.eb-card-editor .cm-editor,
+.eb-card-editor .cm-scroller,
+.eb-card-editor .cm-content,
+.eb-editor {
+	max-width: 100%;
+}
+
 .eb-stack-header {
 	display: flex;
 	align-items: center;
@@ -1438,6 +1474,86 @@ body.eb-dragging-card .eb-archive-drop {
 	color: var(--text-muted);
 }
 
+/* Narrow container: the head's three groups — navigation, period label, mode
+   switch — stop fitting on one line well before the cells do, and squeezed onto
+   one they crush the label. So the label takes a row of its own and the two
+   button groups share the next, pushed to opposite ends. Keyed to the same
+   measured width as the compact grid below, not to `is-mobile`: a narrow
+   desktop split has exactly the same problem (mobile.md §1). */
+.eb-cal.is-narrow .eb-cal-head {
+	display: grid;
+	grid-template-columns: auto auto;
+	grid-template-areas:
+		'title title'
+		'nav modes';
+	justify-content: space-between;
+	row-gap: 6px;
+}
+
+.eb-cal.is-narrow .eb-cal-title {
+	grid-area: title;
+	/* No longer a flex child competing for the row's leftovers. */
+	flex: none;
+}
+
+.eb-cal.is-narrow .eb-cal-nav {
+	grid-area: nav;
+}
+
+.eb-cal.is-narrow .eb-cal-modes {
+	grid-area: modes;
+}
+
+/* Compact month grid: too narrow for chip text, so a card is one colored mark
+   and the tap goes to the day modal (mobile.md §6). Keyed to the container's
+   measured width, so a narrow desktop split renders exactly like a phone. */
+.eb-cal-grid.is-compact .eb-cal-cell {
+	align-items: center;
+	padding: 2px 1px;
+}
+
+.eb-cal-grid.is-compact .eb-cal-daynum {
+	align-self: center;
+	padding: 0 2px;
+}
+
+.eb-cal-marks {
+	display: flex;
+	flex-wrap: wrap;
+	align-content: flex-start;
+	justify-content: center;
+	gap: 3px;
+	/* An impossible day is clipped rather than allowed to push the row: there is
+	   no "+N" here, because there is no chip text for it to stand in for. */
+	min-height: 0;
+	width: 100%;
+	padding: 2px 1px;
+	overflow: hidden;
+}
+
+.eb-cal-mark {
+	flex: 0 0 auto;
+	width: 6px;
+	height: 6px;
+	border-radius: 999px;
+	/* Uncolored cards still have to be countable, so they take the muted text
+	   color rather than disappearing. */
+	background: var(--text-muted);
+}
+
+.eb-cal-mark.is-colored {
+	background: var(--eb-card-color);
+}
+
+.eb-cal-mark.is-done {
+	background: none;
+	box-shadow: inset 0 0 0 1px var(--text-muted);
+}
+
+.eb-cal-mark.is-done.is-colored {
+	box-shadow: inset 0 0 0 1px var(--eb-card-color);
+}
+
 /* Bars sit above the cells: a span crosses columns, so it cannot live in one. */
 .eb-cal-bars {
 	position: absolute;
@@ -1678,4 +1794,201 @@ body.eb-dragging-card .eb-archive-drop {
 .eb-cal-chip-repeat svg {
 	width: 12px;
 	height: 12px;
+}
+
+/* ---------------------------------------------------------------------------
+   Mobile & adaptive (mobile.md)
+
+   Two signals, and they are not interchangeable. `body.is-mobile` is about
+   *how the user touches* the board — hit areas, chrome, density — and is the
+   only one used below. Anything about *how much fits* is keyed to a measured
+   width instead and lives with the component it belongs to (the compact
+   calendar grid above). Nothing here keys off a user-agent string.
+   --------------------------------------------------------------------------- */
+
+/* The view-switch indicator (§4). A `Notice` covers the whole top button bar on
+   a phone, so the board names its new view inside itself. Positioned against
+   the view's content element, beside the Preact mount rather than inside it, so
+   a re-render cannot drop it mid-fade. */
+.eb-content {
+	position: relative;
+}
+
+.eb-view-indicator {
+	position: absolute;
+	top: 8px;
+	left: 50%;
+	z-index: 20;
+	max-width: 80%;
+	padding: 4px 12px;
+	font-size: var(--font-ui-small, 0.85em);
+	color: var(--text-on-accent);
+	background: var(--interactive-accent);
+	border-radius: 999px;
+	box-shadow: var(--shadow-s, 0 1px 4px rgba(0, 0, 0, 0.2));
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	pointer-events: none;
+	opacity: 0;
+	transform: translate(-50%, -6px);
+	transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.eb-view-indicator.is-visible {
+	opacity: 1;
+	transform: translate(-50%, 0);
+}
+
+/* Bottom inset (§4): Obsidian's mobile navbar overlays the leaf, so the last
+   interactive row of every view — the calendar's "No date" tray head, a stack's
+   "Add card", the "Add stack" column — would sit under it. The board reserves
+   that height itself and honours the platform safe area on top of it. The
+   navbar's own height is not exposed as a variable, so it is a measured
+   constant that a theme can still override through `--eb-bottom-inset`. */
+body.is-mobile .eb-root {
+	--eb-navbar-h: 48px;
+	padding-bottom: var(--eb-bottom-inset, calc(var(--eb-navbar-h) + env(safe-area-inset-bottom, 0px)));
+	box-sizing: border-box;
+}
+
+/* Obsidian gives a *page* of Markdown breathing room under the phone header:
+
+     .is-phone … .markdown-source-view > .cm-editor > .cm-scroller {
+       padding-top: var(--view-top-spacing-markdown);
+     }
+
+   The card editor embeds a real source view, so it inherits that page-sized gap
+   inside a tile a few lines tall. The rule reads a variable, so the fix is to
+   zero the variable for our subtree rather than to out-specify a seven-class
+   selector — that keeps working if Obsidian rewrites the selector, and it does
+   not touch the spacing on any actual Markdown page. `.eb-root` is enough of a
+   scope: the core rule is confined to `.mod-root … .view-content`, so it never
+   reaches our modals in the first place. */
+body.is-phone .eb-root {
+	--view-top-spacing-markdown: 0px;
+}
+
+/* Visual density (§5). Mobile themes resolve `--radius-*` and control sizing
+   larger, which inflates a board that is dense on purpose. The rule is: pin the
+   plugin's own metric where the theme would grow the tile, and add hit area
+   with padding where a control is merely too small to hit — never by growing
+   what is drawn. */
+body.is-mobile .eb-stack {
+	--radius-s: 6px;
+	--radius-m: 8px;
+}
+
+body.is-mobile .eb-card,
+body.is-mobile .eb-card-editor,
+body.is-mobile .eb-editor {
+	border-radius: 6px;
+}
+
+body.is-mobile .eb-chip,
+body.is-mobile .eb-badge,
+body.is-mobile .eb-tag {
+	padding: 1px 7px;
+	font-size: var(--font-smaller, 0.8em);
+	line-height: 1.5;
+	border-radius: 10px;
+}
+
+/* Hit area without visual growth: the drawn box keeps its size and a
+   pseudo-element reaches past it (§5). Two shapes, because a 36 x 36 halo is
+   only safe where a control has room around it — inside the badge row or the
+   stack header, neighbours sit 4 px apart and overlapping halos would hand the
+   tap to whichever painted last. So an isolated control grows in both axes and
+   a control in a dense row grows only vertically, keeping its own width. */
+body.is-mobile .eb-icon-button,
+body.is-mobile .eb-card-menu,
+body.is-mobile .eb-checklist-grip,
+body.is-mobile .eb-progress,
+body.is-mobile .eb-badge-edit {
+	position: relative;
+}
+
+body.is-mobile .eb-icon-button::after,
+body.is-mobile .eb-card-menu::after,
+body.is-mobile .eb-checklist-grip::after,
+body.is-mobile .eb-progress::after,
+body.is-mobile .eb-badge-edit::after {
+	content: '';
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	height: max(100%, 36px);
+	transform: translate(-50%, -50%);
+}
+
+/* Isolated: the card's ⋯ in its own corner, the checklist row's grip. */
+body.is-mobile .eb-card-menu::after,
+body.is-mobile .eb-checklist-grip::after {
+	width: max(100%, 36px);
+}
+
+/* Dense: the stack header's row and the badge row keep their own widths. */
+body.is-mobile .eb-icon-button::after,
+body.is-mobile .eb-progress::after,
+body.is-mobile .eb-badge-edit::after {
+	width: 100%;
+}
+
+/* The icon buttons themselves keep the desktop's 24 px tile: the mobile theme
+   would otherwise resolve `--input-height` into them. The row they sit in gets
+   the height instead, which is what makes the 36 px halos above fit. */
+body.is-mobile .eb-icon-button {
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border-radius: var(--radius-s, 4px);
+}
+
+body.is-mobile .eb-stack-header {
+	min-height: 40px;
+}
+
+/* The grip is the stack's cue that it can be moved, not its only drag zone on
+   touch — the whole stack body is (§3) — so it needs no halo of its own. */
+body.is-mobile .eb-stack-grip {
+	height: 32px;
+}
+
+body.is-mobile .eb-card-menu {
+	width: 20px;
+	height: 20px;
+}
+
+/* The calendar's own chrome. These take their hit area as real height — they
+   are the only controls in the head, so there is room for it vertically — and
+   spend as little width as possible on it: the head has three groups to fit and
+   the period label beside them is the thing that must not be squeezed. So the
+   36 px comes from `min-height` alone, and the horizontal padding stays at the
+   desktop's. */
+body.is-mobile .eb-cal-nav button,
+body.is-mobile .eb-cal-modes button {
+	min-height: 36px;
+	padding: 4px 8px;
+	font-size: var(--font-ui-small, 0.85em);
+	border-radius: var(--radius-s, 4px);
+}
+
+/* The two chevrons carry no text, so horizontal padding buys nothing: a square
+   keeps the hit area and gives the width back to the label. */
+body.is-mobile .eb-cal-nav button:first-child,
+body.is-mobile .eb-cal-nav button:last-child {
+	width: 36px;
+	padding: 0;
+	justify-content: center;
+}
+
+body.is-mobile .eb-cal-nav button .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+body.is-mobile .eb-cal-tray-head,
+body.is-mobile .eb-add-card,
+body.is-mobile .eb-add-stack-button {
+	min-height: 36px;
 }

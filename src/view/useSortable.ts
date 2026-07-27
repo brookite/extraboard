@@ -6,8 +6,10 @@
 // "revert then re-render" integration.
 
 import Sortable from 'sortablejs';
+import { Platform } from 'obsidian';
 import type { RefObject } from 'preact';
 import { useLayoutEffect, useRef } from 'preact/hooks';
+import { startAutoScroll, stopAutoScroll } from './autoScroll';
 
 /** Where an item was dragged from and to, in model coordinates. */
 export interface DropInfo {
@@ -111,12 +113,34 @@ export function useSortable(
 			filter: 'input, textarea, button',
 			// Let filtered elements keep their native behaviour (focus, clicks).
 			preventOnFilter: false,
+			// One gesture model for every list on the board (mobile.md §3).
+			//
+			// On touch, take Sortable's *touch-event* path rather than its pointer
+			// path. In Chromium `supportPointer` defaults to true, and during the
+			// pickup delay the pointer path subscribes `pointercancel ->
+			// _disableDelayedDrag` — which a card inside two scroll containers hits
+			// long before the delay elapses, so a finger drag never starts at all.
+			// The touch path aborts on `touchcancel` instead, which the browser
+			// only fires once a scroll has genuinely begun: exactly the pickup that
+			// *should* be abandoned. Nothing declares `touch-action: none`, so a
+			// plain swipe still scrolls the board and the stack, and a card stays
+			// draggable from anywhere on it rather than from a new grip.
+			//
+			// `mousedown` is bound alongside `touchstart`, so a desktop app running
+			// under `emulateMobile(true)` without device emulation keeps its mouse
+			// drag.
+			...(Platform.isMobile ? { supportPointer: false, forceFallback: true } : {}),
+			// Auto-scroll is the plugin's own and proportional (`autoScroll.ts`);
+			// the built-in constant-speed scroller must not compete with it.
+			scroll: false,
 			...options,
 			onStart: (evt) => {
 				dragging = true;
 				markDrag(evt.item, true);
+				startAutoScroll(evt.item);
 			},
 			onEnd: (evt) => {
+				stopAutoScroll();
 				// Clear after the synthetic click that follows a mouse drag.
 				window.setTimeout(() => {
 					dragging = false;
@@ -127,7 +151,11 @@ export function useSortable(
 				if (info) latest.current(info);
 			},
 		});
-		return () => sortable.destroy();
+		return () => {
+			// A board torn down mid-drag must not leave a frame loop running.
+			stopAutoScroll();
+			sortable.destroy();
+		};
 		// Created once per element; fresh callbacks are reached through `latest`.
 	}, []);
 }

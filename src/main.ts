@@ -134,35 +134,15 @@ export default class ExtraboardPlugin extends Plugin {
 		);
 
 		// Add board-wide actions to the view's own "more options" menu instead of a
-		// dedicated header icon (archive.md §7).
+		// dedicated header icon (archive.md §7). Obsidian raises `file-menu` for the
+		// ⋯ button as well as the file explorer, so this one handler is also how the
+		// five actions the mobile header gives up stay reachable (mobile.md §4) —
+		// the list itself lives on the view, beside the header actions it mirrors.
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file, _source, leaf) => {
 				const view = leaf?.view;
 				if (!(view instanceof BoardView) || !view.board || view.file !== file) return;
-				menu.addItem((item) =>
-					item
-						.setTitle(t('menu.file.manageViews'))
-						.setIcon(ICONS.views)
-						.onClick(() => view.manageViews()),
-				);
-				menu.addItem((item) =>
-					item
-						.setTitle(t('menu.file.openArchive'))
-						.setIcon('archive')
-						.onClick(() => view.openArchive()),
-				);
-				menu.addItem((item) =>
-					item
-						.setTitle(t('menu.file.archiveCompletedCards'))
-						.setIcon('check-check')
-						.onClick(() => view.archiveCompletedCards()),
-				);
-				menu.addItem((item) =>
-					item
-						.setTitle(t('menu.file.deleteUntitledCards'))
-						.setIcon('eraser')
-						.onClick(() => view.deleteUntitledCards()),
-				);
+				view.fillMenu(menu);
 			}),
 		);
 

@@ -51,6 +51,16 @@ const TRAY = -1;
 /** Used only when the cell cannot be measured (§3.1). */
 const FALLBACK_CAPACITY = { month: 3, week: 8 };
 
+/**
+ * Below this grid width, in px, a month cell is too narrow for chip text and
+ * the compact renderer takes over (mobile.md §6). Keyed to the **container's**
+ * width, never to `is-mobile`: the problem is how much fits, so a narrow
+ * desktop split has to look the same as a phone. Seven columns under this get
+ * roughly 80 px each, which is a few characters of a title — worth less than
+ * the marks that replace it.
+ */
+const COMPACT_GRID_WIDTH = 560;
+
 type CalendarDef = Extract<ViewDef, { type: 'calendar' }>;
 
 interface Props {
@@ -123,6 +133,40 @@ function useCellCapacity(ref: RefObject<HTMLElement>, mode: 'month' | 'week'): n
 		return () => observer.disconnect();
 	}, [mode]);
 	return capacity;
+}
+
+/** True while the grid is too narrow for chips (`COMPACT_GRID_WIDTH`). */
+function useCompactGrid(ref: RefObject<HTMLElement>): boolean {
+	const [compact, setCompact] = useState(false);
+	useLayoutEffect(() => {
+		const root = ref.current;
+		if (!root || typeof ResizeObserver === 'undefined') return;
+		const measure = (): void => {
+			setCompact(root.clientWidth > 0 && root.clientWidth < COMPACT_GRID_WIDTH);
+		};
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(root);
+		return () => observer.disconnect();
+	}, []);
+	return compact;
+}
+
+/**
+ * Every occurrence that touches each day, multi-day ones included. The chip
+ * grid keeps spans in the bar overlay above the cells; the compact grid has no
+ * overlay, so a span is simply a mark on each day it covers (mobile.md §6).
+ */
+function marksByDay(occurrences: Occurrence[], days: CalDate[]): Map<string, Occurrence[]> {
+	const map = new Map<string, Occurrence[]>();
+	for (const day of days) map.set(dayKey(day), []);
+	for (const occurrence of occurrences) {
+		const span = Math.min(Math.max(occurrence.length, 1), days.length);
+		for (let i = 0; i < span; i++) {
+			map.get(dayKey(addDays(occurrence.start, i)))?.push(occurrence);
+		}
+	}
+	return map;
 }
 
 // --- chips ------------------------------------------------------------------
@@ -239,6 +283,12 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	const [trayOpen, setTrayOpen] = useState(false);
 	const gridRef = useRef<HTMLDivElement>(null);
 	const capacity = useCellCapacity(gridRef, view.mode);
+	// Two consequences of one measurement. `narrow` is about the whole view — the
+	// head's three groups stop fitting on one line well before the cells do — and
+	// `compact` is the cell renderer, which week mode never takes: seven columns
+	// with far more vertical room per day is a different problem (mobile.md §6).
+	const narrow = useCompactGrid(gridRef);
+	const compact = narrow && view.mode === 'month';
 
 	const def = board.config.properties.find((p) => p.name === view.dateProperty);
 	const propertyType: PropertyType = def?.type ?? 'datetime';
@@ -291,6 +341,8 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	}
 	for (const list of byDay.values()) list.sort((a, b) => compareDates(a.start, b.start));
 
+	const marks = compact ? marksByDay(occurrences, days) : null;
+
 	const openDay = (day: CalDate | null): void => {
 		openDayModal(api.app, { api, settings, view, day });
 	};
@@ -340,7 +392,7 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	};
 
 	return (
-		<div class="eb-cal">
+		<div class={`eb-cal${narrow ? ' is-narrow' : ''}`}>
 			<div class="eb-cal-head">
 				<div class="eb-cal-nav">
 					<button type="button" aria-label={t('calendar.previous')} onClick={() => step(-1)}>
@@ -380,10 +432,12 @@ export function CalendarView({ board, view, api, settings }: Props) {
 				))}
 			</div>
 
-			<div class={`eb-cal-grid is-${view.mode}`} ref={gridRef}>
+			<div class={`eb-cal-grid is-${view.mode}${compact ? ' is-compact' : ''}`} ref={gridRef}>
 				{Array.from({ length: rows }, (_, row) => {
 					const rowStart = days[row * 7]!;
-					const segments = layoutRow(occurrences, indexOf, rowStart);
+					// A compact row has no bar overlay, so it needs neither the lane
+					// layout nor the chip budget the lanes eat into.
+					const segments = compact ? [] : layoutRow(occurrences, indexOf, rowStart);
 					const lanes = segments.reduce((max, s) => Math.max(max, s.lane + 1), 0);
 					return (
 						<WeekRow
@@ -394,11 +448,12 @@ export function CalendarView({ board, view, api, settings }: Props) {
 							anchorMonth={anchor.m}
 							showOutside={view.mode === 'month'}
 							today={now}
-							byDay={byDay}
+							byDay={marks ?? byDay}
 							indexOf={indexOf}
 							segments={segments}
 							lanes={lanes}
 							capacity={Math.max(1, capacity - lanes)}
+							compact={compact}
 							rowStartIndex={row * 7}
 							dateTimeOpts={dateTimeOpts}
 							onOpenDay={openDay}
@@ -434,6 +489,8 @@ interface RowProps {
 	segments: Segment[];
 	lanes: number;
 	capacity: number;
+	/** Day number plus colored marks instead of chips and bars (mobile.md §6). */
+	compact: boolean;
 	rowStartIndex: number;
 	dateTimeOpts: DateTimeOpts;
 	onOpenDay: (day: CalDate) => void;
@@ -452,6 +509,7 @@ function WeekRow({
 	segments,
 	lanes,
 	capacity,
+	compact,
 	rowStartIndex,
 	dateTimeOpts,
 	onOpenDay,
@@ -494,23 +552,32 @@ function WeekRow({
 				})}
 			</div>
 			<div class="eb-cal-cells">
-				{days.map((day, i) => (
-					<DayCell
-						key={dayKey(day)}
-						board={board}
-						day={day}
-						index={offset + i}
-						dim={showOutside && day.m !== anchorMonth}
-						isToday={sameDay(day, now)}
-						lanes={lanes}
-						capacity={capacity}
-						occurrences={byDay.get(dayKey(day)) ?? []}
-						indexOf={indexOf}
-						dateTimeOpts={dateTimeOpts}
-						onOpen={() => onOpenDay(day)}
-						onDrop={onDrop}
-					/>
-				))}
+				{days.map((day, i) => {
+					const shared = {
+						board,
+						day,
+						index: offset + i,
+						dim: showOutside && day.m !== anchorMonth,
+						isToday: sameDay(day, now),
+						occurrences: byDay.get(dayKey(day)) ?? [],
+						onOpen: () => onOpenDay(day),
+						onDrop,
+					};
+					// Two renderers side by side rather than conditionals inside one
+					// cell body, so neither path carries the other's cases.
+					return compact ? (
+						<CompactDayCell key={dayKey(day)} {...shared} />
+					) : (
+						<DayCell
+							key={dayKey(day)}
+							{...shared}
+							lanes={lanes}
+							capacity={capacity}
+							indexOf={indexOf}
+							dateTimeOpts={dateTimeOpts}
+						/>
+					);
+				})}
 			</div>
 		</div>
 	);
@@ -518,19 +585,67 @@ function WeekRow({
 
 // --- a day cell -------------------------------------------------------------
 
-interface CellProps {
+interface BaseCellProps {
 	board: Board;
 	day: CalDate;
 	index: number;
 	dim: boolean;
 	isToday: boolean;
-	lanes: number;
-	capacity: number;
 	occurrences: Occurrence[];
-	indexOf: Map<Occurrence, number>;
-	dateTimeOpts: DateTimeOpts;
 	onOpen: () => void;
 	onDrop: (drop: DropInfo) => void;
+}
+
+interface CellProps extends BaseCellProps {
+	lanes: number;
+	capacity: number;
+	indexOf: Map<Occurrence, number>;
+	dateTimeOpts: DateTimeOpts;
+}
+
+function cellClass(dim: boolean, isToday: boolean): string {
+	return `eb-cal-cell${dim ? ' is-dim' : ''}${isToday ? ' is-today' : ''}`;
+}
+
+/**
+ * The narrow-container cell (mobile.md §6): the day number plus one colored
+ * mark per card, and a tap that opens the day modal — which carries the board's
+ * full editing, so nothing is lost by dropping the chips. No `+N`, because no
+ * chip text is drawn for it to truncate.
+ *
+ * The marks are not drag *sources* — there is nothing legible to grab at this
+ * width — but the container keeps its `data-list`, so a card can still be
+ * dropped onto a day from the "No date" tray.
+ */
+function CompactDayCell({ board, day, index, dim, isToday, occurrences, onOpen, onDrop }: BaseCellProps) {
+	const listRef = useRef<HTMLDivElement>(null);
+	useSortable(listRef, { group: 'eb-cal', sort: false, draggable: '.eb-cal-chip' }, onDrop);
+
+	return (
+		<div
+			class={cellClass(dim, isToday)}
+			onClick={() => {
+				if (!isDragging()) onOpen();
+			}}
+		>
+			<div class="eb-cal-daynum">{day.d}</div>
+			<div class="eb-cal-marks" ref={listRef} data-list={index}>
+				{occurrences.map((occurrence, i) => {
+					const card = cardOf(board, occurrence.ref);
+					if (!card) return null;
+					const color = chipColor(board, occurrence.ref, card);
+					return (
+						<span
+							key={`${String(occurrence.ref.stack)}-${String(occurrence.ref.item)}-${String(i)}`}
+							class={`eb-cal-mark${ops.isCardDone(card) ? ' is-done' : ''}${color ? ' is-colored' : ''}`}
+							style={color ? `--eb-card-color: ${color}` : undefined}
+							title={chipText(card)}
+						/>
+					);
+				})}
+			</div>
+		</div>
+	);
 }
 
 function DayCell({
@@ -555,7 +670,7 @@ function DayCell({
 
 	return (
 		<div
-			class={`eb-cal-cell${dim ? ' is-dim' : ''}${isToday ? ' is-today' : ''}`}
+			class={cellClass(dim, isToday)}
 			onClick={() => {
 				// A mouse drag ends in a synthetic click; it must not open a day.
 				if (!isDragging()) onOpen();
