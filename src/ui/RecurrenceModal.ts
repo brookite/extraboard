@@ -13,20 +13,62 @@ import {
 	formatRecurrence,
 	parseRecurrence,
 } from '../model/recurrence';
+import { t } from '../i18n';
 
-const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+// Display only — the stored phrase's own weekday/month names stay English file
+// syntax regardless of UI language (recurrence.md §1.1, §7).
+function weekdayLabels(): string[] {
+	return [
+		t('modal.recurrence.weekday.mon'),
+		t('modal.recurrence.weekday.tue'),
+		t('modal.recurrence.weekday.wed'),
+		t('modal.recurrence.weekday.thu'),
+		t('modal.recurrence.weekday.fri'),
+		t('modal.recurrence.weekday.sat'),
+		t('modal.recurrence.weekday.sun'),
+	];
+}
 const WEEKDAY_VALUES = [1, 2, 3, 4, 5, 6, 0];
-const ORDINAL_LABELS: [string, 1 | 2 | 3 | 4 | -1][] = [
-	['First', 1],
-	['Second', 2],
-	['Third', 3],
-	['Fourth', 4],
-	['Last', -1],
-];
-const MONTH_LABELS = [
-	'January', 'February', 'March', 'April', 'May', 'June',
-	'July', 'August', 'September', 'October', 'November', 'December',
-];
+
+function ordinalLabels(): [string, 1 | 2 | 3 | 4 | -1][] {
+	return [
+		[t('modal.recurrence.ordinal.first'), 1],
+		[t('modal.recurrence.ordinal.second'), 2],
+		[t('modal.recurrence.ordinal.third'), 3],
+		[t('modal.recurrence.ordinal.fourth'), 4],
+		[t('modal.recurrence.ordinal.last'), -1],
+	];
+}
+
+function everyUnitDesc(freq: Freq): string {
+	switch (freq) {
+		case 'day':
+			return t('modal.recurrence.everyUnit.day');
+		case 'week':
+			return t('modal.recurrence.everyUnit.week');
+		case 'month':
+			return t('modal.recurrence.everyUnit.month');
+		case 'year':
+			return t('modal.recurrence.everyUnit.year');
+	}
+}
+
+function monthLabels(): string[] {
+	return [
+		t('modal.recurrence.month.jan'),
+		t('modal.recurrence.month.feb'),
+		t('modal.recurrence.month.mar'),
+		t('modal.recurrence.month.apr'),
+		t('modal.recurrence.month.may'),
+		t('modal.recurrence.month.jun'),
+		t('modal.recurrence.month.jul'),
+		t('modal.recurrence.month.aug'),
+		t('modal.recurrence.month.sep'),
+		t('modal.recurrence.month.oct'),
+		t('modal.recurrence.month.nov'),
+		t('modal.recurrence.month.dec'),
+	];
+}
 
 type End = 'never' | 'until' | 'count';
 
@@ -64,7 +106,7 @@ class RecurrenceModal extends Modal {
 	}
 
 	override onOpen(): void {
-		this.titleEl.setText(`Repeat: ${this.options.name}`);
+		this.titleEl.setText(t('modal.recurrence.titlePrefix', { name: this.options.name }));
 		this.modalEl.addClass('eb-recurrence-modal');
 		this.render();
 	}
@@ -80,10 +122,15 @@ class RecurrenceModal extends Modal {
 		const rule = this.rule;
 
 		new Setting(el)
-			.setName('Repeats')
+			.setName(t('modal.recurrence.repeats'))
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOptions({ day: 'Daily', week: 'Weekly', month: 'Monthly', year: 'Yearly' })
+					.addOptions({
+						day: t('modal.recurrence.freq.day'),
+						week: t('modal.recurrence.freq.week'),
+						month: t('modal.recurrence.freq.month'),
+						year: t('modal.recurrence.freq.year'),
+					})
 					.setValue(rule.freq)
 					.onChange((value) => {
 						this.setFreq(value as Freq);
@@ -102,13 +149,13 @@ class RecurrenceModal extends Modal {
 						this.renderPreview();
 					});
 			})
-			.setDesc(`every N ${rule.freq}s`);
+			.setDesc(everyUnitDesc(rule.freq));
 
 		if (rule.freq === 'week') this.renderWeekdays(el);
 		if (rule.freq === 'month') this.renderMonthly(el);
 		if (rule.freq === 'year') this.renderYearly(el);
 
-		new Setting(el).setName('Starts').addText((text) =>
+		new Setting(el).setName(t('modal.recurrence.starts')).addText((text) =>
 			text
 				.setPlaceholder('2026-07-27')
 				.setValue(this.startText)
@@ -120,10 +167,14 @@ class RecurrenceModal extends Modal {
 		);
 
 		new Setting(el)
-			.setName('Ends')
+			.setName(t('modal.recurrence.ends'))
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOptions({ never: 'Never', until: 'On date', count: 'After N times' })
+					.addOptions({
+						never: t('modal.recurrence.end.never'),
+						until: t('modal.recurrence.end.until'),
+						count: t('modal.recurrence.end.count'),
+					})
 					.setValue(this.end)
 					.onChange((value) => {
 						this.end = value as End;
@@ -133,7 +184,7 @@ class RecurrenceModal extends Modal {
 			);
 
 		if (this.end === 'until') {
-			new Setting(el).setName('Until').addText((text) =>
+			new Setting(el).setName(t('modal.recurrence.until')).addText((text) =>
 				text
 					.setPlaceholder('2026-12-31')
 					.setValue(this.untilText)
@@ -145,7 +196,7 @@ class RecurrenceModal extends Modal {
 			);
 		}
 		if (this.end === 'count') {
-			new Setting(el).setName('Times').addText((text) => {
+			new Setting(el).setName(t('modal.recurrence.times')).addText((text) => {
 				text.inputEl.type = 'number';
 				text.inputEl.min = '1';
 				text.setValue(String(this.rule.count ?? 1)).onChange((value) => {
@@ -160,23 +211,27 @@ class RecurrenceModal extends Modal {
 		this.renderPreview();
 
 		const buttons = el.createDiv({ cls: 'modal-button-container' });
-		const clear = buttons.createEl('button', { cls: 'mod-warning', text: 'No repetition' });
+		const clear = buttons.createEl('button', {
+			cls: 'mod-warning',
+			text: t('modal.recurrence.noRepetition'),
+		});
 		clear.addEventListener('click', () => this.finish(''));
-		const cancel = buttons.createEl('button', { text: 'Cancel' });
+		const cancel = buttons.createEl('button', { text: t('common.cancel') });
 		cancel.addEventListener('click', () => {
 			this.close();
 		});
-		const confirm = buttons.createEl('button', { cls: 'mod-cta', text: 'Save' });
+		const confirm = buttons.createEl('button', { cls: 'mod-cta', text: t('modal.boardSettings.save') });
 		confirm.addEventListener('click', () => {
 			if (this.problem() === null) this.finish(formatRecurrence(this.rule));
 		});
 	}
 
 	private renderWeekdays(el: HTMLElement): void {
-		const setting = new Setting(el).setName('On');
+		const setting = new Setting(el).setName(t('modal.recurrence.on'));
 		const row = setting.controlEl.createDiv({ cls: 'eb-weekday-row' });
+		const labels = weekdayLabels();
 		WEEKDAY_VALUES.forEach((day, i) => {
-			const button = row.createEl('button', { text: WEEKDAY_LABELS[i], cls: 'eb-weekday' });
+			const button = row.createEl('button', { text: labels[i], cls: 'eb-weekday' });
 			if (this.rule.weekdays?.includes(day)) button.addClass('is-on');
 			button.addEventListener('click', () => {
 				const days = new Set(this.rule.weekdays ?? []);
@@ -191,10 +246,13 @@ class RecurrenceModal extends Modal {
 	private renderMonthly(el: HTMLElement): void {
 		const byDay = this.rule.monthDay !== undefined;
 		new Setting(el)
-			.setName('On')
+			.setName(t('modal.recurrence.on'))
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOptions({ day: 'Day of month', nth: 'Weekday of month' })
+					.addOptions({
+						day: t('modal.recurrence.dayOfMonth'),
+						nth: t('modal.recurrence.weekdayOfMonth'),
+					})
 					.setValue(byDay ? 'day' : 'nth')
 					.onChange((value) => {
 						if (value === 'day') {
@@ -209,7 +267,7 @@ class RecurrenceModal extends Modal {
 			);
 
 		if (byDay) {
-			new Setting(el).setName('Day').addText((text) => {
+			new Setting(el).setName(t('modal.recurrence.day')).addText((text) => {
 				text.inputEl.type = 'number';
 				text.inputEl.min = '1';
 				text.inputEl.max = '31';
@@ -223,10 +281,11 @@ class RecurrenceModal extends Modal {
 		}
 
 		const nth = this.rule.nth ?? { ordinal: 1 as const, weekday: 1 };
+		const weekLabels = weekdayLabels();
 		new Setting(el)
-			.setName('The')
+			.setName(t('modal.recurrence.the'))
 			.addDropdown((dropdown) => {
-				for (const [label, value] of ORDINAL_LABELS) dropdown.addOption(String(value), label);
+				for (const [label, value] of ordinalLabels()) dropdown.addOption(String(value), label);
 				dropdown.setValue(String(nth.ordinal)).onChange((value) => {
 					this.rule.nth = { ordinal: Number(value) as 1 | 2 | 3 | 4 | -1, weekday: nth.weekday };
 					this.renderPreview();
@@ -234,7 +293,7 @@ class RecurrenceModal extends Modal {
 			})
 			.addDropdown((dropdown) => {
 				WEEKDAY_VALUES.forEach((day, i) => {
-					dropdown.addOption(String(day), WEEKDAY_LABELS[i] ?? '');
+					dropdown.addOption(String(day), weekLabels[i] ?? '');
 				});
 				dropdown.setValue(String(nth.weekday)).onChange((value) => {
 					this.rule.nth = { ordinal: nth.ordinal, weekday: Number(value) };
@@ -247,9 +306,9 @@ class RecurrenceModal extends Modal {
 		const month = this.rule.month ?? this.rule.start?.m ?? 1;
 		const day = this.rule.day ?? this.rule.start?.d ?? 1;
 		new Setting(el)
-			.setName('On')
+			.setName(t('modal.recurrence.on'))
 			.addDropdown((dropdown) => {
-				MONTH_LABELS.forEach((label, i) => {
+				monthLabels().forEach((label, i) => {
 					dropdown.addOption(String(i + 1), label);
 				});
 				dropdown.setValue(String(month)).onChange((value) => {
@@ -288,23 +347,25 @@ class RecurrenceModal extends Modal {
 		const next = expandRecurrence(this.rule, anchor, anchor, { ...anchor, y: anchor.y + 5 }, 3);
 		el.createDiv({
 			cls: 'eb-recurrence-next',
-			text: next.length ? `Next: ${next.map(formatDate).join(', ')}` : 'This rule produces no days.',
+			text: next.length
+				? t('modal.recurrence.next', { days: next.map(formatDate).join(', ') })
+				: t('modal.recurrence.noDays'),
 		});
 	}
 
 	/** What stops the rule from being saved, or `null` when it is fine. */
 	private problem(): string | null {
 		const rule = this.rule;
-		if (!rule.start) return 'The start date is not a date (YYYY-MM-DD).';
-		if (rule.interval < 1) return 'Repeat every one period or more.';
+		if (!rule.start) return t('modal.recurrence.problem.startNotDate');
+		if (rule.interval < 1) return t('modal.recurrence.problem.intervalTooSmall');
 		if (rule.freq === 'week' && rule.weekdays && rule.weekdays.length === 0) {
-			return 'Choose at least one weekday.';
+			return t('modal.recurrence.problem.needWeekday');
 		}
-		if (this.end === 'until' && !rule.until) return 'The end date is not a date (YYYY-MM-DD).';
+		if (this.end === 'until' && !rule.until) return t('modal.recurrence.problem.endNotDate');
 		if (rule.until && rule.start && formatDate(rule.until) < formatDate(rule.start)) {
-			return 'The end date is before the start date.';
+			return t('modal.recurrence.problem.endBeforeStart');
 		}
-		if (this.end === 'count' && (rule.count ?? 0) < 1) return 'Repeat at least once.';
+		if (this.end === 'count' && (rule.count ?? 0) < 1) return t('modal.recurrence.problem.countTooSmall');
 		return null;
 	}
 

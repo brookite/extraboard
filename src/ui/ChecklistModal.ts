@@ -10,6 +10,7 @@ import { App, Menu, Modal, setIcon } from 'obsidian';
 import Sortable from 'sortablejs';
 import * as cl from '../model/checklist';
 import type { ChecklistItem, ChecklistPath } from '../model/checklist';
+import { t } from '../i18n';
 
 export interface ChecklistModalOptions {
 	/** The card's display text, shown as the modal title. */
@@ -46,14 +47,14 @@ export class ChecklistModal extends Modal {
 
 	override onOpen(): void {
 		this.modalEl.addClass('eb-checklist-modal');
-		this.titleEl.setText(this.options.title || 'Checklist');
+		this.titleEl.setText(this.options.title || t('modal.checklist.title'));
 		this.countEl = this.titleEl.createSpan({ cls: 'eb-checklist-count' });
 
 		this.listEl = this.contentEl.createDiv({ cls: 'eb-checklist' });
 		this.enableDrag();
 
 		const footer = this.contentEl.createDiv({ cls: 'eb-checklist-footer' });
-		const add = footer.createEl('button', { cls: 'mod-cta', text: 'Add item' });
+		const add = footer.createEl('button', { cls: 'mod-cta', text: t('modal.checklist.addItem') });
 		add.addEventListener('click', () => {
 			this.change((items) => {
 				const r = cl.insertAfter(items, this.lastRootPath(items));
@@ -94,7 +95,7 @@ export class ChecklistModal extends Modal {
 
 		const rows = cl.flatten(items);
 		if (!rows.length) {
-			this.listEl.createDiv({ cls: 'eb-checklist-empty', text: 'No items yet.' });
+			this.listEl.createDiv({ cls: 'eb-checklist-empty', text: t('modal.checklist.empty') });
 		}
 		for (const row of rows) this.renderRow(row.item, row.path);
 
@@ -110,7 +111,7 @@ export class ChecklistModal extends Modal {
 		const grip = rowEl.createSpan({ cls: 'eb-checklist-grip' });
 		setIcon(grip, 'grip-vertical');
 		grip.setAttr('aria-hidden', 'true');
-		grip.setAttr('title', 'Drag to reorder');
+		grip.setAttr('title', t('modal.checklist.dragToReorder'));
 
 		const check = rowEl.createEl('input', {
 			type: 'checkbox',
@@ -119,7 +120,10 @@ export class ChecklistModal extends Modal {
 		check.checked = cl.isDone(item);
 		// A custom marker (`[/]`, `[-]`) reads as "not done" and is only rewritten
 		// when the user toggles that row (markdown-format.md §4.5).
-		check.setAttr('aria-label', cl.isDone(item) ? 'Mark as not done' : 'Mark as done');
+		check.setAttr(
+			'aria-label',
+			cl.isDone(item) ? t('modal.checklist.markNotDone') : t('modal.checklist.markDone'),
+		);
 		check.addEventListener('change', () => {
 			this.change((items) => cl.toggle(items, path));
 		});
@@ -139,7 +143,7 @@ export class ChecklistModal extends Modal {
 
 		const menu = rowEl.createEl('button', { cls: 'eb-icon-button', attr: { type: 'button' } });
 		setIcon(menu, 'more-vertical');
-		menu.setAttr('aria-label', 'Item options');
+		menu.setAttr('aria-label', t('modal.checklist.itemOptions'));
 		menu.addEventListener('click', (evt) => {
 			this.openRowMenu(evt, path, input);
 		});
@@ -279,14 +283,14 @@ export class ChecklistModal extends Modal {
 			);
 		};
 
-		structural('Indent', 'indent', (items) => cl.indent(items, path));
-		structural('Outdent', 'outdent', (items) => cl.outdent(items, path));
-		structural('Move up', 'arrow-up', (items) => cl.move(items, path, -1));
-		structural('Move down', 'arrow-down', (items) => cl.move(items, path, 1));
+		structural(t('modal.checklist.indent'), 'indent', (items) => cl.indent(items, path));
+		structural(t('modal.checklist.outdent'), 'outdent', (items) => cl.outdent(items, path));
+		structural(t('propertyDefs.moveUp'), 'arrow-up', (items) => cl.move(items, path, -1));
+		structural(t('propertyDefs.moveDown'), 'arrow-down', (items) => cl.move(items, path, 1));
 		menu.addSeparator();
 		menu.addItem((mi) =>
 			mi
-				.setTitle('Delete item')
+				.setTitle(t('modal.checklist.deleteItem'))
 				.setIcon('trash-2')
 				.setWarning(true)
 				.onClick(() => {

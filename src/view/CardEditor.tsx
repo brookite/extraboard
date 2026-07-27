@@ -5,7 +5,7 @@
 import type { RefObject } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { Notice, type App } from 'obsidian';
-import { describeDropped, processCardText } from '../model/cardText';
+import { processCardText, type DroppedKind } from '../model/cardText';
 import * as ops from '../model/ops';
 import { cardLineContent } from '../model/serialize';
 import type { Board, Card } from '../model/types';
@@ -14,9 +14,41 @@ import type { BoardApi } from './api';
 import { InlineEditor } from './components/InlineEditor';
 import { PropertyBadges } from './components/PropertyBadges';
 import { createEmbeddedEditor } from './embeddedEditor';
+import { t } from '../i18n';
 
-const PLACEHOLDER = 'Card text, #tag';
-const PLACEHOLDER_RAW = 'Card text, @{property|value}, #tag';
+function droppedLabel(kind: DroppedKind): string {
+	switch (kind) {
+		case 'list':
+			return t('cardText.dropped.list');
+		case 'quote':
+			return t('cardText.dropped.quote');
+		case 'heading':
+			return t('cardText.dropped.heading');
+		case 'rule':
+			return t('cardText.dropped.rule');
+		case 'code':
+			return t('cardText.dropped.code');
+		case 'math':
+			return t('cardText.dropped.math');
+		case 'table':
+			return t('cardText.dropped.table');
+		case 'html':
+			return t('cardText.dropped.html');
+		case 'image':
+			return t('cardText.dropped.image');
+	}
+}
+
+/** Human-readable summary of what a card could not keep, or `''`. */
+function describeDropped(dropped: DroppedKind[]): string {
+	if (!dropped.length) return '';
+	const names = dropped.map(droppedLabel);
+	const list =
+		names.length === 1
+			? names[0]!
+			: `${names.slice(0, -1).join(', ')} ${t('cardText.and')} ${names[names.length - 1]!}`;
+	return t('cardText.summary', { list });
+}
 
 /**
  * What the field shows. With the tokens hidden it holds the title and tags
@@ -151,7 +183,7 @@ export function CardEditor({ board, card, target, api, settings, onClose }: Prop
 			<RichField
 				app={api.app}
 				value={cardEditText(card, board, showRaw)}
-				placeholder={showRaw ? PLACEHOLDER_RAW : PLACEHOLDER}
+				placeholder={showRaw ? t('cardEditor.placeholderRaw') : t('cardEditor.placeholder')}
 				scope={rootRef}
 				onReady={(getValue) => {
 					fieldValue.current = getValue;

@@ -225,7 +225,7 @@ describe('property definition validation', () => {
 				{ name: 'accent', type: 'color' },
 				{ name: 'other', type: 'color' },
 			]),
-		).toEqual(['At most one color property is allowed per board.']);
+		).toEqual([{ kind: 'tooManyColors' }]);
 	});
 
 	it('reports duplicate and empty names', () => {

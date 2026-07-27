@@ -9,6 +9,7 @@ import type { BoardApi } from './api';
 import { useSortable } from './useSortable';
 import { Icon } from './components/Icon';
 import { StackColumn } from './components/Stack';
+import { t } from '../i18n';
 
 /**
  * "Archive card": a drop target under "Add stack" (archive.md §5.5). It is
@@ -37,7 +38,7 @@ function ArchiveTarget() {
 	return (
 		<div class="eb-archive-drop" ref={ref} data-archive="">
 			<Icon name="archive" />
-			<span>Archive card</span>
+			<span>{t('kanban.archiveCard')}</span>
 		</div>
 	);
 }
@@ -48,7 +49,7 @@ function ArchiveTarget() {
  * (stack-completion-and-divider-colors.md §3.3).
  */
 export function addStack(api: BoardApi, at: ops.InsertPos = null, onAdded?: () => void): void {
-	void editStack(api.app, { title: 'Add stack', cta: 'Add' }).then((fields) => {
+	void editStack(api.app, { title: t('modal.stack.addTitle'), cta: t('modal.stack.addCta') }).then((fields) => {
 		if (!fields) return;
 		api.update((b) => ops.addStack(b, fields.name, at, fields.completes));
 		onAdded?.();
@@ -60,7 +61,7 @@ function AddStack({ api }: { api: BoardApi }) {
 		<div class="eb-add-stack">
 			<button type="button" class="eb-add-stack-button" onClick={() => addStack(api)}>
 				<Icon name="plus" />
-				<span>Add stack</span>
+				<span>{t('action.addStack')}</span>
 			</button>
 			<ArchiveTarget />
 		</div>

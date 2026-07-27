@@ -3,28 +3,48 @@
 // tab (`defaultProperties`). Specs: properties.md, settings.md.
 
 import { App } from 'obsidian';
-import { validatePropertyDefs } from '../model/properties';
+import { validatePropertyDefs, type PropertyDiagnostic } from '../model/properties';
 import type { PropertyDef, PropertyType, StringListOption } from '../model/types';
 import { colorField } from './ColorPicker';
+import { t } from '../i18n';
 
-const TYPE_LABELS: Record<PropertyType, string> = {
-	string: 'Text',
-	'string-list': 'List of values',
-	integer: 'Number',
-	percent: 'Percent',
-	checkbox: 'Checkbox',
-	color: 'Card color',
-	datetime: 'Date',
-	'date-range': 'Date range',
-	recurrence: 'Recurrence',
-	'date-list': 'List of dates',
-};
+function describePropertyDiagnostic(diag: PropertyDiagnostic): string {
+	switch (diag.kind) {
+		case 'noName':
+			return t('propertyDefs.diagnostic.noName');
+		case 'duplicateName':
+			return t('propertyDefs.diagnostic.duplicateName', { name: diag.name });
+		case 'strictOptionsWrongType':
+			return t('propertyDefs.diagnostic.strictOptionsWrongType', { name: diag.name });
+		case 'timeWrongType':
+			return t('propertyDefs.diagnostic.timeWrongType', { name: diag.name });
+		case 'tooManyColors':
+			return t('propertyDefs.diagnostic.tooManyColors');
+	}
+}
 
-const TIME_LABELS: Record<'none' | 'optional' | 'required', string> = {
-	none: 'Date only',
-	optional: 'Time optional',
-	required: 'Time required',
-};
+export function typeLabels(): Record<PropertyType, string> {
+	return {
+		string: t('propertyDefs.type.string'),
+		'string-list': t('propertyDefs.type.stringList'),
+		integer: t('propertyDefs.type.integer'),
+		percent: t('propertyDefs.type.percent'),
+		checkbox: t('propertyDefs.type.checkbox'),
+		color: t('propertyDefs.type.color'),
+		datetime: t('propertyDefs.type.datetime'),
+		'date-range': t('propertyDefs.type.dateRange'),
+		recurrence: t('propertyDefs.type.recurrence'),
+		'date-list': t('propertyDefs.type.dateList'),
+	};
+}
+
+function timeLabels(): Record<'none' | 'optional' | 'required', string> {
+	return {
+		none: t('propertyDefs.time.none'),
+		optional: t('propertyDefs.time.optional'),
+		required: t('propertyDefs.time.required'),
+	};
+}
 
 /** Deep copy so the editor never mutates the caller's definitions in place. */
 export function cloneDefs(defs: PropertyDef[]): PropertyDef[] {
@@ -64,14 +84,14 @@ export class PropertyDefsEditor {
 		el.addClass('eb-pe');
 
 		if (this.defs.length === 0) {
-			el.createDiv({ cls: 'eb-pe-empty', text: 'No properties yet.' });
+			el.createDiv({ cls: 'eb-pe-empty', text: t('propertyDefs.empty') });
 		}
 		this.defs.forEach((def, index) => {
 			this.renderDef(el.createDiv({ cls: 'eb-pe-row' }), def, index);
 		});
 
 		const actions = el.createDiv({ cls: 'eb-pe-actions' });
-		const add = actions.createEl('button', { text: 'Add property' });
+		const add = actions.createEl('button', { text: t('propertyDefs.addProperty') });
 		add.addEventListener('click', () => {
 			this.defs.push({ name: uniqueName(this.defs), type: 'string' });
 			this.commit();
@@ -87,14 +107,14 @@ export class PropertyDefsEditor {
 
 		const name = head.createEl('input', { type: 'text', cls: 'eb-pe-name' });
 		name.value = def.name;
-		name.placeholder = 'Name';
+		name.placeholder = t('propertyDefs.name');
 		name.addEventListener('change', () => {
 			def.name = name.value.trim();
 			this.commit();
 		});
 
 		const type = head.createEl('select', { cls: 'dropdown eb-pe-type' });
-		for (const [value, label] of Object.entries(TYPE_LABELS)) {
+		for (const [value, label] of Object.entries(typeLabels())) {
 			const option = type.createEl('option', { text: label });
 			option.value = value;
 		}
@@ -110,15 +130,15 @@ export class PropertyDefsEditor {
 			this.commit();
 		});
 
-		this.iconButton(head, '↑', 'Move up', index > 0, () => {
+		this.iconButton(head, '↑', t('propertyDefs.moveUp'), index > 0, () => {
 			this.defs.splice(index - 1, 0, ...this.defs.splice(index, 1));
 			this.commit();
 		});
-		this.iconButton(head, '↓', 'Move down', index < this.defs.length - 1, () => {
+		this.iconButton(head, '↓', t('propertyDefs.moveDown'), index < this.defs.length - 1, () => {
 			this.defs.splice(index + 1, 0, ...this.defs.splice(index, 1));
 			this.commit();
 		});
-		this.iconButton(head, '✕', 'Remove property', true, () => {
+		this.iconButton(head, '✕', t('propertyDefs.removeProperty'), true, () => {
 			this.defs.splice(index, 1);
 			this.commit();
 		});
@@ -129,9 +149,9 @@ export class PropertyDefsEditor {
 
 	private renderTimeMode(row: HTMLElement, def: PropertyDef): void {
 		const body = row.createDiv({ cls: 'eb-pe-body' });
-		body.createSpan({ cls: 'eb-pe-label', text: 'Time' });
+		body.createSpan({ cls: 'eb-pe-label', text: t('propertyDefs.time.label') });
 		const select = body.createEl('select', { cls: 'dropdown' });
-		for (const [value, label] of Object.entries(TIME_LABELS)) {
+		for (const [value, label] of Object.entries(timeLabels())) {
 			const option = select.createEl('option', { text: label });
 			option.value = value;
 		}
@@ -148,7 +168,7 @@ export class PropertyDefsEditor {
 		const strictLabel = body.createEl('label', { cls: 'eb-pe-check' });
 		const strict = strictLabel.createEl('input', { type: 'checkbox' });
 		strict.checked = def.strict === true;
-		strictLabel.createSpan({ text: 'Only allow the values below' });
+		strictLabel.createSpan({ text: t('propertyDefs.strictOnly') });
 		strict.addEventListener('change', () => {
 			if (strict.checked) def.strict = true;
 			else delete def.strict;
@@ -160,7 +180,7 @@ export class PropertyDefsEditor {
 			this.renderOption(body.createDiv({ cls: 'eb-pe-option' }), def, option, i);
 		}
 
-		const add = body.createEl('button', { cls: 'eb-pe-add-value', text: 'Add value' });
+		const add = body.createEl('button', { cls: 'eb-pe-add-value', text: t('propertyDefs.addValue') });
 		add.addEventListener('click', () => {
 			def.options = [...options, { value: '' }];
 			this.commit();
@@ -175,24 +195,24 @@ export class PropertyDefsEditor {
 	): void {
 		const value = el.createEl('input', { type: 'text', cls: 'eb-pe-value' });
 		value.value = option.value;
-		value.placeholder = 'Value';
+		value.placeholder = t('propertyDefs.value');
 		value.addEventListener('change', () => {
 			option.value = value.value.trim();
 			this.commit();
 		});
 
-		colorField(this.app, el, 'Background', option.bg, (next) => {
+		colorField(this.app, el, t('propertyDefs.background'), option.bg, (next) => {
 			if (next) option.bg = next;
 			else delete option.bg;
 			this.commit();
 		});
-		colorField(this.app, el, 'Text', option.fg, (next) => {
+		colorField(this.app, el, t('propertyDefs.text'), option.fg, (next) => {
 			if (next) option.fg = next;
 			else delete option.fg;
 			this.commit();
 		});
 
-		this.iconButton(el, '✕', 'Remove value', true, () => {
+		this.iconButton(el, '✕', t('propertyDefs.removeValue'), true, () => {
 			def.options = (def.options ?? []).filter((_, i) => i !== index);
 			this.commit();
 		});
@@ -218,7 +238,7 @@ export class PropertyDefsEditor {
 		const diags = validatePropertyDefs(this.defs);
 		if (diags.length === 0) return;
 		const list = el.createDiv({ cls: 'eb-pe-diags' });
-		for (const d of diags) list.createDiv({ text: d });
+		for (const d of diags) list.createDiv({ text: describePropertyDiagnostic(d) });
 	}
 
 	private commit(): void {

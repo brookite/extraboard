@@ -6,6 +6,7 @@ import { App, Component, HoverParent, Modal, Notice } from 'obsidian';
 import type { ItemRef } from '../model/ops';
 import type { Board } from '../model/types';
 import type { ColorPickerOptions } from '../ui/ColorPicker';
+import { t } from '../i18n';
 
 export interface BoardApi {
 	/**
@@ -70,7 +71,7 @@ export function searchTag(app: App, tag: string): void {
 	const search = (app as App & SearchCapableApp).internalPlugins?.getPluginById('global-search');
 	const open = search?.instance?.openGlobalSearch;
 	if (!open) {
-		new Notice('Search is disabled — enable it to search by tag.');
+		new Notice(t('notice.searchDisabled'));
 		return;
 	}
 	open.call(search.instance, `tag:#${tag}`);
@@ -93,7 +94,7 @@ class ConfirmModal extends Modal {
 		this.titleEl.setText(this.title);
 		this.contentEl.createEl('p', { text: this.message });
 		const buttons = this.contentEl.createDiv({ cls: 'modal-button-container' });
-		const cancel = buttons.createEl('button', { text: 'Cancel' });
+		const cancel = buttons.createEl('button', { text: t('common.cancel') });
 		cancel.addEventListener('click', () => this.close());
 		const confirm = buttons.createEl('button', { cls: 'mod-warning', text: this.cta });
 		confirm.addEventListener('click', () => {

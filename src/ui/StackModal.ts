@@ -6,6 +6,7 @@
 // in a menu.
 
 import { App, Modal, Setting } from 'obsidian';
+import { t } from '../i18n';
 
 export interface StackFields {
 	name: string;
@@ -47,9 +48,9 @@ class StackModal extends Modal {
 		const el = this.contentEl;
 		el.empty();
 
-		const name = new Setting(el).setName('Name').addText((text) =>
+		const name = new Setting(el).setName(t('modal.stack.name')).addText((text) =>
 			text
-				.setPlaceholder('Stack name')
+				.setPlaceholder(t('modal.stack.namePlaceholder'))
 				.setValue(this.fields.name)
 				.onChange((value) => {
 					this.fields.name = value;
@@ -64,10 +65,8 @@ class StackModal extends Modal {
 		});
 
 		new Setting(el)
-			.setName('Counts cards as completed')
-			.setDesc(
-				'A card moved into this stack is marked done, together with every item of its checklist. Cards already here are left as they are.',
-			)
+			.setName(t('modal.stack.completes'))
+			.setDesc(t('modal.stack.completesDesc'))
 			.addToggle((toggle) =>
 				toggle.setValue(this.fields.completes).onChange((value) => {
 					this.fields.completes = value;
@@ -75,7 +74,7 @@ class StackModal extends Modal {
 			);
 
 		const buttons = el.createDiv({ cls: 'modal-button-container' });
-		const cancel = buttons.createEl('button', { text: 'Cancel' });
+		const cancel = buttons.createEl('button', { text: t('common.cancel') });
 		cancel.addEventListener('click', () => {
 			this.close();
 		});

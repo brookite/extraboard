@@ -10,9 +10,11 @@ import * as ops from '../../model/ops';
 import { escapeValue, formatValue, parseValue } from '../../model/properties';
 import type { Board, Card, PropertyDef, PropertyValue } from '../../model/types';
 import { editRecurrence } from '../../ui/RecurrenceModal';
+import { typeLabels } from '../../ui/PropertyDefsEditor';
 import type { BoardApi } from '../api';
 import { Icon } from './Icon';
 import { safeColor } from './style';
+import { t } from '../../i18n';
 
 /** Types edited as one text field; the rest have a control of their own. */
 const TEXT_TYPES = new Set(['string', 'datetime', 'date-range']);
@@ -50,7 +52,7 @@ export function PropertyBadges({ board, card, target, api }: Props) {
 		const missing = board.config.properties.filter((d) => !valueFor(d.name));
 		const menu = new Menu();
 		if (!missing.length) {
-			menu.addItem((item) => item.setTitle('No other properties on this board').setDisabled(true));
+			menu.addItem((item) => item.setTitle(t('propertyBadges.noOtherProperties')).setDisabled(true));
 		}
 		for (const def of missing) {
 			menu.addItem((item) =>
@@ -81,7 +83,7 @@ export function PropertyBadges({ board, card, target, api }: Props) {
 				<button
 					type="button"
 					class="eb-badge eb-badge-add"
-					aria-label="Add property"
+					aria-label={t('propertyBadges.addProperty')}
 					onClick={addMenu}
 				>
 					<Icon name="plus" />
@@ -146,6 +148,7 @@ interface EditorProps {
 function ValueEditor({ name, def, pv, api, onCommit, onRemove, onClose }: EditorProps) {
 	const type = def?.type ?? 'raw';
 	const current = pv ? formatValue(pv) : '';
+	const typeLabel = type === 'raw' ? t('propertyDefs.type.raw') : typeLabels()[type];
 
 	const commitText = (text: string): void => {
 		const raw = text.trim();
@@ -163,7 +166,7 @@ function ValueEditor({ name, def, pv, api, onCommit, onRemove, onClose }: Editor
 		<div class="eb-value-editor">
 			<div class="eb-value-editor-head">
 				<span class="eb-value-editor-name">{name}</span>
-				<span class="eb-value-editor-type">{type}</span>
+				<span class="eb-value-editor-type">{typeLabel}</span>
 			</div>
 
 			{type === 'checkbox' ? (
@@ -184,7 +187,7 @@ function ValueEditor({ name, def, pv, api, onCommit, onRemove, onClose }: Editor
 							const next = await api.pickColor({
 								title: name,
 								value: pv?.type === 'color' ? pv.value : '',
-								clearLabel: 'No color',
+								clearLabel: t('colorPicker.noColor'),
 							});
 							if (next === null) return;
 							onCommit(next ? { name, type: 'color', value: next } : null);
@@ -192,7 +195,7 @@ function ValueEditor({ name, def, pv, api, onCommit, onRemove, onClose }: Editor
 					}}
 				>
 					<span class="eb-swatch" style={`background: ${safeColor(current) || 'transparent'}`} />
-					{current || 'Pick a color'}
+					{current || t('propertyBadges.pickAColor')}
 				</button>
 			) : type === 'string-list' ? (
 				<StringListEditor name={name} def={def} pv={pv} onCommit={onCommit} />
@@ -210,7 +213,7 @@ function ValueEditor({ name, def, pv, api, onCommit, onRemove, onClose }: Editor
 						})();
 					}}
 				>
-					{current || 'Set a repetition rule'}
+					{current || t('propertyBadges.setRepetitionRule')}
 				</button>
 			) : (
 				<input
@@ -220,7 +223,11 @@ function ValueEditor({ name, def, pv, api, onCommit, onRemove, onClose }: Editor
 					min={type === 'percent' ? 0 : undefined}
 					max={type === 'percent' ? 100 : undefined}
 					placeholder={
-						LIST_TEXT_TYPES.has(type) ? 'value; value' : TEXT_TYPES.has(type) ? 'value' : ''
+						LIST_TEXT_TYPES.has(type)
+							? t('propertyBadges.valueListPlaceholder')
+							: TEXT_TYPES.has(type)
+								? t('propertyBadges.valuePlaceholder')
+								: ''
 					}
 					autofocus
 					onChange={(e) => commitText(e.currentTarget.value)}
@@ -239,10 +246,10 @@ function ValueEditor({ name, def, pv, api, onCommit, onRemove, onClose }: Editor
 
 			<div class="eb-value-editor-actions">
 				<button type="button" class="mod-warning" onClick={onRemove}>
-					Remove
+					{t('propertyBadges.remove')}
 				</button>
 				<button type="button" onClick={onClose}>
-					Done
+					{t('propertyBadges.done')}
 				</button>
 			</div>
 		</div>
@@ -287,7 +294,7 @@ function StringListEditor({
 				<input
 					type="text"
 					class="eb-value-input"
-					placeholder="Add a value"
+					placeholder={t('propertyDefs.addValue')}
 					onKeyDown={(e) => {
 						if (e.key !== 'Enter') return;
 						e.preventDefault();
@@ -299,7 +306,7 @@ function StringListEditor({
 				/>
 			)}
 			{!options.length && def?.strict ? (
-				<div class="eb-value-empty">This property declares no options.</div>
+				<div class="eb-value-empty">{t('propertyBadges.noOptionsDeclared')}</div>
 			) : null}
 		</div>
 	);

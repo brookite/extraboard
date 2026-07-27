@@ -15,6 +15,7 @@ import { ChecklistProgress, progressStyleFor } from './Progress';
 import { PropertyBadge } from './PropertyBadge';
 import { safeColor } from './style';
 import { Tag } from './Tag';
+import { t } from '../../i18n';
 
 interface Props {
 	board: Board;
@@ -88,9 +89,9 @@ export function CardTile({
 
 	const chooseColor = async (): Promise<void> => {
 		const next = await api.pickColor({
-			title: 'Card color',
+			title: t('card.cardColor'),
 			value: rawColor,
-			clearLabel: 'No color',
+			clearLabel: t('colorPicker.noColor'),
 		});
 		if (next === null) return;
 		api.update((b) => ops.setCardColor(b, ref, next));
@@ -114,19 +115,19 @@ export function CardTile({
 		const menu = new Menu();
 		menu.addItem((item) =>
 			item
-				.setTitle('Edit card')
+				.setTitle(t('card.editCard'))
 				.setIcon('pencil')
 				.onClick(() => setEditing(true)),
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle('Duplicate card')
+				.setTitle(t('card.duplicateCard'))
 				.setIcon('copy')
 				.onClick(() => api.update((b) => ops.duplicateItem(b, ref))),
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle(card.task === undefined ? 'Add checkbox' : 'Remove checkbox')
+				.setTitle(card.task === undefined ? t('card.addCheckbox') : t('card.removeCheckbox'))
 				.setIcon(card.task === undefined ? 'square-check' : 'square')
 				.onClick(() =>
 					api.update((b) => ops.setCardTask(b, ref, card.task === undefined ? ' ' : undefined)),
@@ -134,7 +135,7 @@ export function CardTile({
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle('Card color')
+				.setTitle(t('card.cardColor'))
 				.setIcon('palette')
 				.onClick(() => {
 					void chooseColor();
@@ -142,7 +143,7 @@ export function CardTile({
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle('Checklist')
+				.setTitle(t('modal.checklist.title'))
 				.setIcon('list-checks')
 				.onClick(openChecklist),
 		);
@@ -152,7 +153,7 @@ export function CardTile({
 		if (link) {
 			menu.addItem((item) =>
 				item
-					.setTitle('Open note')
+					.setTitle(t('card.openNote'))
 					.setIcon('file-text')
 					.onClick(() => {
 						void api.app.workspace.openLinkText(link.linktext, api.sourcePath(), false);
@@ -160,14 +161,14 @@ export function CardTile({
 			);
 			menu.addItem((item) =>
 				item
-					.setTitle('Unlink note')
+					.setTitle(t('card.unlinkNote'))
 					.setIcon('unlink')
 					.onClick(() => api.update((b) => ops.unlinkCardNote(b, ref))),
 			);
 		} else {
 			menu.addItem((item) =>
 				item
-					.setTitle('Create note')
+					.setTitle(t('card.createNote'))
 					.setIcon('file-plus')
 					.onClick(() => api.createCardNote(ref)),
 			);
@@ -180,7 +181,7 @@ export function CardTile({
 			board.stacks.forEach((stack, i) => {
 				menu.addItem((item) =>
 					item
-						.setTitle(`Move to ${stack.name || 'Untitled'}`)
+						.setTitle(t('card.moveTo', { name: stack.name || t('modal.archive.untitled') }))
 						.setIcon('corner-up-right')
 						.setDisabled(i === stackIndex)
 						.onClick(() => api.update((b) => ops.moveItem(b, ref, i, null))),
@@ -190,7 +191,7 @@ export function CardTile({
 		menu.addSeparator();
 		menu.addItem((item) =>
 			item
-				.setTitle('Archive card')
+				.setTitle(t('kanban.archiveCard'))
 				.setIcon('archive')
 				// Warning styling: it is the item that takes the card off the board,
 				// so it has to read as one at a glance (kanban-view.md §5.3).
@@ -202,7 +203,7 @@ export function CardTile({
 		if (settings.allowDeleteWithoutArchive) {
 			menu.addItem((item) =>
 				item
-					.setTitle('Delete card')
+					.setTitle(t('modal.archive.deleteCard'))
 					.setIcon('trash-2')
 					.setWarning(true)
 					.onClick(() => api.update((b) => ops.deleteItem(b, ref))),
@@ -244,7 +245,7 @@ export function CardTile({
 						type="checkbox"
 						class="eb-card-check task-list-item-checkbox"
 						checked={done}
-						aria-label={done ? 'Mark as not done' : 'Mark as done'}
+						aria-label={done ? t('modal.checklist.markNotDone') : t('modal.checklist.markDone')}
 						onClick={(e) => {
 							e.stopPropagation();
 							api.update((b) => ops.toggleCardTask(b, ref));
@@ -286,12 +287,12 @@ export function CardTile({
 							card.title
 						)
 					) : (
-						<span class="eb-placeholder">Untitled</span>
+						<span class="eb-placeholder">{t('modal.archive.untitled')}</span>
 					)}
 				</div>
 				<IconButton
 					icon="more-horizontal"
-					label="Card options"
+					label={t('card.options')}
 					class="eb-hover-only eb-card-menu"
 					onClick={openMenu}
 				/>
@@ -304,6 +305,8 @@ export function CardTile({
 							pv={pv}
 							config={board.config}
 							progress={progressStyleFor(board, settings)}
+							settings={settings}
+							card={card}
 						/>
 					))}
 				</div>

@@ -148,25 +148,3 @@ export function processCardText(input: string): ProcessedCardText {
 	return { text: kept.join(' '), checklist: buildChecklist(rows), dropped };
 }
 
-const LABELS: Record<DroppedKind, string> = {
-	list: 'lists',
-	quote: 'quotes',
-	heading: 'headings',
-	rule: 'rules',
-	code: 'code blocks',
-	math: 'block math',
-	table: 'tables',
-	html: 'HTML',
-	image: 'images',
-};
-
-/** Human-readable summary of what a card could not keep, or `''`. */
-export function describeDropped(dropped: DroppedKind[]): string {
-	if (!dropped.length) return '';
-	const names = dropped.map((kind) => LABELS[kind]);
-	const list =
-		names.length === 1
-			? names[0]!
-			: `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`;
-	return `A card holds one line of text: ${list} were removed.`;
-}

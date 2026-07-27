@@ -6,6 +6,15 @@
 - Entry point: `src/main.ts` compiled to `main.js` and loaded by Obsidian.
 - Required release artifacts: `main.js`, `manifest.json`, and optional `styles.css`.
 
+## Agent workflow
+
+- Agent work on this repository is organized with the **`manage-app-project`** skill:
+  it is used to restore project context between sessions (read `docs/IDEA.md`,
+  `docs/PROJECT_LOG.md`, `docs/MILESTONES.md`, `docs/SPEC.md` + `docs/specs/`,
+  `docs/plans/`, `docs/NOTICES.md` before implementing) and to keep those documents
+  accurate afterwards. `docs/` is local-only (git-excluded), so the documents live
+  beside the code without being published.
+
 ## Environment & tooling
 
 - Node.js: use current LTS (Node 18+ recommended).

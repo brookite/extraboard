@@ -19,6 +19,7 @@ import { ICONS, VIEW_TYPE_BOARD, viewIcon } from '../util/constants';
 import { BoardApi, confirmDestructive, searchTag } from './api';
 import { CalendarView } from './CalendarView';
 import { KanbanView, addStack } from './KanbanView';
+import { t } from '../i18n';
 
 export class BoardView extends TextFileView {
 	plugin: ExtraboardPlugin;
@@ -74,21 +75,21 @@ export class BoardView extends TextFileView {
 		this.ensureMount();
 		// The switch wears the active view's own icon and opens the view menu
 		// (views.md §3.1); it is created first so it sits leftmost in the header.
-		this.viewSwitchEl = this.addAction(ICONS.board, 'Views', (event) => {
+		this.viewSwitchEl = this.addAction(ICONS.board, t('action.views'), (event) => {
 			this.openViewMenu(event);
 		});
 		// One tap to the next view, beside the menu that picks one by name. It is
 		// hidden while the board has a single view — there would be nothing to
 		// cycle — and `renderBoard` is what reveals it (views.md §3.3).
-		this.viewCycleEl = this.addAction(ICONS.switchView, 'Switch board view', () => {
+		this.viewCycleEl = this.addAction(ICONS.switchView, t('action.switchBoardView'), () => {
 			this.nextView();
 		});
-		this.addAction(ICONS.add, 'Add stack', () => this.addStack());
+		this.addAction(ICONS.add, t('action.addStack'), () => this.addStack());
 		// The archive is reached often enough to deserve the header, not only the
 		// file menu (user decision, 2026-07-26).
-		this.addAction(ICONS.archive, 'Open archive', () => this.openArchive());
-		this.addAction(ICONS.settings, 'Board settings', () => this.openBoardSettings());
-		this.addAction(ICONS.markdown, 'Open as Markdown', () => this.openAsMarkdown());
+		this.addAction(ICONS.archive, t('menu.file.openArchive'), () => this.openArchive());
+		this.addAction(ICONS.settings, t('command.boardSettings'), () => this.openBoardSettings());
+		this.addAction(ICONS.markdown, t('action.openAsMarkdown'), () => this.openAsMarkdown());
 	}
 
 	override async onClose(): Promise<void> {
@@ -180,7 +181,7 @@ export class BoardView extends TextFileView {
 		menu.addSeparator();
 		menu.addItem((item) =>
 			item
-				.setTitle('Manage views…')
+				.setTitle(t('menu.file.manageViews'))
 				.setIcon(ICONS.views)
 				.onClick(() => this.manageViews()),
 		);
@@ -243,11 +244,15 @@ export class BoardView extends TextFileView {
 		if (!board) return;
 		const count = ops.countCompletedCards(board);
 		if (count === 0) {
-			new Notice('No completed cards to archive.');
+			new Notice(t('notice.noCompletedCards'));
 			return;
 		}
 		this.applyEdit((b) => ops.archiveCompletedCards(b));
-		new Notice(`Archived ${String(count)} card${count === 1 ? '' : 's'}.`);
+		new Notice(
+			count === 1
+				? t('notice.archivedOne')
+				: t('notice.archivedMany', { count }),
+		);
 	}
 
 	// --- internals ---
@@ -280,14 +285,14 @@ export class BoardView extends TextFileView {
 	private renderBoard(): void {
 		const el = this.ensureMount();
 		if (!this.board) {
-			render(<div class="eb-empty">Could not parse this board.</div>, el);
+			render(<div class="eb-empty">{t('board.parseError')}</div>, el);
 			return;
 		}
 		const views = this.board.config.views;
 		const view = activeViewOf(this.board.config);
 		if (this.viewSwitchEl) {
 			setIcon(this.viewSwitchEl, viewIcon(view.type));
-			this.viewSwitchEl.setAttribute('aria-label', `View: ${view.name}`);
+			this.viewSwitchEl.setAttribute('aria-label', t('action.viewAria', { name: view.name }));
 		}
 		if (this.viewCycleEl) {
 			// Creating or deleting a view is what makes the cycler appear or go, and
@@ -295,7 +300,9 @@ export class BoardView extends TextFileView {
 			this.viewCycleEl.toggle(views.length > 1);
 			const at = views.findIndex((v) => v.id === view.id);
 			const next = views[(at + 1) % views.length];
-			if (next) this.viewCycleEl.setAttribute('aria-label', `Switch to ${next.name}`);
+			if (next) {
+				this.viewCycleEl.setAttribute('aria-label', t('action.switchToAria', { name: next.name }));
+			}
 		}
 		if (view.type === 'calendar') {
 			render(

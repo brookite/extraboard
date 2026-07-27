@@ -7,6 +7,7 @@ import { invalidatedValues } from '../model/ops';
 import type { BadgeColor, Board, BoardConfig, ProgressStyle, PropertyDef } from '../model/types';
 import { colorField } from './ColorPicker';
 import { PropertyDefsEditor, cloneDefs } from './PropertyDefsEditor';
+import { t } from '../i18n';
 
 interface TagRow {
 	tag: string;
@@ -47,16 +48,14 @@ export class BoardSettingsModal extends Modal {
 	}
 
 	override onOpen(): void {
-		this.titleEl.setText(this.options.title ?? 'Board settings');
+		this.titleEl.setText(this.options.title ?? t('modal.boardSettings.title'));
 		this.modalEl.addClass('eb-board-settings');
 		const { contentEl } = this;
 		contentEl.empty();
 
 		new Setting(contentEl)
-			.setName('Show checkbox on cards')
-			.setDesc(
-				'Offer a task checkbox on cards that are not task list items yet. Cards that already are tasks always show one.',
-			)
+			.setName(t('modal.boardSettings.showCardCheckbox.name'))
+			.setDesc(t('modal.boardSettings.showCardCheckbox.desc'))
 			.addToggle((toggle) =>
 				toggle.setValue(this.config.showCardCheckbox === true).onChange((value) => {
 					if (value) this.config.showCardCheckbox = true;
@@ -65,13 +64,11 @@ export class BoardSettingsModal extends Modal {
 			);
 
 		new Setting(contentEl)
-			.setName('Card note folder')
-			.setDesc(
-				'Where this board creates card notes. Empty uses the folder from plugin settings, which defaults to the vault root.',
-			)
+			.setName(t('modal.boardSettings.cardNoteFolder.name'))
+			.setDesc(t('modal.boardSettings.cardNoteFolder.desc'))
 			.addText((text) =>
 				text
-					.setPlaceholder('Cards')
+					.setPlaceholder(t('modal.boardSettings.cardNoteFolder.placeholder'))
 					.setValue(this.config.cardContentDir ?? '')
 					.onChange((value) => {
 						const dir = value.trim();
@@ -81,15 +78,15 @@ export class BoardSettingsModal extends Modal {
 			);
 
 		new Setting(contentEl)
-			.setName('Progress style')
-			.setDesc('Shape of the checklist count and percent properties on this board.')
+			.setName(t('modal.boardSettings.progressStyle.name'))
+			.setDesc(t('modal.boardSettings.progressStyle.desc'))
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOptions({
-						'': 'Follow plugin settings',
-						ring: 'Ring',
-						fraction: 'Fraction (3/7)',
-						percent: 'Percent (43%)',
+						'': t('modal.boardSettings.progressStyle.followPlugin'),
+						ring: t('settings.progressStyle.ring'),
+						fraction: t('settings.progressStyle.fraction'),
+						percent: t('settings.progressStyle.percent'),
 					})
 					.setValue(this.config.progressStyle ?? '')
 					.onChange((value) => {
@@ -98,10 +95,10 @@ export class BoardSettingsModal extends Modal {
 					}),
 			);
 
-		new Setting(contentEl).setName('Properties').setHeading();
+		new Setting(contentEl).setName(t('modal.boardSettings.properties.heading')).setHeading();
 		contentEl.createDiv({
 			cls: 'setting-item-description',
-			text: 'Property order here is the order of tokens on a card. Changing a definition never rewrites cards.',
+			text: t('modal.boardSettings.properties.desc'),
 		});
 		const propsEl = contentEl.createDiv();
 		const editor = new PropertyDefsEditor(this.app, propsEl, this.properties, (defs) => {
@@ -110,7 +107,7 @@ export class BoardSettingsModal extends Modal {
 		});
 		editor.render();
 
-		new Setting(contentEl).setName('Tag colors').setHeading();
+		new Setting(contentEl).setName(t('modal.boardSettings.tagColors.heading')).setHeading();
 		const tagsEl = contentEl.createDiv();
 		this.renderTags(tagsEl);
 
@@ -118,10 +115,10 @@ export class BoardSettingsModal extends Modal {
 		this.renderImpact();
 
 		new Setting(contentEl)
-			.addButton((button) => button.setButtonText('Cancel').onClick(() => this.close()))
+			.addButton((button) => button.setButtonText(t('common.cancel')).onClick(() => this.close()))
 			.addButton((button) =>
 				button
-					.setButtonText(this.options.cta ?? 'Save')
+					.setButtonText(this.options.cta ?? t('modal.boardSettings.save'))
 					.setCta()
 					.onClick(() => {
 						this.options.onSave(this.nextConfig());
@@ -139,28 +136,30 @@ export class BoardSettingsModal extends Modal {
 	private renderTags(el: HTMLElement): void {
 		el.empty();
 		el.addClass('eb-pe');
-		if (this.tags.length === 0) el.createDiv({ cls: 'eb-pe-empty', text: 'No tag colors yet.' });
+		if (this.tags.length === 0) {
+			el.createDiv({ cls: 'eb-pe-empty', text: t('modal.boardSettings.tagColors.empty') });
+		}
 
 		this.tags.forEach((row, index) => {
 			const line = el.createDiv({ cls: 'eb-pe-option' });
 			const name = line.createEl('input', { type: 'text', cls: 'eb-pe-value' });
 			name.value = row.tag;
-			name.placeholder = 'Tag name';
+			name.placeholder = t('modal.boardSettings.tagColors.namePlaceholder');
 			name.addEventListener('change', () => {
 				row.tag = name.value.trim().replace(/^#/, '');
 			});
-			colorField(this.app, line, 'Background', row.color.bg, (value) => {
+			colorField(this.app, line, t('propertyDefs.background'), row.color.bg, (value) => {
 				if (value) row.color.bg = value;
 				else delete row.color.bg;
 				this.renderTags(el);
 			});
-			colorField(this.app, line, 'Text', row.color.fg, (value) => {
+			colorField(this.app, line, t('propertyDefs.text'), row.color.fg, (value) => {
 				if (value) row.color.fg = value;
 				else delete row.color.fg;
 				this.renderTags(el);
 			});
 			const remove = line.createEl('button', { cls: 'eb-pe-button', text: '✕' });
-			remove.setAttribute('aria-label', 'Remove tag color');
+			remove.setAttribute('aria-label', t('modal.boardSettings.tagColors.removeAria'));
 			remove.addEventListener('click', () => {
 				this.tags.splice(index, 1);
 				this.renderTags(el);
@@ -168,7 +167,7 @@ export class BoardSettingsModal extends Modal {
 		});
 
 		const actions = el.createDiv({ cls: 'eb-pe-actions' });
-		const add = actions.createEl('button', { text: 'Add tag color' });
+		const add = actions.createEl('button', { text: t('modal.boardSettings.tagColors.addTagColor') });
 		add.addEventListener('click', () => {
 			this.tags.push({ tag: '', color: {} });
 			this.renderTags(el);
@@ -198,8 +197,10 @@ export class BoardSettingsModal extends Modal {
 		const affected = invalidatedValues(board, this.nextConfig());
 		if (affected.length === 0) return;
 		const names = [...new Set(affected.map((a) => a.property))].join(', ');
-		el.createDiv({
-			text: `${String(affected.length)} card value(s) no longer match their property type (${names}). Card text is left as written; those values stop being shown once the board is re-read.`,
-		});
+		const text =
+			affected.length === 1
+				? t('modal.boardSettings.impactOne', { count: affected.length, names })
+				: t('modal.boardSettings.impactMany', { count: affected.length, names });
+		el.createDiv({ text });
 	}
 }

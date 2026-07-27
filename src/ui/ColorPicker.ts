@@ -9,6 +9,7 @@
 
 import { App, Modal } from 'obsidian';
 import { safeColor, toHexColor } from '../util/color';
+import { t } from '../i18n';
 
 /** Preset palette: Obsidian's accent hues, soft variants, and neutrals. */
 const PALETTE: string[][] = [
@@ -52,8 +53,9 @@ export function colorField(
 	const swatch = wrap.createEl('button', { cls: 'eb-swatch eb-swatch-button' });
 	swatch.type = 'button';
 	swatch.style.background = safeColor(value) ?? 'transparent';
-	swatch.setAttribute('aria-label', `Choose ${label.toLowerCase()} color`);
-	swatch.title = `Choose ${label.toLowerCase()} color`;
+	const chooseLabel = t('colorPicker.chooseColorFor', { label: label.toLowerCase() });
+	swatch.setAttribute('aria-label', chooseLabel);
+	swatch.title = chooseLabel;
 
 	const input = wrap.createEl('input', { type: 'text', cls: 'eb-pe-color-input' });
 	input.value = value ?? '';
@@ -63,9 +65,9 @@ export function colorField(
 
 	swatch.addEventListener('click', () => {
 		void pickColor(app, {
-			title: `${label} color`,
+			title: t('colorPicker.colorForTitle', { label }),
 			value: input.value,
-			clearLabel: 'No color',
+			clearLabel: t('colorPicker.noColor'),
 		}).then((next) => {
 			if (next !== null) onChange(next);
 		});
@@ -92,7 +94,7 @@ class ColorPickerModal extends Modal {
 	}
 
 	override onOpen(): void {
-		this.titleEl.setText(this.options.title ?? 'Choose a color');
+		this.titleEl.setText(this.options.title ?? t('colorPicker.defaultTitle'));
 		this.modalEl.addClass('eb-cp-modal');
 		const el = this.contentEl;
 		el.empty();
@@ -119,13 +121,13 @@ class ColorPickerModal extends Modal {
 
 		const custom = el.createDiv({ cls: 'eb-cp-custom' });
 		this.nativeEl = custom.createEl('input', { type: 'color', cls: 'eb-cp-native' });
-		this.nativeEl.setAttribute('aria-label', 'Pick a custom color');
+		this.nativeEl.setAttribute('aria-label', t('colorPicker.pickCustomColor'));
 		this.nativeEl.addEventListener('input', () => {
 			this.select(this.nativeEl.value);
 		});
 		this.textEl = custom.createEl('input', { type: 'text', cls: 'eb-cp-text' });
-		this.textEl.placeholder = 'Any CSS color value';
-		this.textEl.setAttribute('aria-label', 'Color value');
+		this.textEl.placeholder = t('colorPicker.anyCssValue');
+		this.textEl.setAttribute('aria-label', t('colorPicker.customColorValue'));
 		this.textEl.addEventListener('input', () => {
 			this.select(this.textEl.value, true);
 		});
@@ -142,11 +144,11 @@ class ColorPickerModal extends Modal {
 				this.finish('');
 			});
 		}
-		const cancel = buttons.createEl('button', { text: 'Cancel' });
+		const cancel = buttons.createEl('button', { text: t('common.cancel') });
 		cancel.addEventListener('click', () => {
 			this.close();
 		});
-		this.ctaEl = buttons.createEl('button', { cls: 'mod-cta', text: 'Select' });
+		this.ctaEl = buttons.createEl('button', { cls: 'mod-cta', text: t('colorPicker.select') });
 		this.ctaEl.addEventListener('click', () => {
 			this.finish(this.value);
 		});
@@ -171,7 +173,11 @@ class ColorPickerModal extends Modal {
 		this.previewEl.style.background = safe ?? 'transparent';
 		this.previewEl.classList.toggle('is-empty', safe === null);
 		this.labelEl.setText(
-			this.value === '' ? 'No color' : safe === null ? `${this.value} — not a color` : this.value,
+			this.value === ''
+				? t('colorPicker.noColor')
+				: safe === null
+					? t('colorPicker.notAColor', { value: this.value })
+					: this.value,
 		);
 		if (!fromText) this.textEl.value = this.value;
 

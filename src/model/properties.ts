@@ -142,29 +142,41 @@ export function formatToken(pv: PropertyValue): string {
 }
 
 /**
- * Non-fatal validation of board property definitions. Returns human-readable
+ * A validation diagnostic, structured rather than pre-rendered text — the
+ * model stays free of UI strings, and a caller looks each `kind` up through
+ * `t()` (i18n-and-dates.md §1.2).
+ */
+export type PropertyDiagnostic =
+	| { kind: 'noName' }
+	| { kind: 'duplicateName'; name: string }
+	| { kind: 'strictOptionsWrongType'; name: string }
+	| { kind: 'timeWrongType'; name: string }
+	| { kind: 'tooManyColors' };
+
+/**
+ * Non-fatal validation of board property definitions. Returns structured
  * diagnostics; never throws.
  *
  * `color` is limited to one per board because it paints the card. `checkbox`
  * is not: the card's own checkbox is a native task marker (markdown-format.md
  * §4.0), so a `checkbox` property is just a named boolean badge (M5).
  */
-export function validatePropertyDefs(defs: PropertyDef[]): string[] {
-	const diags: string[] = [];
+export function validatePropertyDefs(defs: PropertyDef[]): PropertyDiagnostic[] {
+	const diags: PropertyDiagnostic[] = [];
 	const seen = new Set<string>();
 	let colors = 0;
 	for (const d of defs) {
-		if (!d.name.trim()) diags.push('A property has no name.');
-		else if (seen.has(d.name)) diags.push(`Property "${d.name}" is declared more than once.`);
+		if (!d.name.trim()) diags.push({ kind: 'noName' });
+		else if (seen.has(d.name)) diags.push({ kind: 'duplicateName', name: d.name });
 		seen.add(d.name);
 		if (d.type === 'color') colors++;
 		if ((d.strict !== undefined || d.options !== undefined) && d.type !== 'string-list') {
-			diags.push(`Property "${d.name}": strict/options are only valid on string-list.`);
+			diags.push({ kind: 'strictOptionsWrongType', name: d.name });
 		}
 		if (d.time !== undefined && d.type !== 'datetime') {
-			diags.push(`Property "${d.name}": time is only valid on datetime.`);
+			diags.push({ kind: 'timeWrongType', name: d.name });
 		}
 	}
-	if (colors > 1) diags.push('At most one color property is allowed per board.');
+	if (colors > 1) diags.push({ kind: 'tooManyColors' });
 	return diags;
 }

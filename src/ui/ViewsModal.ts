@@ -8,6 +8,7 @@ import type { Board, CalendarMode, PropertyDef, ViewDef, ViewKind } from '../mod
 import { dateProperties, defaultViewName, hasKanbanView, isViewUsable } from '../model/views';
 import type { BoardApi } from '../view/api';
 import { ICONS, viewIcon } from '../util/constants';
+import { t } from '../i18n';
 
 export interface ViewsModalOptions {
 	api: BoardApi;
@@ -30,7 +31,7 @@ class ViewsModal extends Modal {
 	}
 
 	override onOpen(): void {
-		this.titleEl.setText('Views');
+		this.titleEl.setText(t('modal.views.title'));
 		this.modalEl.addClass('eb-views-modal');
 		this.render();
 	}
@@ -56,7 +57,7 @@ class ViewsModal extends Modal {
 		});
 
 		const actions = el.createDiv({ cls: 'modal-button-container' });
-		const add = actions.createEl('button', { cls: 'mod-cta', text: 'New view' });
+		const add = actions.createEl('button', { cls: 'mod-cta', text: t('modal.views.newView') });
 		add.addEventListener('click', () => {
 			this.createView();
 		});
@@ -80,7 +81,7 @@ class ViewsModal extends Modal {
 		const text = main.createDiv({ cls: 'eb-views-text' });
 		text.createDiv({ cls: 'eb-views-name', text: view.name });
 		text.createDiv({ cls: 'eb-views-desc', text: describe(board, view) });
-		if (active) main.createSpan({ cls: 'eb-views-active', text: 'active' });
+		if (active) main.createSpan({ cls: 'eb-views-active', text: t('modal.views.active') });
 		main.addEventListener('click', () => {
 			this.options.api.update((b) => ops.setActiveView(b, view.id));
 			this.options.onSwitch?.(view.id);
@@ -98,12 +99,12 @@ class ViewsModal extends Modal {
 				this.render();
 			});
 		};
-		move(index - 1, 'Move up', ICONS.up, index > 0);
-		move(index + 2, 'Move down', ICONS.down, index < board.config.views.length - 1);
+		move(index - 1, t('propertyDefs.moveUp'), ICONS.up, index > 0);
+		move(index + 2, t('propertyDefs.moveDown'), ICONS.down, index < board.config.views.length - 1);
 
 		const edit = buttons.createEl('button', { cls: 'eb-views-button' });
 		setIcon(edit, ICONS.edit);
-		edit.setAttribute('aria-label', 'Edit view');
+		edit.setAttribute('aria-label', t('modal.views.editView'));
 		edit.addEventListener('click', () => {
 			this.editView(view);
 		});
@@ -111,7 +112,10 @@ class ViewsModal extends Modal {
 		const remove = buttons.createEl('button', { cls: 'eb-views-button mod-warning' });
 		setIcon(remove, ICONS.delete);
 		const last = board.config.views.length <= 1;
-		remove.setAttribute('aria-label', last ? 'A board needs at least one view' : 'Delete view');
+		remove.setAttribute(
+			'aria-label',
+			last ? t('modal.views.needsOneView') : t('modal.views.deleteView'),
+		);
 		remove.disabled = last;
 		remove.addEventListener('click', () => {
 			void this.deleteView(view);
@@ -120,9 +124,9 @@ class ViewsModal extends Modal {
 
 	private async deleteView(view: ViewDef): Promise<void> {
 		const ok = await this.options.api.confirm(
-			'Delete view',
-			`Delete the view "${view.name}"? The board's cards are not affected.`,
-			'Delete',
+			t('modal.views.deleteView'),
+			t('modal.views.deleteConfirmMessage', { name: view.name }),
+			t('common.delete'),
 		);
 		if (!ok) return;
 		this.options.api.update((b) => ops.deleteView(b, view.id));
@@ -136,8 +140,8 @@ class ViewsModal extends Modal {
 		const kanbanTaken = hasKanbanView(board.config.views);
 		const type: ViewKind = kanbanTaken ? 'calendar' : 'kanban';
 		void this.form({
-			title: 'New view',
-			cta: 'Create',
+			title: t('modal.views.newView'),
+			cta: t('modal.newBoard.cta'),
 			fields: {
 				name: defaultViewName(type),
 				type,
@@ -171,8 +175,8 @@ class ViewsModal extends Modal {
 		const board = this.board();
 		if (!board) return;
 		void this.form({
-			title: 'Edit view',
-			cta: 'Save',
+			title: t('modal.views.editView'),
+			cta: t('modal.boardSettings.save'),
 			fields: {
 				name: view.name,
 				type: view.type,
@@ -216,9 +220,10 @@ class ViewsModal extends Modal {
 
 /** Subtitle of a view card: what it is, and what it is computed from. */
 function describe(board: Board, view: ViewDef): string {
-	if (view.type !== 'calendar') return 'Kanban';
-	const suffix = isViewUsable(board.config, view) ? '' : ' — missing property';
-	return `Calendar · ${view.dateProperty} · ${view.mode}${suffix}`;
+	if (view.type !== 'calendar') return t('modal.views.kanban');
+	const mode = view.mode === 'month' ? t('modal.views.mode.month') : t('modal.views.mode.week');
+	const suffix = isViewUsable(board.config, view) ? '' : t('modal.views.missingProperty');
+	return t('modal.views.describeCalendar', { prop: view.dateProperty, mode }) + suffix;
 }
 
 // --- the view form ----------------------------------------------------------
@@ -272,7 +277,7 @@ class ViewFormModal extends Modal {
 		// Editing a Kanban view must not report *itself* as the blocking one.
 		const kanbanPossible = !kanbanTaken || (lockType && this.fields.type === 'kanban');
 
-		const name = new Setting(el).setName('Name').addText((text) =>
+		const name = new Setting(el).setName(t('modal.stack.name')).addText((text) =>
 			text
 				.setPlaceholder(defaultViewName(this.fields.type))
 				.setValue(this.fields.name)
@@ -287,9 +292,9 @@ class ViewFormModal extends Modal {
 			this.finish(this.fields);
 		});
 
-		const typeSetting = new Setting(el).setName('Type').addDropdown((dropdown) => {
+		const typeSetting = new Setting(el).setName(t('modal.views.type')).addDropdown((dropdown) => {
 			dropdown
-				.addOptions({ kanban: 'Kanban', calendar: 'Calendar' })
+				.addOptions({ kanban: t('modal.views.kanban'), calendar: t('modal.views.calendar') })
 				.setValue(this.fields.type)
 				.onChange((value) => {
 					this.fields.type = value as ViewKind;
@@ -308,24 +313,22 @@ class ViewFormModal extends Modal {
 			}
 		});
 		if (lockType) {
-			typeSetting.setDesc(
-				"A view's type is fixed. Delete this view and create a new one to change it.",
-			);
+			typeSetting.setDesc(t('modal.views.typeFixedDesc'));
 		}
 
 		// Both limits are shown with their reason rather than hidden (views.md §4.3, §4.4).
 		if (!lockType && !kanbanPossible) {
 			el.createDiv({
 				cls: 'setting-item-description eb-views-note',
-				text: 'This board already has a Kanban view. Building a second one from the values of a string-list property is not supported yet.',
+				text: t('modal.views.kanbanTakenNote'),
 			});
 		}
 		if (!calendarPossible) {
 			const note = el.createDiv({ cls: 'setting-item-description eb-views-note' });
 			note.createDiv({
-				text: 'Calendar views need a date property. This board has none — declare a datetime, date-range or date-list property first.',
+				text: t('modal.views.calendarNeedsDateNote'),
 			});
-			const open = note.createEl('button', { text: 'Board settings' });
+			const open = note.createEl('button', { text: t('command.boardSettings') });
 			open.addEventListener('click', () => {
 				this.close();
 				this.options.openBoardSettings();
@@ -334,8 +337,8 @@ class ViewFormModal extends Modal {
 
 		if (this.fields.type === 'calendar' && calendarPossible) {
 			new Setting(el)
-				.setName('Date property')
-				.setDesc('Cards are placed on the grid by this property.')
+				.setName(t('modal.views.dateProperty'))
+				.setDesc(t('modal.views.datePropertyDesc'))
 				.addDropdown((dropdown) => {
 					const options: Record<string, string> = {};
 					for (const def of dates) options[def.name] = `${def.name} (${def.type})`;
@@ -348,9 +351,9 @@ class ViewFormModal extends Modal {
 					this.fields.dateProperty ??= dropdown.getValue();
 				});
 
-			new Setting(el).setName('Mode').addDropdown((dropdown) =>
+			new Setting(el).setName(t('modal.views.mode.label')).addDropdown((dropdown) =>
 				dropdown
-					.addOptions({ month: 'Month', week: 'Week' })
+					.addOptions({ month: t('modal.views.mode.month'), week: t('modal.views.mode.week') })
 					.setValue(this.fields.mode)
 					.onChange((value) => {
 						this.fields.mode = value as CalendarMode;
@@ -359,7 +362,7 @@ class ViewFormModal extends Modal {
 		}
 
 		const buttons = el.createDiv({ cls: 'modal-button-container' });
-		const cancel = buttons.createEl('button', { text: 'Cancel' });
+		const cancel = buttons.createEl('button', { text: t('common.cancel') });
 		cancel.addEventListener('click', () => {
 			this.close();
 		});

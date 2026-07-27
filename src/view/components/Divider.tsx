@@ -6,6 +6,7 @@ import type { BoardApi } from '../api';
 import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
 import { safeColor } from './style';
+import { t } from '../../i18n';
 
 interface Props {
 	board: Board;
@@ -24,7 +25,7 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 	const divider = entry.divider;
 	const ref = { stack: stackIndex, item: index };
 	const named = divider.name !== undefined;
-	const toggleLabel = divider.collapsed ? 'Expand group' : 'Collapse group';
+	const toggleLabel = divider.collapsed ? t('divider.expand') : t('divider.collapse');
 
 	const color = safeColor(divider.color);
 
@@ -34,9 +35,9 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 	/** The color the group's cards inherit (stack-completion-and-divider-colors.md §4). */
 	const chooseColor = async (): Promise<void> => {
 		const next = await api.pickColor({
-			title: 'Divider color',
+			title: t('divider.dividerColor'),
 			value: divider.color ?? '',
-			clearLabel: 'No color',
+			clearLabel: t('colorPicker.noColor'),
 		});
 		if (next === null) return;
 		api.update((b) => ops.setDividerColor(b, ref, next));
@@ -52,7 +53,7 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle(named ? 'Rename divider' : 'Name divider')
+				.setTitle(named ? t('divider.renameDivider') : t('divider.nameDivider'))
 				.setIcon('pencil')
 				.onClick(() => setEditing(true)),
 		);
@@ -61,7 +62,7 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 			// and no group to read as a band (§4.2).
 			menu.addItem((item) =>
 				item
-					.setTitle('Divider color')
+					.setTitle(t('divider.dividerColor'))
 					.setIcon('palette')
 					.onClick(() => {
 						void chooseColor();
@@ -69,7 +70,7 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 			);
 			menu.addItem((item) =>
 				item
-					.setTitle('Remove name')
+					.setTitle(t('divider.removeName'))
 					.setIcon('minus')
 					.onClick(() => api.update((b) => ops.renameDivider(b, ref, undefined))),
 			);
@@ -77,7 +78,7 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 		menu.addSeparator();
 		menu.addItem((item) =>
 			item
-				.setTitle('Delete divider')
+				.setTitle(t('divider.deleteDivider'))
 				.setIcon('trash-2')
 				.setWarning(true)
 				.onClick(() => api.update((b) => ops.deleteItem(b, ref))),
@@ -90,7 +91,7 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 			<div class="eb-item eb-divider-row is-editing" data-index={index}>
 				<InlineEditor
 					value={divider.name ?? ''}
-					placeholder="Divider name"
+					placeholder={t('divider.namePlaceholder')}
 					onSubmit={(name) => {
 						setEditing(false);
 						api.update((b) => ops.renameDivider(b, ref, name));
@@ -128,18 +129,18 @@ export function DividerRow({ board, stackIndex, index, api, hiddenCount }: Props
 			</button>
 			{named ? (
 				<span class="eb-divider-label" onClick={() => setEditing(true)}>
-					{divider.name || <span class="eb-placeholder">Unnamed</span>}
+					{divider.name || <span class="eb-placeholder">{t('divider.unnamed')}</span>}
 				</span>
 			) : null}
 			<span class="eb-divider-line" />
 			{divider.collapsed && hiddenCount > 0 ? (
-				<span class="eb-stack-count" title="Hidden cards">
+				<span class="eb-stack-count" title={t('divider.hiddenCards')}>
 					{hiddenCount}
 				</span>
 			) : null}
 			<IconButton
 				icon="more-vertical"
-				label="Divider options"
+				label={t('divider.options')}
 				class="eb-hover-only"
 				onClick={openMenu}
 			/>

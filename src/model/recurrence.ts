@@ -436,11 +436,3 @@ export function nextOccurrence(
 	const to = { y: from.y + horizonYears, m: from.m, d: from.d };
 	return expandRecurrence(rule, anchor, from, to, 1)[0] ?? null;
 }
-
-/**
- * The sentence the rule form previews. English for now; M11 localizes what is
- * shown without touching what is stored (§5).
- */
-export function describeRecurrence(rule: Recurrence): string {
-	return formatRecurrence(rule);
-}

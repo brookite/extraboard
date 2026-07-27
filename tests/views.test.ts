@@ -244,7 +244,7 @@ describe('views: ops (§2.4)', () => {
 describe('views: validation (§2.2)', () => {
 	it('reports a second Kanban view', () => {
 		const board = ops.addView(parse('view: kanban'), { name: 'Another', type: 'kanban' });
-		expect(validateViews(board.config).join(' ')).toContain('at most one Kanban');
+		expect(validateViews(board.config)).toContainEqual({ kind: 'tooManyKanban' });
 	});
 
 	it('reports a calendar whose property is gone or is not a date', () => {
@@ -254,7 +254,11 @@ describe('views: validation (§2.2)', () => {
 			'properties:',
 			'  - { name: title, type: string }',
 		);
-		expect(validateViews(board.config).join(' ')).toContain('does not declare');
+		expect(validateViews(board.config)).toContainEqual({
+			kind: 'missingDateProperty',
+			name: 'Due',
+			property: 'due',
+		});
 
 		const retyped = parse(
 			'views:',
@@ -262,7 +266,12 @@ describe('views: validation (§2.2)', () => {
 			'properties:',
 			'  - { name: title, type: string }',
 		);
-		expect(validateViews(retyped.config).join(' ')).toContain('cannot drive a calendar');
+		expect(validateViews(retyped.config)).toContainEqual({
+			kind: 'wrongDatePropertyType',
+			name: 'Due',
+			property: 'title',
+			type: 'string',
+		});
 	});
 
 	it('accepts a healthy board', () => {

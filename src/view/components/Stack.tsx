@@ -10,6 +10,7 @@ import { CardTile } from './Card';
 import { DividerRow } from './Divider';
 import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
+import { t } from '../../i18n';
 
 interface Props {
 	board: Board;
@@ -47,7 +48,7 @@ export function StackColumn({ board, index, api, settings }: Props) {
 
 	const collapsed = stack.collapsed;
 	const hidden = ops.hiddenItems(stack);
-	const toggleLabel = collapsed ? 'Expand stack' : 'Collapse stack';
+	const toggleLabel = collapsed ? t('stack.expand') : t('stack.collapse');
 
 	const setCollapsed = (value: boolean): void =>
 		api.update((b) => ops.setStackCollapsed(b, index, value));
@@ -62,8 +63,8 @@ export function StackColumn({ board, index, api, settings }: Props) {
 	/** Name plus the completion flag, in one form (§3.3). */
 	const editParameters = async (): Promise<void> => {
 		const fields = await editStack(api.app, {
-			title: 'Edit stack',
-			cta: 'Save',
+			title: t('modal.stack.editTitle'),
+			cta: t('modal.stack.editCta'),
 			name: stack.name,
 			completes: stack.completes,
 		});
@@ -73,7 +74,10 @@ export function StackColumn({ board, index, api, settings }: Props) {
 
 	/** Insert a stack beside this one, configured before it exists. */
 	const insertStack = async (at: number): Promise<void> => {
-		const fields = await editStack(api.app, { title: 'Add stack', cta: 'Add' });
+		const fields = await editStack(api.app, {
+			title: t('modal.stack.addTitle'),
+			cta: t('modal.stack.addCta'),
+		});
 		if (!fields) return;
 		api.update((b) => ops.addStack(b, fields.name, at, fields.completes));
 	};
@@ -84,9 +88,11 @@ export function StackColumn({ board, index, api, settings }: Props) {
 			// The cards are archived, not destroyed (archive.md §5.6) — which is
 			// what the confirmation has to say, so "Delete" is not read as "lose".
 			const ok = await api.confirm(
-				'Delete stack',
-				`"${stack.name}" contains ${String(count)} card${count === 1 ? '' : 's'}. Deleting the stack moves ${count === 1 ? 'it' : 'them'} to the archive, where ${count === 1 ? 'it' : 'they'} can be restored.`,
-				'Delete',
+				t('stack.deleteStack'),
+				count === 1
+					? t('stack.deleteConfirmMessageOne', { name: stack.name })
+					: t('stack.deleteConfirmMessageMany', { name: stack.name, count }),
+				t('common.delete'),
 			);
 			if (!ok) return;
 		}
@@ -97,19 +103,19 @@ export function StackColumn({ board, index, api, settings }: Props) {
 		const menu = new Menu();
 		menu.addItem((item) =>
 			item
-				.setTitle('Add card')
+				.setTitle(t('stack.addCard'))
 				.setIcon('plus')
 				.onClick(addCard),
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle('Add divider')
+				.setTitle(t('stack.addDivider'))
 				.setIcon('minus')
 				.onClick(() => api.update((b) => ops.addDivider(b, index, undefined))),
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle('Add named divider')
+				.setTitle(t('stack.addNamedDivider'))
 				.setIcon('heading')
 				.onClick(() => api.update((b) => ops.addDivider(b, index, 'Group'))),
 		);
@@ -119,7 +125,7 @@ export function StackColumn({ board, index, api, settings }: Props) {
 		// renames inline, which is the faster path when that is all one wants.
 		menu.addItem((item) =>
 			item
-				.setTitle('Edit stack')
+				.setTitle(t('modal.stack.editTitle'))
 				.setIcon('pencil')
 				.onClick(() => {
 					void editParameters();
@@ -133,7 +139,7 @@ export function StackColumn({ board, index, api, settings }: Props) {
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle('Insert stack left')
+				.setTitle(t('stack.insertLeft'))
 				.setIcon('arrow-left')
 				.onClick(() => {
 					void insertStack(index);
@@ -141,7 +147,7 @@ export function StackColumn({ board, index, api, settings }: Props) {
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle('Insert stack right')
+				.setTitle(t('stack.insertRight'))
 				.setIcon('arrow-right')
 				.onClick(() => {
 					void insertStack(index + 1);
@@ -150,7 +156,7 @@ export function StackColumn({ board, index, api, settings }: Props) {
 		menu.addSeparator();
 		menu.addItem((item) =>
 			item
-				.setTitle('Delete stack')
+				.setTitle(t('stack.deleteStack'))
 				.setIcon('trash-2')
 				.setWarning(true)
 				.onClick(() => void deleteStack()),
@@ -171,7 +177,7 @@ export function StackColumn({ board, index, api, settings }: Props) {
 			<div class="eb-stack-header">
 				{/* The only drag zone for the stack (`handle` in KanbanView), so the
 				    rest of the header keeps its click targets. */}
-				<span class="eb-stack-grip" title="Drag to reorder" aria-hidden="true">
+				<span class="eb-stack-grip" title={t('modal.checklist.dragToReorder')} aria-hidden="true">
 					<Icon name="grip-vertical" />
 				</span>
 				<button
@@ -189,7 +195,7 @@ export function StackColumn({ board, index, api, settings }: Props) {
 				{renaming ? (
 					<InlineEditor
 						value={stack.name}
-						placeholder="Stack name"
+						placeholder={t('modal.stack.namePlaceholder')}
 						class="eb-stack-name-editor"
 						onSubmit={(name) => {
 							setRenaming(false);
@@ -199,25 +205,29 @@ export function StackColumn({ board, index, api, settings }: Props) {
 					/>
 				) : (
 					<span class="eb-stack-name" onClick={() => setRenaming(true)}>
-						{stack.name || <span class="eb-placeholder">Untitled</span>}
+						{stack.name || <span class="eb-placeholder">{t('modal.archive.untitled')}</span>}
 					</span>
 				)}
 				{/* Otherwise the flag would be invisible and cards would look like
 				    they complete themselves (§3.3). */}
 				{stack.completes ? (
-					<span class="eb-stack-completes" title="Completes cards" aria-label="Completes cards">
+					<span
+						class="eb-stack-completes"
+						title={t('stack.completesCards')}
+						aria-label={t('stack.completesCards')}
+					>
 						<Icon name="check-check" />
 					</span>
 				) : null}
 				<span class="eb-stack-count">{ops.cardCount(stack)}</span>
-				<IconButton icon="more-vertical" label="Stack options" onClick={openMenu} />
+				<IconButton icon="more-vertical" label={t('stack.options')} onClick={openMenu} />
 			</div>
 
 			{collapsed ? null : (
 				<div class="eb-stack-compose">
 					<button type="button" class="eb-add-card" onClick={addCard}>
 						<Icon name="plus" />
-						<span>Add card</span>
+						<span>{t('stack.addCard')}</span>
 					</button>
 				</div>
 			)}

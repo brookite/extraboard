@@ -2,6 +2,7 @@
 
 import { App, Notice, TFile, TFolder, normalizePath } from 'obsidian';
 import { noteFileName } from '../model/link';
+import { t } from '../i18n';
 
 /**
  * Resolve the folder for a new card note: the board's `cardContentDir`, then
@@ -50,7 +51,7 @@ export async function createCardNote(
 	sourcePath: string,
 ): Promise<{ file: TFile; link: string } | null> {
 	if (!(await ensureFolder(app, folder))) {
-		new Notice(`Extraboard: could not use the folder "${folder}".`);
+		new Notice(t('notice.badNoteFolder', { folder }));
 		return null;
 	}
 
@@ -60,7 +61,7 @@ export async function createCardNote(
 		file = await app.vault.create(uniquePath(app, folder, name), '');
 	} catch (err) {
 		console.error('Extraboard: failed to create the card note', err);
-		new Notice('Extraboard: could not create the note.');
+		new Notice(t('notice.createNoteFailed'));
 		return null;
 	}
 

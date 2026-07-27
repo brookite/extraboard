@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { ChecklistItem } from '../src/model/checklist';
-import { describeDropped, processCardText } from '../src/model/cardText';
+import { processCardText } from '../src/model/cardText';
 import * as ops from '../src/model/ops';
 import { parseBody } from '../src/model/parse';
 import { serializeBody } from '../src/model/serialize';
@@ -142,13 +142,10 @@ describe('card text: block constructs are removed', () => {
 	it('reports every kind it removed, once each, in first-seen order', () => {
 		const r = processCardText('T\n> q\n- item\n# h\n- other');
 		expect(r.dropped).toEqual(['quote', 'list', 'heading']);
-		expect(describeDropped(r.dropped)).toBe(
-			'A card holds one line of text: quotes, lists and headings were removed.',
-		);
 	});
 
-	it('says nothing when nothing was removed', () => {
-		expect(describeDropped([])).toBe('');
+	it('reports nothing dropped when nothing was removed', () => {
+		expect(processCardText('Plain text').dropped).toEqual([]);
 	});
 });
 

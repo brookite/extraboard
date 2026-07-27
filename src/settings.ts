@@ -3,6 +3,8 @@
 // Spec: docs/specs/settings.md.
 
 import type { ProgressStyle, PropertyDef } from './model/types';
+import type { Lang } from './i18n';
+import type { DateFormatMode } from './i18n/dates';
 
 export interface ExtraboardSettings {
 	/**
@@ -37,6 +39,23 @@ export interface ExtraboardSettings {
 	 * actions are unaffected.
 	 */
 	allowDeleteWithoutArchive: boolean;
+	/**
+	 * UI language. `auto` follows Obsidian's own configured language; anything
+	 * other than `ru` falls back to English (i18n-and-dates.md §1).
+	 */
+	language: Lang | 'auto';
+	/**
+	 * How the date half of every rendered date is shown (i18n-and-dates.md §2).
+	 * `custom` reads `datePattern`, a moment.js format string.
+	 */
+	dateFormat: DateFormatMode;
+	/** The same four choices for the time half, configured separately. `custom`
+	 * reads `timePattern`. */
+	timeFormat: DateFormatMode;
+	/** moment.js pattern for `dateFormat: 'custom'`; empty falls back to `built-in`. */
+	datePattern: string;
+	/** moment.js pattern for `timeFormat: 'custom'`; empty falls back to `built-in`. */
+	timePattern: string;
 }
 
 export const DEFAULT_SETTINGS: ExtraboardSettings = {
@@ -46,4 +65,9 @@ export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	showRawPropertyTokens: false,
 	fillCardWithColor: false,
 	allowDeleteWithoutArchive: false,
+	language: 'auto',
+	dateFormat: 'system',
+	timeFormat: 'system',
+	datePattern: '',
+	timePattern: '',
 };

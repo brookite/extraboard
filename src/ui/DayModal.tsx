@@ -5,7 +5,7 @@
 // card menu all work exactly as they do on the Kanban side — plus the two
 // badges a calendar needs, the card's **stack** and its **named divider**.
 
-import { App, Menu, Modal, moment } from 'obsidian';
+import { App, Menu, Modal } from 'obsidian';
 import { render } from 'preact';
 import { useRef, useState } from 'preact/hooks';
 import { occurrencesOn, placeCards, setCardDay } from '../model/calendar';
@@ -17,6 +17,7 @@ import type { BoardApi } from '../view/api';
 import { CardTile } from '../view/components/Card';
 import { Icon } from '../view/components/Icon';
 import { safeColor } from '../view/components/style';
+import { currentLanguage, t } from '../i18n';
 
 type CalendarDef = Extract<ViewDef, { type: 'calendar' }>;
 
@@ -32,16 +33,16 @@ export function openDayModal(app: App, options: DayModalOptions): void {
 	new DayModal(app, options).open();
 }
 
+/**
+ * Always the full, absolute form — a modal heading identifying *which* day
+ * this is has no use for "in 3 days" — so only the locale source moves onto
+ * the plugin's own resolved language (i18n-and-dates.md §2), not whatever
+ * Obsidian's app-wide locale happens to be.
+ */
 function dayTitle(day: CalDate | null): string {
-	if (!day) return 'No date';
+	if (!day) return t('modal.day.noDate');
 	const date = new Date(day.y, day.m - 1, day.d);
-	let locale: string | undefined;
-	try {
-		locale = moment.locale();
-	} catch {
-		locale = undefined;
-	}
-	return new Intl.DateTimeFormat(locale, {
+	return new Intl.DateTimeFormat(currentLanguage(), {
 		weekday: 'long',
 		day: 'numeric',
 		month: 'long',
@@ -100,7 +101,7 @@ function DayRow({ board, refItem, api, settings }: RowProps) {
 		board.stacks.forEach((target, i) => {
 			menu.addItem((item) =>
 				item
-					.setTitle(target.name || 'Untitled')
+					.setTitle(target.name || t('modal.archive.untitled'))
 					.setIcon('square-kanban')
 					.setDisabled(i === refItem.stack)
 					.onClick(() => {
@@ -119,7 +120,7 @@ function DayRow({ board, refItem, api, settings }: RowProps) {
 		const groups = namedDividers(board, refItem.stack);
 		menu.addItem((item) =>
 			item
-				.setTitle('None')
+				.setTitle(t('modal.day.noGroupOption'))
 				.setIcon('minus')
 				.setChecked(divider === null)
 				.onClick(() => {
@@ -156,7 +157,7 @@ function DayRow({ board, refItem, api, settings }: RowProps) {
 			<div class="eb-day-meta">
 				<button type="button" class="eb-badge eb-day-stack" onClick={chooseStack}>
 					<Icon name="square-kanban" />
-					<span>{stack.name || 'Untitled'}</span>
+					<span>{stack.name || t('modal.archive.untitled')}</span>
 				</button>
 				{divider ? (
 					<button
@@ -171,7 +172,7 @@ function DayRow({ board, refItem, api, settings }: RowProps) {
 				) : namedDividers(board, refItem.stack).length > 0 ? (
 					<button type="button" class="eb-badge eb-day-divider is-empty" onClick={chooseDivider}>
 						<Icon name="heading" />
-						<span>No group</span>
+						<span>{t('modal.day.noGroup')}</span>
 					</button>
 				) : null}
 			</div>
@@ -216,7 +217,7 @@ function Composer({ board, api, view, day, propertyType, stackIndex, onStack }: 
 		board.stacks.forEach((target, i) => {
 			menu.addItem((item) =>
 				item
-					.setTitle(target.name || 'Untitled')
+					.setTitle(target.name || t('modal.archive.untitled'))
 					.setIcon('square-kanban')
 					.setChecked(i === stackIndex)
 					.onClick(() => onStack(i)),
@@ -230,7 +231,7 @@ function Composer({ board, api, view, day, propertyType, stackIndex, onStack }: 
 			<input
 				ref={inputRef}
 				type="text"
-				placeholder="Add a card…"
+				placeholder={t('modal.day.addCardPlaceholder')}
 				value={text}
 				onInput={(e) => setText((e.target as HTMLInputElement).value)}
 				onKeyDown={(e) => {
@@ -241,10 +242,10 @@ function Composer({ board, api, view, day, propertyType, stackIndex, onStack }: 
 			/>
 			<button type="button" class="eb-badge eb-day-stack" onClick={chooseStack}>
 				<Icon name="square-kanban" />
-				<span>{stack.name || 'Untitled'}</span>
+				<span>{stack.name || t('modal.archive.untitled')}</span>
 			</button>
 			<button type="button" class="mod-cta" onClick={submit}>
-				Add
+				{t('modal.day.add')}
 			</button>
 		</div>
 	);
@@ -310,7 +311,7 @@ class DayModal extends Modal {
 			<>
 				{unique.length === 0 ? (
 					<div class="eb-day-empty">
-						{day ? 'No cards on this day.' : 'Every card has a date.'}
+						{day ? t('modal.day.noCardsToday') : t('modal.day.everyCardDated')}
 					</div>
 				) : (
 					<div class="eb-day-list">

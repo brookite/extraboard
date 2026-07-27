@@ -59,28 +59,45 @@ export function hasKanbanView(views: readonly ViewDef[]): boolean {
 }
 
 /**
+ * A validation diagnostic, structured rather than pre-rendered text, in the
+ * shape `PropertyDiagnostic` uses: the model stays free of UI strings, and a
+ * caller looks each `kind` up through `t()` (i18n-and-dates.md §1.2).
+ */
+export type ViewDiagnostic =
+	| { kind: 'invalidId'; name: string }
+	| { kind: 'duplicateId'; id: string }
+	| { kind: 'missingDateProperty'; name: string; property: string }
+	| { kind: 'wrongDatePropertyType'; name: string; property: string; type: string }
+	| { kind: 'tooManyKanban' };
+
+/**
  * Non-fatal diagnostics, in the shape `validatePropertyDefs` uses: reported to
  * the user, never thrown, never a reason to drop a board.
  */
-export function validateViews(config: BoardConfig): string[] {
-	const diags: string[] = [];
+export function validateViews(config: BoardConfig): ViewDiagnostic[] {
+	const diags: ViewDiagnostic[] = [];
 	const seen = new Set<string>();
 	let kanban = 0;
 	for (const view of config.views) {
-		if (!ID_RE.test(view.id)) diags.push(`View "${view.name}" has an invalid id.`);
-		else if (seen.has(view.id)) diags.push(`View id "${view.id}" is used more than once.`);
+		if (!ID_RE.test(view.id)) diags.push({ kind: 'invalidId', name: view.name });
+		else if (seen.has(view.id)) diags.push({ kind: 'duplicateId', id: view.id });
 		seen.add(view.id);
 		if (view.type === 'kanban') kanban++;
 		if (view.type === 'calendar') {
 			const def = config.properties.find((p) => p.name === view.dateProperty);
 			if (!def) {
-				diags.push(`View "${view.name}" is computed from "${view.dateProperty}", which this board does not declare.`);
+				diags.push({ kind: 'missingDateProperty', name: view.name, property: view.dateProperty });
 			} else if (!CALENDAR_TYPES.has(def.type)) {
-				diags.push(`View "${view.name}": "${view.dateProperty}" is a ${def.type} property and cannot drive a calendar.`);
+				diags.push({
+					kind: 'wrongDatePropertyType',
+					name: view.name,
+					property: view.dateProperty,
+					type: def.type,
+				});
 			}
 		}
 	}
-	if (kanban > 1) diags.push('A board can hold at most one Kanban view.');
+	if (kanban > 1) diags.push({ kind: 'tooManyKanban' });
 	return diags;
 }
 

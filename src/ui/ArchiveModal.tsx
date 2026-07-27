@@ -19,6 +19,7 @@ import { MarkdownText, hasMarkdown } from '../view/components/MarkdownText';
 import { ChecklistProgress, progressStyleFor } from '../view/components/Progress';
 import { PropertyBadge } from '../view/components/PropertyBadge';
 import { styleFor } from '../view/components/style';
+import { t } from '../i18n';
 
 interface RowProps {
 	entry: ArchivedCard;
@@ -45,7 +46,7 @@ function ArchiveRow({ entry, board, api, settings, onRestore, onDelete, onOpenLi
 					class="eb-card-check task-list-item-checkbox"
 					checked={done}
 					disabled
-					aria-label={done ? 'Done' : 'Not done'}
+					aria-label={done ? t('modal.archive.done') : t('modal.archive.notDone')}
 				/>
 				<div
 					class="eb-card-title"
@@ -56,25 +57,27 @@ function ArchiveRow({ entry, board, api, settings, onRestore, onDelete, onOpenLi
 					}}
 				>
 					{card.title.trim() === '' ? (
-						<span class="eb-placeholder">Untitled</span>
+						<span class="eb-placeholder">{t('modal.archive.untitled')}</span>
 					) : hasMarkdown(card.title) ? (
 						<MarkdownText markdown={card.title} api={api} />
 					) : (
 						card.title
 					)}
 				</div>
-				<IconButton icon="archive-restore" label="Restore card" onClick={onRestore} />
-				<IconButton icon="trash-2" label="Delete card" onClick={onDelete} />
+				<IconButton icon="archive-restore" label={t('modal.archive.restoreCard')} onClick={onRestore} />
+				<IconButton icon="trash-2" label={t('modal.archive.deleteCard')} onClick={onDelete} />
 			</div>
 			<div class="eb-card-props">
 				{/* The origin comes first: it is what Restore will use (§5.3). */}
-				<span class="eb-badge eb-archive-from">{entry.from ?? 'Unknown'}</span>
+				<span class="eb-badge eb-archive-from">{entry.from ?? t('modal.archive.unknownOrigin')}</span>
 				{badges.map((pv, i) => (
 					<PropertyBadge
 						key={i}
 						pv={pv}
 						config={board.config}
 						progress={progressStyleFor(board, settings)}
+						settings={settings}
+						card={card}
 					/>
 				))}
 			</div>
@@ -126,10 +129,12 @@ export class ArchiveModal extends Modal {
 	private render(): void {
 		const board = this.api.getBoard();
 		const cards = board ? ops.archivedCards(board) : [];
-		this.titleEl.setText(cards.length ? `Archive (${String(cards.length)})` : 'Archive');
+		this.titleEl.setText(
+			cards.length ? t('modal.archive.titleWithCount', { count: cards.length }) : t('modal.archive.title'),
+		);
 
 		if (!board || !cards.length) {
-			render(<div class="eb-archive-empty">The archive is empty.</div>, this.contentEl);
+			render(<div class="eb-archive-empty">{t('modal.archive.empty')}</div>, this.contentEl);
 			return;
 		}
 
@@ -162,10 +167,10 @@ export class ArchiveModal extends Modal {
 							void this.confirmClear(cards.length);
 						}}
 					>
-						Clear archive
+						{t('modal.archive.clearArchive')}
 					</button>
 					<button type="button" onClick={() => this.close()}>
-						Close
+						{t('modal.archive.close')}
 					</button>
 				</div>
 			</>,
@@ -175,11 +180,13 @@ export class ArchiveModal extends Modal {
 
 	/** Destroying an archived card is irreversible, so both ways of it confirm. */
 	private async confirmDelete(entry: ArchivedCard, index: number): Promise<void> {
-		const title = entry.card.title.trim() || 'this untitled card';
+		const title = entry.card.title.trim();
 		const ok = await this.api.confirm(
-			'Delete archived card',
-			`"${title}" will be removed from the archive. This cannot be undone.`,
-			'Delete',
+			t('modal.archive.deleteConfirmTitle'),
+			title
+				? t('modal.archive.deleteConfirmMessage', { title })
+				: t('modal.archive.deleteConfirmMessageUntitled'),
+			t('modal.archive.delete'),
 		);
 		if (!ok) return;
 		this.api.update((b) => ops.deleteArchived(b, index));
@@ -188,9 +195,11 @@ export class ArchiveModal extends Modal {
 
 	private async confirmClear(count: number): Promise<void> {
 		const ok = await this.api.confirm(
-			'Clear archive',
-			`${String(count)} archived card${count === 1 ? '' : 's'} will be removed. This cannot be undone.`,
-			'Clear archive',
+			t('modal.archive.clearArchive'),
+			count === 1
+				? t('modal.archive.clearConfirmMessageOne')
+				: t('modal.archive.clearConfirmMessageMany', { count }),
+			t('modal.archive.clearArchive'),
 		);
 		if (!ok) return;
 		this.api.update((b) => ops.clearArchive(b));

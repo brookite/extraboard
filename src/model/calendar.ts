@@ -75,7 +75,7 @@ function rawDates(pv: PropertyValue | undefined): string[] {
  * parseable date among the card's **other** date properties. Absent means the
  * card is undated — a series is never anchored to "today".
  */
-function anchorFor(card: Card, property: string): CalDate | undefined {
+export function anchorFor(card: Card, property: string): CalDate | undefined {
 	let best: CalDate | undefined;
 	for (const pv of card.properties) {
 		if (pv.name === property) continue;

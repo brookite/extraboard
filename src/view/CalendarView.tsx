@@ -37,6 +37,8 @@ import type { BoardApi } from './api';
 import { Icon } from './components/Icon';
 import { safeColor } from './components/style';
 import { DropInfo, isDragging, useSortable } from './useSortable';
+import { currentLanguage, t } from '../i18n';
+import { dateTimeOptsFor, formatTimePart, type DateTimeOpts } from '../i18n/dates';
 
 /** `data-list` of the "No date" tray — the one container that is not a day. */
 const TRAY = -1;
@@ -54,20 +56,17 @@ interface Props {
 }
 
 // --- locale helpers ---------------------------------------------------------
-// M11 moves all of this onto the shared formatter (`i18n/dates.ts`); until then
-// the calendar reads the locale directly (§2).
-
-function locale(): string | undefined {
-	try {
-		return moment.locale();
-	} catch {
-		return undefined;
-	}
-}
+// The grid's own navigation chrome (period label, weekday names, week start)
+// is always shown in full, absolute form — there is no "relative July 2026" —
+// so only its **locale source** moves onto the shared resolver (i18n-and-dates.md
+// §2): the plugin's own `language` setting, not whatever Obsidian's app-wide
+// locale happens to be, so the two cannot silently disagree. Chip/tooltip
+// *time* values do go through the full `dateFormat`/`timeFormat` pipeline
+// below, since those are the same kind of value a property badge shows.
 
 function firstDayOfWeek(): number {
 	try {
-		return moment.localeData().firstDayOfWeek();
+		return moment.localeData(currentLanguage())?.firstDayOfWeek() ?? 1;
 	} catch {
 		return 1;
 	}
@@ -75,17 +74,13 @@ function firstDayOfWeek(): number {
 
 const asDate = (d: CalDate): Date => new Date(d.y, d.m - 1, d.d);
 
-function formatTime(minutes: number): string {
-	const d = new Date(2000, 0, 1, Math.floor(minutes / 60), minutes % 60);
-	return new Intl.DateTimeFormat(locale(), { hour: 'numeric', minute: '2-digit' }).format(d);
-}
-
 function periodLabel(anchor: CalDate, mode: 'month' | 'week', start: CalDate): string {
+	const lang = currentLanguage();
 	if (mode === 'month') {
-		return new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric' }).format(asDate(anchor));
+		return new Intl.DateTimeFormat(lang, { month: 'long', year: 'numeric' }).format(asDate(anchor));
 	}
 	const end = addDays(start, 6);
-	const fmt = new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'long', year: 'numeric' });
+	const fmt = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'long', year: 'numeric' });
 	try {
 		return fmt.formatRange(asDate(start), asDate(end));
 	} catch {
@@ -94,7 +89,7 @@ function periodLabel(anchor: CalDate, mode: 'month' | 'week', start: CalDate): s
 }
 
 function weekdayNames(first: number): string[] {
-	const fmt = new Intl.DateTimeFormat(locale(), { weekday: 'short' });
+	const fmt = new Intl.DateTimeFormat(currentLanguage(), { weekday: 'short' });
 	// 2024-01-07 was a Sunday, so it anchors the names to weekday numbers.
 	return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2024, 0, 7 + ((first + i) % 7))));
 }
@@ -142,7 +137,7 @@ function cardOf(board: Board, occurrenceRef: ops.ItemRef): Card | null {
 /** Plain, cheap card text: the title with its link flattened and tokens gone. */
 function chipText(card: Card): string {
 	const text = unlinkedTitle(card.title).trim();
-	return text || 'Untitled';
+	return text || t('modal.archive.untitled');
 }
 
 function chipColor(board: Board, ref: ops.ItemRef, card: Card): string | undefined {
@@ -161,12 +156,14 @@ interface ChipProps {
 	/** `data-index` — the occurrence's index, or the undated card's in the tray. */
 	index: number;
 	time?: number;
+	/** Only needed when `time` is passed. */
+	opts?: DateTimeOpts;
 	/** From a repetition rule: one card showing up on many days (recurrence.md §3). */
 	repeating?: boolean;
 	onOpen: () => void;
 }
 
-function Chip({ board, card, occRef, index, time, repeating, onOpen }: ChipProps) {
+function Chip({ board, card, occRef, index, time, opts, repeating, onOpen }: ChipProps) {
 	const color = chipColor(board, occRef, card);
 	const done = ops.isCardDone(card);
 	return (
@@ -182,7 +179,9 @@ function Chip({ board, card, occRef, index, time, repeating, onOpen }: ChipProps
 		>
 			{done ? <Icon name="check" class="eb-cal-chip-check" /> : null}
 			{repeating ? <Icon name="repeat" class="eb-cal-chip-repeat" /> : null}
-			{time !== undefined ? <span class="eb-cal-chip-time">{formatTime(time)}</span> : null}
+			{time !== undefined && opts ? (
+				<span class="eb-cal-chip-time">{formatTimePart(time, opts)}</span>
+			) : null}
 			<span class="eb-cal-chip-text">{chipText(card)}</span>
 		</div>
 	);
@@ -245,14 +244,17 @@ export function CalendarView({ board, view, api, settings }: Props) {
 
 	const def = board.config.properties.find((p) => p.name === view.dateProperty);
 	const propertyType: PropertyType = def?.type ?? 'datetime';
+	const dateTimeOpts = dateTimeOptsFor(settings);
 
 	// A view whose property is gone renders its reason, not an empty grid (§7).
 	if (!def || !['datetime', 'date-range', 'date-list', 'recurrence'].includes(def.type)) {
+		const [before, after] = t('calendar.brokenMessage').split('{property}');
 		return (
 			<div class="eb-cal-broken">
 				<p>
-					This calendar is computed from <strong>{view.dateProperty}</strong>, which the board no
-					longer declares as a date property.
+					{before}
+					<strong>{view.dateProperty}</strong>
+					{after}
 				</p>
 				<button
 					type="button"
@@ -261,7 +263,7 @@ export function CalendarView({ board, view, api, settings }: Props) {
 						api.manageViews();
 					}}
 				>
-					Manage views
+					{t('command.manageViews')}
 				</button>
 			</div>
 		);
@@ -343,13 +345,13 @@ export function CalendarView({ board, view, api, settings }: Props) {
 		<div class="eb-cal">
 			<div class="eb-cal-head">
 				<div class="eb-cal-nav">
-					<button type="button" aria-label="Previous" onClick={() => step(-1)}>
+					<button type="button" aria-label={t('calendar.previous')} onClick={() => step(-1)}>
 						<Icon name="chevron-left" />
 					</button>
 					<button type="button" onClick={() => setAnchor(today())}>
-						Today
+						{t('calendar.today')}
 					</button>
-					<button type="button" aria-label="Next" onClick={() => step(1)}>
+					<button type="button" aria-label={t('calendar.next')} onClick={() => step(1)}>
 						<Icon name="chevron-right" />
 					</button>
 				</div>
@@ -360,14 +362,14 @@ export function CalendarView({ board, view, api, settings }: Props) {
 						class={view.mode === 'month' ? 'is-active' : ''}
 						onClick={() => setMode('month')}
 					>
-						Month
+						{t('modal.views.mode.month')}
 					</button>
 					<button
 						type="button"
 						class={view.mode === 'week' ? 'is-active' : ''}
 						onClick={() => setMode('week')}
 					>
-						Week
+						{t('modal.views.mode.week')}
 					</button>
 				</div>
 			</div>
@@ -400,6 +402,7 @@ export function CalendarView({ board, view, api, settings }: Props) {
 							lanes={lanes}
 							capacity={Math.max(1, capacity - lanes)}
 							rowStartIndex={row * 7}
+							dateTimeOpts={dateTimeOpts}
 							onOpenDay={openDay}
 							onDrop={onDrop}
 						/>
@@ -434,6 +437,7 @@ interface RowProps {
 	lanes: number;
 	capacity: number;
 	rowStartIndex: number;
+	dateTimeOpts: DateTimeOpts;
 	onOpenDay: (day: CalDate) => void;
 	onDrop: (drop: DropInfo) => void;
 }
@@ -451,6 +455,7 @@ function WeekRow({
 	lanes,
 	capacity,
 	rowStartIndex,
+	dateTimeOpts,
 	onOpenDay,
 	onDrop,
 }: RowProps) {
@@ -503,6 +508,7 @@ function WeekRow({
 						capacity={capacity}
 						occurrences={byDay.get(dayKey(day)) ?? []}
 						indexOf={indexOf}
+						dateTimeOpts={dateTimeOpts}
 						onOpen={() => onOpenDay(day)}
 						onDrop={onDrop}
 					/>
@@ -524,6 +530,7 @@ interface CellProps {
 	capacity: number;
 	occurrences: Occurrence[];
 	indexOf: Map<Occurrence, number>;
+	dateTimeOpts: DateTimeOpts;
 	onOpen: () => void;
 	onDrop: (drop: DropInfo) => void;
 }
@@ -538,6 +545,7 @@ function DayCell({
 	capacity,
 	occurrences,
 	indexOf,
+	dateTimeOpts,
 	onOpen,
 	onDrop,
 }: CellProps) {
@@ -569,6 +577,7 @@ function DayCell({
 							occRef={occurrence.ref}
 							index={indexOf.get(occurrence) ?? 0}
 							time={occurrence.start.minutes}
+							opts={dateTimeOpts}
 							repeating={occurrence.repeating}
 							onOpen={onOpen}
 						/>
@@ -602,7 +611,7 @@ function Tray({ board, undated, open, onToggle, onOpen, onDrop }: TrayProps) {
 		<div class={`eb-cal-tray${open ? ' is-open' : ''}`}>
 			<button type="button" class="eb-cal-tray-head" onClick={onToggle}>
 				<Icon name={open ? 'chevron-down' : 'chevron-right'} />
-				<span>No date</span>
+				<span>{t('modal.day.noDate')}</span>
 				<span class="eb-cal-tray-count">{undated.length}</span>
 			</button>
 			<div class="eb-cal-tray-list" ref={listRef} data-list={TRAY}>

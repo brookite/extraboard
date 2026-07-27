@@ -4,6 +4,7 @@
 import type { Board, ProgressStyle } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
 import { ProgressRing } from './ProgressRing';
+import { t } from '../../i18n';
 
 /** Board config first, then the plugin setting — two levels, board wins. */
 export function progressStyleFor(board: Board, settings: ExtraboardSettings): ProgressStyle {
@@ -36,7 +37,7 @@ export function ChecklistProgress({ done, total, style, onOpen }: ChecklistProps
 
 	if (!onOpen) {
 		return (
-			<span class="eb-progress is-static" title={label} aria-label={`Checklist ${label}`}>
+			<span class="eb-progress is-static" title={label} aria-label={t('progress.checklistAria', { label })}>
 				{body}
 			</span>
 		);
@@ -46,7 +47,7 @@ export function ChecklistProgress({ done, total, style, onOpen }: ChecklistProps
 			type="button"
 			class="eb-progress"
 			title={label}
-			aria-label={`Checklist ${label}`}
+			aria-label={t('progress.checklistAria', { label })}
 			onClick={(e) => {
 				e.stopPropagation();
 				onOpen();

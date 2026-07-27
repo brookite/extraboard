@@ -17,6 +17,7 @@ import { ICONS, VIEW_TYPE_BOARD } from './util/constants';
 import { NEW_BOARD_BASENAME, newBoardConfig, newBoardText } from './util/newBoard';
 import { parseFrontmatter } from './model/frontmatter';
 import type { BoardConfig } from './model/types';
+import { setLanguage, t } from './i18n';
 
 export default class ExtraboardPlugin extends Plugin {
 	settings!: ExtraboardSettings;
@@ -27,6 +28,7 @@ export default class ExtraboardPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+		setLanguage(this.settings.language);
 
 		this.registerView(
 			VIEW_TYPE_BOARD,
@@ -42,13 +44,13 @@ export default class ExtraboardPlugin extends Plugin {
 		// converting after file-open, which Obsidian was reverting mid-open.
 		this.patchLeafSetViewState();
 
-		this.addRibbonIcon(ICONS.board, 'Create new board', () => {
+		this.addRibbonIcon(ICONS.board, t('ribbon.createBoard'), () => {
 			this.createNewBoard();
 		});
 
 		this.addCommand({
 			id: 'create-board',
-			name: 'Create new board',
+			name: t('command.createBoard'),
 			callback: () => {
 				this.createNewBoard();
 			},
@@ -56,7 +58,7 @@ export default class ExtraboardPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'open-as-board',
-			name: 'Open current file as board',
+			name: t('command.openAsBoard'),
 			checkCallback: (checking: boolean) => {
 				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (!view || !view.file) return false;
@@ -67,7 +69,7 @@ export default class ExtraboardPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'board-settings',
-			name: 'Board settings',
+			name: t('command.boardSettings'),
 			checkCallback: (checking: boolean) => {
 				const view = this.app.workspace.getActiveViewOfType(BoardView);
 				if (!view?.board) return false;
@@ -78,7 +80,7 @@ export default class ExtraboardPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'manage-views',
-			name: 'Manage views',
+			name: t('command.manageViews'),
 			checkCallback: (checking: boolean) => {
 				const view = this.app.workspace.getActiveViewOfType(BoardView);
 				if (!view?.board) return false;
@@ -89,7 +91,7 @@ export default class ExtraboardPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'next-view',
-			name: 'Switch to next view',
+			name: t('command.nextView'),
 			checkCallback: (checking: boolean) => {
 				const view = this.app.workspace.getActiveViewOfType(BoardView);
 				if (!view?.board || view.board.config.views.length < 2) return false;
@@ -100,7 +102,7 @@ export default class ExtraboardPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'open-archive',
-			name: 'Open archive',
+			name: t('command.openArchive'),
 			checkCallback: (checking: boolean) => {
 				const view = this.app.workspace.getActiveViewOfType(BoardView);
 				if (!view?.board) return false;
@@ -111,7 +113,7 @@ export default class ExtraboardPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'archive-completed-cards',
-			name: 'Archive completed cards',
+			name: t('command.archiveCompletedCards'),
 			checkCallback: (checking: boolean) => {
 				const view = this.app.workspace.getActiveViewOfType(BoardView);
 				if (!view?.board) return false;
@@ -138,25 +140,25 @@ export default class ExtraboardPlugin extends Plugin {
 				if (!(view instanceof BoardView) || !view.board || view.file !== file) return;
 				menu.addItem((item) =>
 					item
-						.setTitle('Manage views…')
+						.setTitle(t('menu.file.manageViews'))
 						.setIcon(ICONS.views)
 						.onClick(() => view.manageViews()),
 				);
 				menu.addItem((item) =>
 					item
-						.setTitle('Open archive')
+						.setTitle(t('menu.file.openArchive'))
 						.setIcon('archive')
 						.onClick(() => view.openArchive()),
 				);
 				menu.addItem((item) =>
 					item
-						.setTitle('Archive completed cards')
+						.setTitle(t('menu.file.archiveCompletedCards'))
 						.setIcon('check-check')
 						.onClick(() => view.archiveCompletedCards()),
 				);
 				menu.addItem((item) =>
 					item
-						.setTitle('Delete untitled cards')
+						.setTitle(t('menu.file.deleteUntitledCards'))
 						.setIcon('eraser')
 						.onClick(() => view.deleteUntitledCards()),
 				);
@@ -168,6 +170,14 @@ export default class ExtraboardPlugin extends Plugin {
 		this.app.workspace.onLayoutReady(() => {
 			void this.convertOpenBoards();
 		});
+
+		// Relative date labels ("in 3 days") and future date-highlight rules are
+		// facts about the current moment, not the file — recomputed by a plain
+		// re-render, never a save (i18n-and-dates.md §4). A minute is the finest
+		// unit a relative label ever shows, so that is how often this needs to run;
+		// switching back to a board tab also catches up immediately.
+		this.registerInterval(window.setInterval(() => this.refreshBoards(), 60_000));
+		this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.refreshBoards()));
 	}
 
 	onunload() {}
@@ -272,7 +282,7 @@ export default class ExtraboardPlugin extends Plugin {
 		if (await this.isBoard(file)) {
 			this.convertLeafToBoard(leaf, file);
 		} else {
-			new Notice('Not a board: add an "extraboard" key to the note frontmatter.');
+			new Notice(t('notice.notABoard'));
 		}
 	}
 
@@ -309,7 +319,7 @@ export default class ExtraboardPlugin extends Plugin {
 	/** Add an "Open as board" action to a Markdown view (idempotent). */
 	private addBoardAction(view: MarkdownView): void {
 		if (this.boardActions.has(view)) return;
-		const el = view.addAction(ICONS.board, 'Open as board', () => {
+		const el = view.addAction(ICONS.board, t('action.openAsBoard'), () => {
 			const file = view.file;
 			if (file) void this.openAsBoard(view.leaf, file);
 		});
@@ -332,8 +342,8 @@ export default class ExtraboardPlugin extends Plugin {
 	private createNewBoard(): void {
 		new BoardSettingsModal(this.app, {
 			config: newBoardConfig(cloneDefs(this.settings.defaultProperties)),
-			title: 'New board',
-			cta: 'Create',
+			title: t('modal.newBoard.title'),
+			cta: t('modal.newBoard.cta'),
 			onSave: (config) => {
 				void this.writeNewBoard(config);
 			},
@@ -349,7 +359,7 @@ export default class ExtraboardPlugin extends Plugin {
 			file = await this.app.vault.create(path, newBoardText(config));
 		} catch (err) {
 			console.error('Extraboard: failed to create board', err);
-			new Notice('Extraboard: could not create the board file.');
+			new Notice(t('notice.createBoardFailed'));
 			return;
 		}
 		this.convertLeafToBoard(this.app.workspace.getLeaf('tab'), file);
