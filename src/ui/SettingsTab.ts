@@ -17,6 +17,7 @@ import {
 import { today } from '../model/dates';
 import { PropertyDefsEditor } from './PropertyDefsEditor';
 import { DateHighlightsEditor } from './DateHighlightsEditor';
+import { FolderSuggest } from './FolderSuggest';
 
 function nowMinutes(): number {
 	const d = new Date();
@@ -61,7 +62,7 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 	 * Declarative settings (Obsidian 1.13+) replace `display()` entirely when
 	 * they return anything, and `defaultProperties` is a nested, typed editor
 	 * that the descriptors cannot express. Returning an empty list keeps the
-	 * custom tab below on every supported version (`minAppVersion` is 1.4.0)
+	 * custom tab below on every supported version (`minAppVersion` is 1.4.10)
 	 * while still implementing the newer API surface. See NOTICES.
 	 */
 	getSettingDefinitions(): never[] {
@@ -101,17 +102,21 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(t('settings.cardNoteFolder.name'))
 			.setDesc(t('settings.cardNoteFolder.desc'))
-			.addText((text) =>
+			.addText((text) => {
+				const save = (value: string) => {
+					const dir = value.trim();
+					// Vault-relative and normalized: the plugin never writes outside the vault.
+					this.plugin.settings.cardNoteFolder = dir ? normalizePath(dir) : '';
+					void this.plugin.saveSettings();
+				};
 				text
 					.setPlaceholder(t('settings.cardNoteFolder.placeholder'))
 					.setValue(this.plugin.settings.cardNoteFolder)
-					.onChange((value) => {
-						const dir = value.trim();
-						// Vault-relative and normalized: the plugin never writes outside the vault.
-						this.plugin.settings.cardNoteFolder = dir ? normalizePath(dir) : '';
-						void this.plugin.saveSettings();
-					}),
-			);
+					.onChange(save);
+				// Picking a suggestion sets the input programmatically, which does
+				// not fire `onChange` — hence the same `save` passed along.
+				new FolderSuggest(this.app, text.inputEl, save);
+			});
 
 		new Setting(containerEl)
 			.setName(t('settings.progressStyle.name'))

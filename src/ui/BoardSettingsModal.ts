@@ -2,12 +2,13 @@
 // header action + command), not only at creation: it rewrites the `extraboard`
 // frontmatter node in place. Spec: kanban-view.md §5.4, markdown-format.md §2.
 
-import { App, Modal, Setting } from 'obsidian';
+import { App, Modal, Setting, normalizePath } from 'obsidian';
 import { invalidatedValues } from '../model/ops';
 import type { BadgeColor, Board, BoardConfig, ProgressStyle, PropertyDef } from '../model/types';
 import { colorField } from './ColorPicker';
 import { PropertyDefsEditor, cloneDefs } from './PropertyDefsEditor';
 import { DateHighlightsEditor } from './DateHighlightsEditor';
+import { FolderSuggest } from './FolderSuggest';
 import { cloneRules, type DateHighlightRule } from '../model/dateHighlights';
 import { t } from '../i18n';
 
@@ -73,16 +74,20 @@ export class BoardSettingsModal extends Modal {
 		new Setting(contentEl)
 			.setName(t('modal.boardSettings.cardNoteFolder.name'))
 			.setDesc(t('modal.boardSettings.cardNoteFolder.desc'))
-			.addText((text) =>
+			.addText((text) => {
+				const save = (value: string) => {
+					const dir = value.trim();
+					if (dir) this.config.cardContentDir = normalizePath(dir);
+					else delete this.config.cardContentDir;
+				};
 				text
 					.setPlaceholder(t('modal.boardSettings.cardNoteFolder.placeholder'))
 					.setValue(this.config.cardContentDir ?? '')
-					.onChange((value) => {
-						const dir = value.trim();
-						if (dir) this.config.cardContentDir = dir;
-						else delete this.config.cardContentDir;
-					}),
-			);
+					.onChange(save);
+				// A picked suggestion sets the input directly, so `onChange` never
+				// fires for it; the callback carries the same write.
+				new FolderSuggest(this.app, text.inputEl, save);
+			});
 
 		new Setting(contentEl)
 			.setName(t('modal.boardSettings.progressStyle.name'))
