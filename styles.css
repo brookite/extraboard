@@ -260,6 +260,15 @@
 	height: 14px;
 }
 
+/* "Complete card" (kanban-view.md §5.3), the green counterpart to the red
+   `is-warning` Obsidian gives destructive items. Same shape as the theme's own
+   rule — title and icon both — so it reads as one of the menu's items and not
+   as decoration. */
+.menu-item.eb-menu-success .menu-item-title,
+.menu-item.eb-menu-success .menu-item-icon {
+	color: var(--text-success, var(--color-green));
+}
+
 /* Flush with the card's padding: nothing indents the checkbox. */
 .eb-card-check {
 	flex: 0 0 auto;
@@ -1981,11 +1990,14 @@ body.is-mobile .eb-card-menu {
    are the only controls in the head, so there is room for it vertically — and
    spend as little width as possible on it: the head has three groups to fit and
    the period label beside them is the thing that must not be squeezed. So the
-   36 px comes from `min-height` alone, and the horizontal padding stays at the
-   desktop's. */
+   36 px is the whole height, and the horizontal padding stays at the desktop's.
+   It has to be `height`, not `min-height`: the mobile theme resolves
+   `--input-height` (44 px) into every button, and a minimum cannot bring that
+   back down — the head would be a third taller than the row needs, for a target
+   already comfortably past the 36 px the rest of the mobile chrome uses. */
 body.is-mobile .eb-cal-nav button,
 body.is-mobile .eb-cal-modes button {
-	min-height: 36px;
+	height: 36px;
 	padding: 4px 8px;
 	font-size: var(--font-ui-small, 0.85em);
 	border-radius: var(--radius-s, 4px);

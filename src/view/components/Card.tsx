@@ -5,6 +5,7 @@ import * as ops from '../../model/ops';
 import type { BoardConfig, Card } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
 import { ChecklistModal } from '../../ui/ChecklistModal';
+import { styleMenuItem, submenuOf } from '../../util/menu';
 import type { BoardApi } from '../api';
 import { CardEditor } from '../CardEditor';
 import { hoverLinkText, openLinkText, resolveCardLink } from '../links';
@@ -184,21 +185,57 @@ function CardTileInner({
 			);
 		}
 
-		// A flat "Move to" section, one item per stack — no submenu, so it works
-		// the same way on mobile (kanban-view.md §5.3).
-		// Read through the live board rather than a captured one: the menu is built
-		// at click time, and this card is not handed the board (see `Props`).
+		// The move section (kanban-view.md §5.3). Read through the live board
+		// rather than a captured one: the menu is built at click time, and this
+		// card is not handed the board (see `Props`).
 		const stacks = api.getBoard()?.stacks ?? [];
+		const completing = stacks.findIndex((stack) => stack.completes);
+		if (completing !== -1 || stacks.length > 1) menu.addSeparator();
+
+		// "Complete card" is the shortcut for the move a board with a completing
+		// stack makes over and over: the card lands at the end of that stack and
+		// `moveItem` marks it done on the way in (§3.2). Green, because it is the
+		// menu's one affirmative action among neutral and destructive ones — and
+		// the mirror of "Archive card"'s red at the other end.
+		if (completing !== -1 && completing !== stackIndex) {
+			menu.addItem((item) => {
+				item
+					.setTitle(t('card.completeCard'))
+					.setIcon('circle-check-big')
+					.onClick(() => api.update((b) => ops.moveItem(b, ref, completing, null)));
+				styleMenuItem(item, 'eb-menu-success');
+			});
+		}
+
+		// "Move to" as a submenu, one child per stack. The flat list it replaces
+		// grew with the board and pushed "Archive card" off the bottom of a phone
+		// screen; the parent item is one row whatever the board looks like. Where
+		// submenus are unavailable the same children open as their own menu, so
+		// the action is never simply missing (§5.3).
 		if (stacks.length > 1) {
-			menu.addSeparator();
-			stacks.forEach((stack, i) => {
-				menu.addItem((item) =>
-					item
-						.setTitle(t('card.moveTo', { name: stack.name || t('modal.archive.untitled') }))
-						.setIcon('corner-up-right')
-						.setDisabled(i === stackIndex)
-						.onClick(() => api.update((b) => ops.moveItem(b, ref, i, null))),
-				);
+			const fill = (target: Menu): void => {
+				stacks.forEach((stack, i) => {
+					target.addItem((item) =>
+						item
+							.setTitle(stack.name || t('modal.archive.untitled'))
+							.setIcon('square-kanban')
+							.setDisabled(i === stackIndex)
+							.onClick(() => api.update((b) => ops.moveItem(b, ref, i, null))),
+					);
+				});
+			};
+			menu.addItem((item) => {
+				item.setTitle(t('card.moveToStack')).setIcon('corner-up-right');
+				const submenu = submenuOf(item);
+				if (submenu) fill(submenu);
+				else {
+					item.onClick(() => {
+						const flat = new Menu();
+						fill(flat);
+						// The `⋯` click: the only position both platforms agree on here.
+						flat.showAtMouseEvent(event);
+					});
+				}
 			});
 		}
 		menu.addSeparator();
