@@ -17,15 +17,40 @@ interface InternalEditor {
 		focus?(): void;
 		cm?: { contentDOM?: HTMLElement };
 	};
+	/** `true` in source mode, `false` in Live Preview — read off the owner. */
+	sourceMode?: boolean;
+	showSearch?(replace?: boolean): void;
 	set?(value: string, clear?: boolean): void;
 	destroy?(): void;
 	unload?(): void;
 }
 
+/**
+ * The editor's owner — Obsidian's `MarkdownFileInfo`. Three keys are enough to
+ * *construct* the editor, but on focus it assigns `workspace.activeEditor = owner`,
+ * and from then on core code reads the object as a full file info: the word-count
+ * plugin calls `owner.editor.getSelection()` on every selection change, the
+ * application menu reads `owner.editMode.sourceMode` on every file-open, the
+ * mobile toolbar reads `owner.editor.hasFocus()`, and the toggle-preview /
+ * search-and-replace commands call `owner.toggleMode()` / `owner.showSearch()`
+ * with no type guard. Anything missing is an uncaught TypeError inside Obsidian.
+ *
+ * `file` stays `null`: the card's text lives in the board file, but claiming it
+ * would put this editor into the CM undo-history cache under the board's path,
+ * where the *next* card editor with a same-length text would inherit it.
+ * `workspace.getActiveFile()` falls through to the board view either way.
+ */
 interface EditorOwner {
 	app: App;
+	file: TFile | null;
+	hoverPopover: unknown;
+	/** Both filled in once the editor exists — it is what they delegate to. */
+	editor?: InternalEditor['editor'];
+	editMode?: InternalEditor;
 	onMarkdownScroll(): void;
 	getMode(): string;
+	toggleMode(): void;
+	showSearch(replace?: boolean): void;
 }
 
 type EditorCtor = new (app: App, container: HTMLElement, owner: EditorOwner) => InternalEditor;
@@ -125,19 +150,31 @@ export function createEmbeddedEditor(
 	const Ctor = resolveEditorCtor(app);
 	if (!Ctor) return null;
 
+	// The owner is built before the editor, because the editor's constructor takes
+	// it; the two keys that can only point back at the editor are filled in after.
+	let mounted: InternalEditor | null = null;
+	const owner: EditorOwner = {
+		app,
+		file: null,
+		hoverPopover: null,
+		// A board is not a Markdown view: there is nothing to scroll, the editor
+		// is always in source mode, and there is no reading view to toggle to.
+		onMarkdownScroll: () => undefined,
+		getMode: () => 'source',
+		toggleMode: () => undefined,
+		showSearch: (replace) => mounted?.showSearch?.(replace),
+	};
+
 	let instance: InternalEditor;
 	try {
-		instance = new Ctor(app, container, {
-			app,
-			// A board is not a Markdown view: there is nothing to scroll and the
-			// editor is always in source mode.
-			onMarkdownScroll: () => undefined,
-			getMode: () => 'source',
-		});
+		instance = new Ctor(app, container, owner);
 	} catch (err) {
 		console.warn('Extraboard: could not create the embedded editor', err);
 		return null;
 	}
+	mounted = instance;
+	owner.editor = instance.editor;
+	owner.editMode = instance;
 
 	const setValue = instance.set?.bind(instance);
 	const getValue = instance.editor?.getValue?.bind(instance.editor);
@@ -194,9 +231,22 @@ export function createEmbeddedEditor(
 			closed = true;
 			content.removeEventListener('keydown', onKeyDown);
 			content.removeEventListener('blur', onBlur);
+			releaseOwner(app, owner);
 			destroy(instance);
 		},
 	};
+}
+
+/**
+ * Obsidian points `workspace.activeEditor` at the owner when the editor takes
+ * focus and never clears it by itself. A destroyed card editor left there would
+ * aim every editor-scoped command at a dead CodeMirror, so the pointer is
+ * dropped while it is still ours — the getter then falls back to the active
+ * Markdown view on its own.
+ */
+function releaseOwner(app: App, owner: EditorOwner): void {
+	const workspace: { activeEditor?: unknown } = app.workspace;
+	if (workspace.activeEditor === owner) workspace.activeEditor = null;
 }
 
 function destroy(instance: InternalEditor): void {
