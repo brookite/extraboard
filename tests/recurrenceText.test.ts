@@ -35,13 +35,13 @@ describe('describeRecurrence: frequency + interval', () => {
 	it('weekly with a weekday list, Monday-first regardless of input order', () => {
 		const rule: Recurrence = { freq: 'week', interval: 1, weekdays: [5, 1, 3] };
 		expect(describeRecurrence(rule, opts('en'))).toBe('every week on Mon, Wed, Fri');
-		expect(describeRecurrence(rule, opts('ru'))).toBe('каждую неделю по: Пн, Ср, Пт');
+		expect(describeRecurrence(rule, opts('ru'))).toBe('каждую неделю в Пн, Ср, Пт');
 	});
 
 	it('every 2 weeks on one weekday', () => {
 		const rule: Recurrence = { freq: 'week', interval: 2, weekdays: [2] };
 		expect(describeRecurrence(rule, opts('en'))).toBe('every 2 weeks on Tue');
-		expect(describeRecurrence(rule, opts('ru'))).toBe('каждые 2 недели по: Вт');
+		expect(describeRecurrence(rule, opts('ru'))).toBe('каждые 2 недели в Вт');
 	});
 
 	it('every 5 weeks (Russian "many" bucket)', () => {
@@ -136,5 +136,79 @@ describe('describeRecurrence: dates route through the shared formatter', () => {
 		};
 		const custom: DateTimeOpts = { dateFormat: 'built-in', timeFormat: 'built-in', lang: 'en' };
 		expect(describeRecurrence(rule, custom)).toBe('every day from 2026-07-27 until 2026-12-31');
+	});
+});
+
+// The badge's own form (recurrence.md §5): no "every" — its `repeat` icon says
+// that — abbreviated units, and no absolute date at all.
+describe('describeRecurrence: compact form', () => {
+	const compact = { compact: true };
+
+	it('drops "every" and abbreviates the unit', () => {
+		const week: Recurrence = { freq: 'week', interval: 1 };
+		expect(describeRecurrence(week, opts('en'), compact)).toBe('wk');
+		expect(describeRecurrence(week, opts('ru'), compact)).toBe('нед.');
+
+		const month: Recurrence = { freq: 'month', interval: 1 };
+		expect(describeRecurrence(month, opts('en'), compact)).toBe('mo');
+		expect(describeRecurrence(month, opts('ru'), compact)).toBe('мес.');
+
+		// Day and year are short enough to stay whole in Russian.
+		const day: Recurrence = { freq: 'day', interval: 1 };
+		expect(describeRecurrence(day, opts('ru'), compact)).toBe('день');
+		const year: Recurrence = { freq: 'year', interval: 1 };
+		expect(describeRecurrence(year, opts('ru'), compact)).toBe('год');
+	});
+
+	it('keeps the interval, still bucketed by the Russian plural rules', () => {
+		const two: Recurrence = { freq: 'week', interval: 2 };
+		expect(describeRecurrence(two, opts('en'), compact)).toBe('2 wks');
+		expect(describeRecurrence(two, opts('ru'), compact)).toBe('2 нед.');
+
+		const twoYears: Recurrence = { freq: 'year', interval: 2 };
+		expect(describeRecurrence(twoYears, opts('ru'), compact)).toBe('2 года');
+		const fiveYears: Recurrence = { freq: 'year', interval: 5 };
+		expect(describeRecurrence(fiveYears, opts('ru'), compact)).toBe('5 лет');
+	});
+
+	it('keeps the weekday list', () => {
+		const rule: Recurrence = { freq: 'week', interval: 1, weekdays: [2] };
+		expect(describeRecurrence(rule, opts('en'), compact)).toBe('wk on Tue');
+		expect(describeRecurrence(rule, opts('ru'), compact)).toBe('нед. в Вт');
+	});
+
+	it('drops the start date — the tooltip has the full sentence', () => {
+		const rule: Recurrence = {
+			freq: 'week',
+			interval: 1,
+			weekdays: [2],
+			start: { y: 2026, m: 7, d: 28 },
+		};
+		expect(describeRecurrence(rule, opts('ru'), compact)).toBe('нед. в Вт');
+		expect(describeRecurrence(rule, opts('ru'))).toBe('каждую неделю в Вт с 2026-07-28');
+	});
+
+	it('drops the end date too, but keeps a count', () => {
+		const until: Recurrence = { freq: 'week', interval: 1, until: { y: 2026, m: 12, d: 31 } };
+		expect(describeRecurrence(until, opts('ru'), compact)).toBe('нед.');
+
+		const counted: Recurrence = { freq: 'day', interval: 1, count: 3 };
+		expect(describeRecurrence(counted, opts('en'), compact)).toBe('day for 3 times');
+		expect(describeRecurrence(counted, opts('ru'), compact)).toBe('день 3 раза');
+	});
+
+	it('keeps the monthly clauses, with the weekday of an nth rule abbreviated', () => {
+		const monthDay: Recurrence = { freq: 'month', interval: 1, monthDay: 15 };
+		expect(describeRecurrence(monthDay, opts('ru'), compact)).toBe('мес. 15 числа');
+
+		const nth: Recurrence = { freq: 'month', interval: 1, nth: { ordinal: -1, weekday: 5 } };
+		expect(describeRecurrence(nth, opts('en'), compact)).toBe('mo on the last Fri');
+		expect(describeRecurrence(nth, opts('ru'), compact)).toBe('мес. — последняя: Пт');
+	});
+
+	it('keeps the yearly day and month', () => {
+		const rule: Recurrence = { freq: 'year', interval: 1, month: 7, day: 4 };
+		expect(describeRecurrence(rule, opts('en'), compact)).toBe('yr on July 4');
+		expect(describeRecurrence(rule, opts('ru'), compact)).toBe('год 4 июля');
 	});
 });

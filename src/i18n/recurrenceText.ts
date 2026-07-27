@@ -127,39 +127,48 @@ function ordinalLabel(ordinal: 1 | 2 | 3 | 4 | -1): string {
 	}
 }
 
-function freqClause(rule: Recurrence, lang: 'en' | 'ru'): string {
-	const unit = rule.freq;
-	if (rule.interval === 1) {
-		switch (unit) {
-			case 'day':
-				return t('recurrenceText.freqOne.day');
-			case 'week':
-				return t('recurrenceText.freqOne.week');
-			case 'month':
-				return t('recurrenceText.freqOne.month');
-			default:
-				return t('recurrenceText.freqOne.year');
-		}
-	}
+// Keys spelled out rather than assembled from parts, so `t()` still checks each
+// one against `en.ts`'s shape at compile time.
+const FREQ_ONE = {
+	full: {
+		day: 'recurrenceText.freqOne.day',
+		week: 'recurrenceText.freqOne.week',
+		month: 'recurrenceText.freqOne.month',
+		year: 'recurrenceText.freqOne.year',
+	},
+	compact: {
+		day: 'recurrenceText.unitOne.day',
+		week: 'recurrenceText.unitOne.week',
+		month: 'recurrenceText.unitOne.month',
+		year: 'recurrenceText.unitOne.year',
+	},
+} as const;
+
+const FREQ_MANY = {
+	full: {
+		day: { few: 'recurrenceText.freqMany.day.few', many: 'recurrenceText.freqMany.day.many' },
+		week: { few: 'recurrenceText.freqMany.week.few', many: 'recurrenceText.freqMany.week.many' },
+		month: { few: 'recurrenceText.freqMany.month.few', many: 'recurrenceText.freqMany.month.many' },
+		year: { few: 'recurrenceText.freqMany.year.few', many: 'recurrenceText.freqMany.year.many' },
+	},
+	compact: {
+		day: { few: 'recurrenceText.unitMany.day.few', many: 'recurrenceText.unitMany.day.many' },
+		week: { few: 'recurrenceText.unitMany.week.few', many: 'recurrenceText.unitMany.week.many' },
+		month: { few: 'recurrenceText.unitMany.month.few', many: 'recurrenceText.unitMany.month.many' },
+		year: { few: 'recurrenceText.unitMany.year.few', many: 'recurrenceText.unitMany.year.many' },
+	},
+} as const;
+
+/**
+ * "every 2 weeks" / «каждые 2 недели», or its compact form ("2 wks", «2 нед.»),
+ * where the badge's `repeat` icon already says "every".
+ */
+function freqClause(rule: Recurrence, lang: 'en' | 'ru', compact: boolean): string {
+	const form = compact ? 'compact' : 'full';
+	if (rule.interval === 1) return t(FREQ_ONE[form][rule.freq]);
 	const category = new Intl.PluralRules(lang).select(rule.interval);
 	const bucket = category === 'few' ? 'few' : 'many';
-	const key =
-		unit === 'day'
-			? bucket === 'few'
-				? 'recurrenceText.freqMany.day.few'
-				: 'recurrenceText.freqMany.day.many'
-			: unit === 'week'
-				? bucket === 'few'
-					? 'recurrenceText.freqMany.week.few'
-					: 'recurrenceText.freqMany.week.many'
-				: unit === 'month'
-					? bucket === 'few'
-						? 'recurrenceText.freqMany.month.few'
-						: 'recurrenceText.freqMany.month.many'
-					: bucket === 'few'
-						? 'recurrenceText.freqMany.year.few'
-						: 'recurrenceText.freqMany.year.many';
-	return t(key, { n: rule.interval });
+	return t(FREQ_MANY[form][rule.freq][bucket], { n: rule.interval });
 }
 
 function timesClause(count: number, lang: 'en' | 'ru'): string {
@@ -169,14 +178,28 @@ function timesClause(count: number, lang: 'en' | 'ru'): string {
 	return t('recurrenceText.timesMany', { n: count });
 }
 
+export interface DescribeOptions {
+	/**
+	 * The badge's form: no "every" (its `repeat` icon says that), abbreviated
+	 * units, and **no absolute dates at all** — a start or end date is the
+	 * longest clause of the sentence and would not fit a card, so both stay in
+	 * the badge's tooltip, which shows the full form (recurrence.md §5).
+	 */
+	compact?: boolean;
+}
+
 /**
  * A human sentence for a rule ("every 2 weeks on Mon, Wed from 2026-07-27"),
  * describing only what the rule itself specifies — same scope as
  * `formatRecurrence`, just localized. Embedded dates go through the shared
  * pipeline, so they honor the user's own `dateFormat`.
  */
-export function describeRecurrence(rule: Recurrence, opts: DateTimeOpts): string {
-	let out = freqClause(rule, opts.lang);
+export function describeRecurrence(
+	rule: Recurrence,
+	opts: DateTimeOpts,
+	{ compact = false }: DescribeOptions = {},
+): string {
+	let out = freqClause(rule, opts.lang, compact);
 
 	if (rule.freq === 'week' && rule.weekdays?.length) {
 		const list = DAY_ORDER.filter((d) => rule.weekdays?.includes(d))
@@ -188,7 +211,9 @@ export function describeRecurrence(rule: Recurrence, opts: DateTimeOpts): string
 	} else if (rule.freq === 'month' && rule.nth) {
 		out += t('recurrenceText.onNth', {
 			ordinal: ordinalLabel(rule.nth.ordinal),
-			weekday: weekdayFull(rule.nth.weekday),
+			// The label pair stays (see the gender note above); only its weekday
+			// shortens, so «— последняя: Пт» fits a badge.
+			weekday: compact ? weekdayAbbrev(rule.nth.weekday) : weekdayFull(rule.nth.weekday),
 		});
 	} else if (rule.freq === 'year' && rule.month !== undefined && rule.day !== undefined) {
 		out +=
@@ -197,9 +222,15 @@ export function describeRecurrence(rule: Recurrence, opts: DateTimeOpts): string
 				: t('recurrenceText.onYearly', { day: rule.day, month: monthFull(rule.month) });
 	}
 
-	if (rule.start) out += t('recurrenceText.from', { date: formatCalDate(rule.start, opts) });
-	if (rule.until) out += t('recurrenceText.until', { date: formatCalDate(rule.until, opts) });
-	else if (rule.count !== undefined) out += timesClause(rule.count, opts.lang);
+	if (!compact && rule.start) {
+		out += t('recurrenceText.from', { date: formatCalDate(rule.start, opts) });
+	}
+	if (rule.until) {
+		if (!compact) out += t('recurrenceText.until', { date: formatCalDate(rule.until, opts) });
+	} else if (rule.count !== undefined) {
+		// A count is short and bounds the series, so it survives the compaction.
+		out += timesClause(rule.count, opts.lang);
+	}
 
 	return out;
 }

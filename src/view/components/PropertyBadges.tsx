@@ -8,7 +8,11 @@ import { Menu } from 'obsidian';
 import { useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import { escapeValue, formatValue, parseValue } from '../../model/properties';
+import { parseRecurrence } from '../../model/recurrence';
 import type { Board, Card, PropertyDef, PropertyValue } from '../../model/types';
+import type { ExtraboardSettings } from '../../settings';
+import { dateTimeOptsFor, type DateTimeOpts } from '../../i18n/dates';
+import { describeRecurrence } from '../../i18n/recurrenceText';
 import { editRecurrence } from '../../ui/RecurrenceModal';
 import { typeLabels } from '../../ui/PropertyDefsEditor';
 import type { BoardApi } from '../api';
@@ -26,9 +30,11 @@ interface Props {
 	card: Card;
 	target: ops.ItemRef;
 	api: BoardApi;
+	/** Read for the date/recurrence formatting a badge label needs. */
+	settings: ExtraboardSettings;
 }
 
-export function PropertyBadges({ board, card, target, api }: Props) {
+export function PropertyBadges({ board, card, target, api, settings }: Props) {
 	// Name of the property whose editor is open; it need not be on the card yet.
 	const [open, setOpen] = useState<string | null>(null);
 
@@ -76,6 +82,7 @@ export function PropertyBadges({ board, card, target, api }: Props) {
 					<BadgeButton
 						key={pv.name}
 						pv={pv}
+						opts={dateTimeOptsFor(settings)}
 						active={pv.name === openName}
 						onClick={() => setOpen(pv.name === openName ? null : pv.name)}
 					/>
@@ -104,17 +111,39 @@ export function PropertyBadges({ board, card, target, api }: Props) {
 	);
 }
 
-function badgeLabel(pv: PropertyValue): string {
-	const text = formatValue(pv);
+/**
+ * A `recurrence` value reads as the same compact sentence the card's badge shows
+ * (recurrence.md §5) rather than as the stored English phrase, which is far too
+ * long for a chip. The phrase itself stays one hover away, in the title.
+ */
+function badgeText(pv: PropertyValue, opts: DateTimeOpts): string {
+	if (pv.type !== 'recurrence') return formatValue(pv);
+	const rule = parseRecurrence(pv.raw);
+	return rule ? describeRecurrence(rule, opts, { compact: true }) : pv.raw;
+}
+
+function badgeLabel(pv: PropertyValue, opts: DateTimeOpts): string {
+	const text = badgeText(pv, opts);
 	return text ? `${pv.name}: ${text}` : pv.name;
+}
+
+/** The full story behind a shortened label, or nothing when it is not shortened. */
+function badgeTooltip(pv: PropertyValue, opts: DateTimeOpts): string | undefined {
+	if (pv.type !== 'recurrence') return undefined;
+	const rule = parseRecurrence(pv.raw);
+	// The raw phrase first: while editing, what the file holds is the fact that
+	// matters, and the sentence below it is the reading of that fact.
+	return rule ? `${pv.raw}\n${describeRecurrence(rule, opts)}` : pv.raw;
 }
 
 function BadgeButton({
 	pv,
+	opts,
 	active,
 	onClick,
 }: {
 	pv: PropertyValue;
+	opts: DateTimeOpts;
 	active: boolean;
 	onClick: () => void;
 }) {
@@ -123,9 +152,10 @@ function BadgeButton({
 		.filter(Boolean)
 		.join(' ');
 	return (
-		<button type="button" class={classes} onClick={onClick}>
+		<button type="button" class={classes} title={badgeTooltip(pv, opts)} onClick={onClick}>
 			{color ? <span class="eb-swatch" style={`background: ${color}`} /> : null}
-			{badgeLabel(pv)}
+			{pv.type === 'recurrence' ? <Icon name="repeat" class="eb-badge-icon" /> : null}
+			<span class="eb-badge-text">{badgeLabel(pv, opts)}</span>
 		</button>
 	);
 }

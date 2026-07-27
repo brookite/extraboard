@@ -359,6 +359,33 @@
 	color: var(--text-muted);
 }
 
+/* A badge's text, so a long value ellipsizes instead of overflowing its
+   container: `text-overflow` needs the text's own box, not the flex chip. */
+.eb-badge-text {
+	overflow: hidden;
+	min-width: 0;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.eb-badge-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	color: var(--text-faint);
+}
+
+.eb-badge-icon svg {
+	width: 12px;
+	height: 12px;
+}
+
+/* The recurrence chip is the widest badge there is (a whole sentence), so it is
+   the one that has to yield to the card's width. */
+.eb-badge-recurrence {
+	max-width: 100%;
+	min-width: 0;
+}
+
 .eb-tag {
 	display: inline-flex;
 	padding: 1px 7px;
@@ -520,8 +547,8 @@
 
 .eb-badge-edit {
 	max-width: 100%;
+	min-width: 0;
 	overflow: hidden;
-	text-overflow: ellipsis;
 	border: 1px solid transparent;
 	box-shadow: none;
 	cursor: pointer;
@@ -1633,9 +1660,13 @@ body.eb-dragging-card .eb-archive-drop {
 	font-size: var(--font-ui-smaller, 0.85em);
 }
 
+/* The stored phrase in full, so it wraps rather than overflowing the panel. */
 .eb-value-rule {
 	width: 100%;
+	height: auto;
 	text-align: left;
+	white-space: normal;
+	word-break: break-word;
 }
 
 .eb-cal-chip-repeat {

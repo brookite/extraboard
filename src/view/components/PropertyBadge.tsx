@@ -11,6 +11,7 @@ import { dateTimeOptsFor, formatCalDate, formatCalSpan, absoluteTooltip, type Da
 import { describeRecurrence } from '../../i18n/recurrenceText';
 import { t } from '../../i18n';
 import { readableOn } from '../../util/color';
+import { Icon } from './Icon';
 import { PercentValue } from './Progress';
 import { safeColor, styleFor } from './style';
 
@@ -83,13 +84,20 @@ function RecurrenceBadge({ raw, card, dates }: { raw: string; card: Card; dates:
 	const rule = parseRecurrence(raw);
 	if (!rule) return <span class="eb-badge">{raw}</span>;
 	const next = nextHit(rule, card, dates.property);
+	// The chip carries the compact form; the tooltip carries everything the
+	// compaction left out — the dates and the next hit (recurrence.md §5).
+	const full = describeRecurrence(rule, dates.opts);
+	const tooltip = next
+		? `${full}\n${t('card.nextOccurrence', { date: formatCalDate(next, dates.opts) })}`
+		: full;
 	return (
 		<span
-			class="eb-badge"
+			class="eb-badge eb-badge-recurrence"
 			style={highlightStyle(dates, spanOf(next))}
-			title={next ? t('card.nextOccurrence', { date: formatCalDate(next, dates.opts) }) : undefined}
+			title={tooltip}
 		>
-			{describeRecurrence(rule, dates.opts)}
+			<Icon name="repeat" class="eb-badge-icon" />
+			<span class="eb-badge-text">{describeRecurrence(rule, dates.opts, { compact: true })}</span>
 		</span>
 	);
 }

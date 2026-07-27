@@ -195,7 +195,7 @@ export function CardEditor({ board, card, target, api, settings, onClose }: Prop
 				onCommit={save}
 				onCancel={onClose}
 			/>
-			<PropertyBadges board={board} card={card} target={target} api={api} />
+			<PropertyBadges board={board} card={card} target={target} api={api} settings={settings} />
 		</div>
 	);
 }

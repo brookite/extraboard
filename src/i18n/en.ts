@@ -126,6 +126,19 @@ export const en = {
 			month: { few: 'every {n} months', many: 'every {n} months' },
 			year: { few: 'every {n} years', many: 'every {n} years' },
 		},
+		// The compact form a badge shows: no "every", units abbreviated.
+		unitOne: {
+			day: 'day',
+			week: 'wk',
+			month: 'mo',
+			year: 'yr',
+		},
+		unitMany: {
+			day: { few: '{n} days', many: '{n} days' },
+			week: { few: '{n} wks', many: '{n} wks' },
+			month: { few: '{n} mos', many: '{n} mos' },
+			year: { few: '{n} yrs', many: '{n} yrs' },
+		},
 		weekdayFull: {
 			mon: 'Monday',
 			tue: 'Tuesday',

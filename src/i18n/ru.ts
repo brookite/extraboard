@@ -127,6 +127,19 @@ export const ru: DeepPartial<typeof en> = {
 			month: { few: 'каждые {n} месяца', many: 'каждые {n} месяцев' },
 			year: { few: 'каждые {n} года', many: 'каждые {n} лет' },
 		},
+		unitOne: {
+			day: 'день',
+			week: 'нед.',
+			month: 'мес.',
+			year: 'год',
+		},
+		unitMany: {
+			day: { few: '{n} дн.', many: '{n} дн.' },
+			week: { few: '{n} нед.', many: '{n} нед.' },
+			month: { few: '{n} мес.', many: '{n} мес.' },
+			// Years stay spelled out: «2 г.» reads as a single year, not two.
+			year: { few: '{n} года', many: '{n} лет' },
+		},
 		weekdayFull: {
 			mon: 'понедельник',
 			tue: 'вторник',
@@ -157,7 +170,7 @@ export const ru: DeepPartial<typeof en> = {
 			fourth: '4-я',
 			last: 'последняя',
 		},
-		onWeekdays: ' по: {list}',
+		onWeekdays: ' в {list}',
 		onMonthDay: ' {n} числа',
 		onNth: ' — {ordinal}: {weekday}',
 		onYearly: ' {day} {month}',
