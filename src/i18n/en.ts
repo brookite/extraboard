@@ -549,6 +549,7 @@ export const en = {
 		colorForTitle: '{label} color',
 		customColorValue: 'Color value',
 		pickCustomColor: 'Pick a custom color',
+		opacity: 'Opacity',
 		anyCssValue: 'Any CSS color value',
 		select: 'Select',
 		noColor: 'No color',

@@ -19,16 +19,38 @@ export function safeColor(value: string | undefined): string | null {
 	return HEX_RE.test(v) ? v : null;
 }
 
+/** A resolved color: opaque `#rrggbb` plus the alpha that was taken off it. */
+export interface ResolvedColor {
+	/** Lower-case `#rrggbb`, what `<input type="color">` accepts. */
+	hex: string;
+	/** 0–1. `1` for every color that carries no alpha. */
+	alpha: number;
+}
+
+const clamp255 = (n: number): string =>
+	Math.max(0, Math.min(255, Math.round(n)))
+		.toString(16)
+		.padStart(2, '0');
+
 /**
- * Best-effort `#rrggbb` for any CSS color, because the native color input
- * accepts nothing else. Resolved through the browser (so named colors and
- * `var(--…)` work), using `host` for the lookup context; `null` when the value
- * is not a color at all.
+ * Split any CSS color into an opaque hex and its alpha. Resolved through the
+ * browser (so named colors, `rgba(…)` and `var(--…)` all work), using `host`
+ * for the lookup context; `null` when the value is not a color at all.
+ *
+ * The two callers want opposite halves of this — the native input wants the hex
+ * with the alpha stripped, the opacity slider wants the alpha — so it is
+ * resolved once and split, rather than probed twice.
  */
-export function toHexColor(value: string | undefined, host: HTMLElement): string | null {
+export function resolveColor(value: string | undefined, host: HTMLElement): ResolvedColor | null {
 	const safe = safeColor(value);
 	if (safe === null) return null;
-	if (/^#[0-9a-f]{6}$/i.test(safe)) return safe.toLowerCase();
+	if (/^#[0-9a-f]{6}$/i.test(safe)) return { hex: safe.toLowerCase(), alpha: 1 };
+	if (/^#[0-9a-f]{8}$/i.test(safe)) {
+		return {
+			hex: safe.slice(0, 7).toLowerCase(),
+			alpha: Number.parseInt(safe.slice(7), 16) / 255,
+		};
+	}
 
 	const probe = host.ownerDocument.createElement('span');
 	probe.className = 'eb-color-probe';
@@ -39,11 +61,31 @@ export function toHexColor(value: string | undefined, host: HTMLElement): string
 
 	const parts = /^rgba?\(([^)]+)\)$/.exec(computed)?.[1]?.split(/[\s,/]+/);
 	if (!parts || parts.length < 3) return null;
-	const channel = (raw: string): string =>
-		Math.max(0, Math.min(255, Math.round(Number(raw))))
-			.toString(16)
-			.padStart(2, '0');
-	return `#${channel(parts[0]!)}${channel(parts[1]!)}${channel(parts[2]!)}`;
+	const alpha = parts.length > 3 ? Number(parts[3]) : 1;
+	return {
+		hex: `#${clamp255(Number(parts[0]))}${clamp255(Number(parts[1]))}${clamp255(Number(parts[2]))}`,
+		alpha: Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1,
+	};
+}
+
+/**
+ * Best-effort `#rrggbb` for any CSS color, because the native color input
+ * accepts nothing else. Alpha is dropped — see {@link resolveColor} to keep it.
+ */
+export function toHexColor(value: string | undefined, host: HTMLElement): string | null {
+	return resolveColor(value, host)?.hex ?? null;
+}
+
+/**
+ * `#rrggbb` + alpha → the value we store. Eight-digit hex rather than `rgba()`:
+ * it is the same notation the opaque case already uses, so a color stays one
+ * token the user can read, retype and paste. A fully opaque color keeps its
+ * six-digit form so nothing that was already written gains a redundant `ff`.
+ */
+export function withAlpha(hex: string, alpha: number): string {
+	const a = Math.max(0, Math.min(1, alpha));
+	if (a >= 1) return hex;
+	return `${hex}${clamp255(a * 255)}`;
 }
 
 /**

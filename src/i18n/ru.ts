@@ -551,6 +551,7 @@ export const ru: DeepPartial<typeof en> = {
 		colorForTitle: 'Цвет: {label}',
 		customColorValue: 'Значение цвета',
 		pickCustomColor: 'Свой цвет',
+		opacity: 'Прозрачность',
 		anyCssValue: 'Любое CSS-значение цвета',
 		select: 'Выбрать',
 		noColor: 'Без цвета',

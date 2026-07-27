@@ -8,7 +8,7 @@
 // the platform picker, which not every device provides.
 
 import { App, Modal } from 'obsidian';
-import { safeColor, toHexColor } from '../util/color';
+import { resolveColor, safeColor, withAlpha } from '../util/color';
 import { t } from '../i18n';
 
 /** Preset palette: Obsidian's accent hues, soft variants, and neutrals. */
@@ -82,6 +82,7 @@ class ColorPickerModal extends Modal {
 	private labelEl!: HTMLElement;
 	private textEl!: HTMLInputElement;
 	private nativeEl!: HTMLInputElement;
+	private alphaEl!: HTMLInputElement;
 	private ctaEl!: HTMLButtonElement;
 
 	constructor(
@@ -113,7 +114,7 @@ class ColorPickerModal extends Modal {
 				swatch.setAttribute('aria-label', color);
 				swatch.title = color;
 				swatch.addEventListener('click', () => {
-					this.select(color);
+					this.select(withAlpha(color, this.alpha()));
 				});
 				this.swatches.set(color, swatch);
 			}
@@ -122,9 +123,27 @@ class ColorPickerModal extends Modal {
 		const custom = el.createDiv({ cls: 'eb-cp-custom' });
 		this.nativeEl = custom.createEl('input', { type: 'color', cls: 'eb-cp-native' });
 		this.nativeEl.setAttribute('aria-label', t('colorPicker.pickCustomColor'));
+		// Hue and opacity are independent: changing one keeps the other, so
+		// "pick a color, then fade it" works in either order.
 		this.nativeEl.addEventListener('input', () => {
-			this.select(this.nativeEl.value);
+			this.select(withAlpha(this.nativeEl.value, this.alpha()));
 		});
+		// Opacity is a second axis rather than a second picker: `<input
+		// type="color">` cannot express alpha on any platform we support, and a
+		// hand-rolled saturation/alpha canvas would be a large touch-hostile
+		// control for one number. The slider composes `#rrggbbaa` out of what the
+		// native input already gives us.
+		this.alphaEl = custom.createEl('input', { type: 'range', cls: 'eb-cp-alpha' });
+		this.alphaEl.min = '0';
+		this.alphaEl.max = '100';
+		this.alphaEl.step = '1';
+		this.alphaEl.setAttribute('aria-label', t('colorPicker.opacity'));
+		this.alphaEl.addEventListener('input', () => {
+			const base = resolveColor(this.value, this.contentEl);
+			if (!base) return;
+			this.select(withAlpha(base.hex, Number(this.alphaEl.value) / 100));
+		});
+
 		this.textEl = custom.createEl('input', { type: 'text', cls: 'eb-cp-text' });
 		this.textEl.placeholder = t('colorPicker.anyCssValue');
 		this.textEl.setAttribute('aria-label', t('colorPicker.customColorValue'));
@@ -168,9 +187,17 @@ class ColorPickerModal extends Modal {
 		this.sync(fromText);
 	}
 
+	/** The opacity currently in force; `1` while there is no color to read one from. */
+	private alpha(): number {
+		return resolveColor(this.value, this.contentEl)?.alpha ?? 1;
+	}
+
 	private sync(fromText: boolean): void {
 		const safe = safeColor(this.value);
-		this.previewEl.style.background = safe ?? 'transparent';
+		// `backgroundColor`, not the `background` shorthand: the checkerboard
+		// behind a translucent swatch is a `background-image`, and the shorthand
+		// would wipe it out.
+		this.previewEl.style.backgroundColor = safe ?? 'transparent';
 		this.previewEl.classList.toggle('is-empty', safe === null);
 		this.labelEl.setText(
 			this.value === ''
@@ -181,10 +208,16 @@ class ColorPickerModal extends Modal {
 		);
 		if (!fromText) this.textEl.value = this.value;
 
-		const hex = toHexColor(this.value, this.contentEl);
-		if (hex !== null) this.nativeEl.value = hex;
+		const resolved = resolveColor(this.value, this.contentEl);
+		if (resolved) this.nativeEl.value = resolved.hex;
+		this.alphaEl.value = String(Math.round((resolved?.alpha ?? 1) * 100));
+		// A value the slider cannot recompose without destroying it — `var(--x)`
+		// resolves to a color, but writing hex back would freeze the theme
+		// variable into a literal. Only what is already hex or `rgb()` is fadeable.
+		this.alphaEl.disabled = resolved === null || !/^(#|rgba?\()/i.test(this.value.trim());
+		// Compared on the resolved hue, so a faded color still marks its swatch.
 		for (const [color, swatch] of this.swatches) {
-			swatch.classList.toggle('is-selected', color === safe?.toLowerCase());
+			swatch.classList.toggle('is-selected', color === resolved?.hex);
 		}
 		this.ctaEl.disabled = safe === null;
 	}

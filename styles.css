@@ -1008,6 +1008,15 @@ body.is-mobile .eb-hover-only {
 	flex: 0 0 auto;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-s, 6px);
+	/* Checkerboard: without something behind it a translucent color reads as a
+	   lighter opaque one, and the opacity slider looks like it does nothing. The
+	   color itself is set as `background-color` (ColorPicker.ts), so it layers
+	   over this instead of replacing it. */
+	background-image:
+		linear-gradient(45deg, var(--background-modifier-border) 25%, transparent 25% 75%, var(--background-modifier-border) 75%),
+		linear-gradient(45deg, var(--background-modifier-border) 25%, transparent 25% 75%, var(--background-modifier-border) 75%);
+	background-size: 12px 12px;
+	background-position: 0 0, 6px 6px;
 }
 
 /* "No color" reads as the theme background, not as an invisible box. */
@@ -1069,6 +1078,15 @@ body.is-mobile .eb-hover-only {
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-s, 6px);
 	cursor: pointer;
+}
+
+.eb-cp-alpha {
+	flex: 0 1 6rem;
+	min-width: 4rem;
+}
+
+.eb-cp-alpha:disabled {
+	opacity: 0.4;
 }
 
 .eb-cp-text {
