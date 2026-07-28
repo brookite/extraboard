@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseBoard, parseBody } from '../src/model/parse';
 import { serializeBoard, serializeBody } from '../src/model/serialize';
 import type { Board, BoardConfig } from '../src/model/types';
+import { newBoardConfig, newBoardText } from '../src/util/newBoard';
 
 const bodyConfig: BoardConfig = {
 	version: 1,
@@ -17,7 +18,7 @@ const bodyConfig: BoardConfig = {
 
 function boardFromBody(body: string, config: BoardConfig): Board {
 	const { preamble, stacks } = parseBody(body, config);
-	return { config, frontmatterDoc: null, preamble, stacks, trailing: '' };
+	return { config, frontmatter: null, preamble, stacks, trailing: '' };
 }
 
 describe('body: canonical fixed point', () => {
@@ -111,19 +112,25 @@ describe('body: normalization then idempotence for messy input', () => {
 	});
 });
 
-describe('full file: frontmatter + body round-trip', () => {
+describe('full file: frontmatter + settings block + body round-trip', () => {
 	const input =
 		'---\n' +
 		'aliases:\n' +
 		'  - Project Board\n' +
-		'extraboard:\n' +
-		'  version: 1\n' +
-		'  view: kanban\n' +
-		'  properties:\n' +
-		'    - name: priority\n' +
-		'      type: integer\n' +
+		'extraboard: true\n' +
 		'# a trailing comment\n' +
 		'---\n' +
+		'```extraboard-settings\n' +
+		JSON.stringify(
+			{
+				version: 1,
+				views: [{ id: 'v1', name: 'Board', type: 'kanban' }],
+				properties: [{ name: 'priority', type: 'integer' }],
+			},
+			null,
+			2,
+		) +
+		'\n```\n' +
 		'## Backlog\n' +
 		'- Item one @{priority|1} #a\n';
 
@@ -151,5 +158,19 @@ describe('full file: frontmatter + body round-trip', () => {
 	it('normalizes CRLF to LF', () => {
 		const crlf = input.replace(/\n/g, '\r\n');
 		expect(serializeBoard(parseBoard(crlf))).not.toContain('\r');
+	});
+});
+
+describe('a freshly created board file', () => {
+	const text = newBoardText(newBoardConfig([{ name: 'priority', type: 'integer' }]));
+
+	it('carries the marker and a settings block, and is a fixed point', () => {
+		expect(text.startsWith('---\nextraboard: true\n---\n```extraboard-settings\n')).toBe(true);
+		expect(serializeBoard(parseBoard(text))).toBe(text);
+	});
+
+	it('reads back the configuration it was created with', () => {
+		expect(parseBoard(text).config.properties).toEqual([{ name: 'priority', type: 'integer' }]);
+		expect(parseBoard(text).stacks.map((s) => s.name)).toEqual(['To do', 'In progress', 'Done']);
 	});
 });

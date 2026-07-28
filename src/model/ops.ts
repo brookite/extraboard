@@ -9,7 +9,6 @@
 import { parseArchive, prependToArchive, serializeArchive, serializeArchivedCard } from './archive';
 import { ChecklistItem, checkAll, cloneChecklist, progress } from './checklist';
 import { processCardText } from './cardText';
-import { configToDoc, writeConfig } from './frontmatter';
 import { parseCardLink, unlinkedTitle } from './link';
 import { parseCardContent } from './parse';
 import { formatValue, parseValue } from './properties';
@@ -725,30 +724,20 @@ export function clearArchive(board: Board): Board {
 // --- board configuration ----------------------------------------------------
 
 /**
- * Replace the board configuration and write it back into the `extraboard`
- * frontmatter node. The YAML document is cloned first, so the previous board
- * object stays valid and the op keeps the usual "new board out" contract;
- * foreign frontmatter keys and comments are preserved by `writeConfig`.
+ * Replace the board configuration. Serialization is what writes it back into
+ * the `extraboard-settings` block, so this is a plain field swap.
  *
  * Existing cards are deliberately left alone: a value that no longer validates
  * under the new definition keeps its text until the user edits that card
  * (kanban-view.md §5.4).
  */
 export function setBoardConfig(board: Board, config: BoardConfig): Board {
-	let doc = board.frontmatterDoc;
-	if (doc) {
-		doc = doc.clone();
-		writeConfig(doc, config);
-	} else {
-		doc = configToDoc(config);
-	}
-	return { ...board, config, frontmatterDoc: doc };
+	return { ...board, config };
 }
 
 // --- view operations --------------------------------------------------------
-// Spec: views.md §2.4. Each one rewrites the `extraboard` node through
-// `setBoardConfig`, so a view change travels the same path as any other config
-// edit and preserves foreign frontmatter.
+// Spec: views.md §2.4. Each one goes through `setBoardConfig`, so a view change
+// travels the same path as any other config edit.
 
 function withViews(board: Board, views: ViewDef[], activeView?: string): Board {
 	const active = activeView ?? board.config.activeView;

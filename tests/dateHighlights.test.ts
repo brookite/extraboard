@@ -1,5 +1,5 @@
 // Date highlight rules: the matcher, the two-level resolution, validation, the
-// frontmatter round trip, and the contrast helper.
+// settings block round trip, and the contrast helper.
 // Spec: docs/specs/i18n-and-dates.md §3.
 
 import { describe, it, expect } from 'vitest';
@@ -16,7 +16,7 @@ import {
 import { addDays, type CalDate, type DateSpan } from '../src/model/dates';
 import { nextOccurrence, parseRecurrence } from '../src/model/recurrence';
 import { defaultBoardConfig, type BoardConfig } from '../src/model/types';
-import { parseFrontmatter, serializeFrontmatter, writeConfig } from '../src/model/frontmatter';
+import { parseBoardSettings, serializeSettingsBlock } from '../src/model/boardSettings';
 import { contrastText } from '../src/util/color';
 
 /** Noon on 2026-07-27, the moment every case below is measured from. */
@@ -263,60 +263,44 @@ describe('isDateFamily', () => {
 	});
 });
 
-describe('frontmatter round trip', () => {
-	const text = [
-		'---',
-		'extraboard:',
-		'  version: 1',
-		'  dateHighlights:',
-		'    - property: due',
-		'      when: before',
-		'      amount: 3',
-		'      unit: day',
-		'      color: "#e0ac00"',
-		'    - when: after',
-		'      amount: 0',
-		'      unit: day',
-		'      color: "#e93147"',
-		'---',
-		'',
-		'## Todo',
-		'',
-	].join('\n');
+describe('settings block round trip', () => {
+	const rules = [
+		{ property: 'due', when: 'before', amount: 3, unit: 'day', color: '#e0ac00' },
+		{ when: 'after', amount: 0, unit: 'day', color: '#e93147' },
+	];
+
+	/** A board body whose settings block carries `settings`, followed by a stack. */
+	function bodyOf(settings: Record<string, unknown>): string {
+		return '```extraboard-settings\n' + JSON.stringify(settings, null, 2) + '\n```\n\n## Todo\n';
+	}
 
 	it('reads a board list, keeping order and the optional property', () => {
-		const { config } = parseFrontmatter(text);
-		expect(config.dateHighlights).toEqual([
-			{ property: 'due', when: 'before', amount: 3, unit: 'day', color: '#e0ac00' },
-			{ when: 'after', amount: 0, unit: 'day', color: '#e93147' },
-		]);
+		const { config } = parseBoardSettings(bodyOf({ version: 1, dateHighlights: rules }));
+		expect(config.dateHighlights).toEqual(rules);
 	});
 
 	it('writes the list back unchanged', () => {
-		const parsed = parseFrontmatter(text);
-		writeConfig(parsed.doc!, parsed.config);
-		const round = parseFrontmatter(serializeFrontmatter(parsed.doc, parsed.body));
-		expect(round.config.dateHighlights).toEqual(parsed.config.dateHighlights);
+		const { config } = parseBoardSettings(bodyOf({ version: 1, dateHighlights: rules }));
+		const round = parseBoardSettings(serializeSettingsBlock(config));
+		expect(round.config.dateHighlights).toEqual(config.dateHighlights);
 	});
 
 	it('keeps an empty list, which is a board saying "no highlights"', () => {
-		const empty = text.replace(/ {2}dateHighlights:[\s\S]*?(?=---)/, '  dateHighlights: []\n');
-		const parsed = parseFrontmatter(empty);
-		expect(parsed.config.dateHighlights).toEqual([]);
-		writeConfig(parsed.doc!, parsed.config);
-		expect(parseFrontmatter(serializeFrontmatter(parsed.doc, parsed.body)).config.dateHighlights).toEqual([]);
+		const { config } = parseBoardSettings(bodyOf({ version: 1, dateHighlights: [] }));
+		expect(config.dateHighlights).toEqual([]);
+		expect(parseBoardSettings(serializeSettingsBlock(config)).config.dateHighlights).toEqual([]);
 	});
 
 	it('has no key at all when the board follows the plugin setting', () => {
-		const { config, doc, body } = parseFrontmatter(text.replace(/ {2}dateHighlights:[\s\S]*?(?=---)/, ''));
+		const { config } = parseBoardSettings(bodyOf({ version: 1 }));
 		expect(config.dateHighlights).toBeUndefined();
-		writeConfig(doc!, config);
-		expect(serializeFrontmatter(doc, body)).not.toContain('dateHighlights');
+		expect(serializeSettingsBlock(config)).not.toContain('dateHighlights');
 	});
 
 	it('drops a malformed rule rather than keeping junk the matcher must guard', () => {
-		const broken = text.replace('      unit: day\n      color: "#e0ac00"', '      unit: fortnight\n      color: "#e0ac00"');
-		expect(parseFrontmatter(broken).config.dateHighlights).toHaveLength(1);
+		const broken = [{ ...rules[0], unit: 'fortnight' }, rules[1]];
+		const { config } = parseBoardSettings(bodyOf({ version: 1, dateHighlights: broken }));
+		expect(config.dateHighlights).toHaveLength(1);
 	});
 });
 

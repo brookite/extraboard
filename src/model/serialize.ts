@@ -1,8 +1,9 @@
 // Board -> Markdown. Canonical and round-trip stable.
 // Spec: docs/specs/markdown-format.md §4, §6. Pure; no `obsidian`.
 
+import { serializeSettingsBlock } from './boardSettings';
 import { serializeChecklist } from './checklist';
-import { serializeFrontmatter } from './frontmatter';
+import { serializeFrontmatter, withBoardMarker } from './frontmatter';
 import { withMarkers } from './markers';
 import { formatToken } from './properties';
 import { Board, BoardConfig, Card, Divider, Stack } from './types';
@@ -97,7 +98,13 @@ export function serializeBody(board: Board): string {
 	return board.preamble + regionLines.join('\n');
 }
 
-/** Serialize a full Board to board-file text. */
+/**
+ * Serialize a full Board to board-file text: the frontmatter (marker
+ * guaranteed, foreign keys verbatim), the settings block, then the body.
+ */
 export function serializeBoard(board: Board): string {
-	return serializeFrontmatter(board.frontmatterDoc, serializeBody(board));
+	return serializeFrontmatter(
+		withBoardMarker(board.frontmatter),
+		serializeSettingsBlock(board.config) + serializeBody(board),
+	);
 }

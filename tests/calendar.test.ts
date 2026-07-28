@@ -27,19 +27,16 @@ import {
 import { parseBoard } from '../src/model/parse';
 import { serializeBoard } from '../src/model/serialize';
 import type { Board } from '../src/model/types';
+import { boardHead } from './boardFile';
 
-const FM = [
-	'---',
-	'extraboard:',
-	'  version: 1',
-	'  views:',
-	'    - { id: v1, name: Due, type: calendar, dateProperty: due, mode: month }',
-	'  properties:',
-	'    - { name: due, type: datetime }',
-	'    - { name: sprint, type: date-range }',
-	'    - { name: dates, type: date-list }',
-	'---',
-].join('\n');
+const FM = boardHead({
+	views: [{ id: 'v1', name: 'Due', type: 'calendar', dateProperty: 'due', mode: 'month' }],
+	properties: [
+		{ name: 'due', type: 'datetime' },
+		{ name: 'sprint', type: 'date-range' },
+		{ name: 'dates', type: 'date-list' },
+	],
+});
 
 const board = (...cards: string[]): Board =>
 	parseBoard([FM, '', '## To do', '', ...cards, ''].join('\n'));

@@ -1,10 +1,13 @@
 // Content of a freshly created board file.
 
-import { configToDoc, serializeFrontmatter } from '../model/frontmatter';
+import { serializeSettingsBlock } from '../model/boardSettings';
+import { BOARD_MARKER, serializeFrontmatter } from '../model/frontmatter';
 import type { BoardConfig, PropertyDef } from '../model/types';
 import { defaultBoardConfig } from '../model/types';
 
-const NEW_BOARD_BODY = '## To do\n\n## In progress\n\n## Done\n';
+// The leading blank line separates the settings block from the first stack; it
+// is ordinary preamble, so it round-trips like any other body text.
+const NEW_BOARD_BODY = '\n## To do\n\n## In progress\n\n## Done\n';
 
 /**
  * Configuration a new board starts from: the plugin's `defaultProperties`
@@ -17,7 +20,10 @@ export function newBoardConfig(properties: PropertyDef[]): BoardConfig {
 
 /** File content of a new board with the given configuration. */
 export function newBoardText(config: BoardConfig): string {
-	return serializeFrontmatter(configToDoc(config), NEW_BOARD_BODY);
+	return serializeFrontmatter(
+		`${BOARD_MARKER}\n`,
+		serializeSettingsBlock(config) + NEW_BOARD_BODY,
+	);
 }
 
 export const NEW_BOARD_BASENAME = 'Untitled board';

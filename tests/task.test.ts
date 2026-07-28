@@ -18,7 +18,7 @@ const config: BoardConfig = {
 
 function boardFromBody(body: string): Board {
 	const { preamble, stacks } = parseBody(body, config);
-	return { config, frontmatterDoc: null, preamble, stacks, trailing: '' };
+	return { config, frontmatter: null, preamble, stacks, trailing: '' };
 }
 
 const cardAt = (board: Board, stack: number, item: number): Card => {
@@ -117,14 +117,12 @@ describe('board configuration rewriting', () => {
 		'---\n' +
 		'aliases:\n' +
 		'  - Project Board\n' +
-		'extraboard:\n' +
-		'  version: 1\n' +
-		'  view: kanban\n' +
+		'extraboard: true\n' +
 		'---\n' +
 		'## Backlog\n' +
 		'- Item one\n';
 
-	it('writes new config into the extraboard node and keeps foreign keys', () => {
+	it('writes new config into the settings block and keeps foreign keys', () => {
 		const board = parseBoard(input);
 		const next = ops.setBoardConfig(board, {
 			...board.config,
@@ -135,9 +133,9 @@ describe('board configuration rewriting', () => {
 		const text = serializeBoard(next);
 
 		expect(text).toContain('aliases:');
-		expect(text).toContain('showCardCheckbox: true');
-		expect(text).toContain('name: status');
-		expect(text).toContain('urgent:');
+		expect(text).toContain('"showCardCheckbox": true');
+		expect(text).toContain('"name": "status"');
+		expect(text).toContain('"urgent"');
 
 		const reparsed = parseBoard(text);
 		expect(reparsed.config.showCardCheckbox).toBe(true);
@@ -161,7 +159,7 @@ describe('card color', () => {
 	};
 	const withDef = (body: string): Board => {
 		const { preamble, stacks } = parseBody(body, colored);
-		return { config: colored, frontmatterDoc: null, preamble, stacks, trailing: '' };
+		return { config: colored, frontmatter: null, preamble, stacks, trailing: '' };
 	};
 	const ref = { stack: 0, item: 0 };
 
@@ -192,7 +190,7 @@ describe('card color', () => {
 	});
 
 	it('adds a color property to a board that declares none', () => {
-		const board = parseBoard('---\nextraboard:\n  version: 1\n---\n## A\n\n- Card\n');
+		const board = parseBoard('---\nextraboard: true\n---\n## A\n\n- Card\n');
 		const next = ops.setCardColor(board, ref, '#08b94e');
 		expect(next.config.properties).toEqual([{ name: 'color', type: 'color' }]);
 
@@ -205,7 +203,7 @@ describe('card color', () => {
 	});
 
 	it('replaces an untyped token of the same name instead of duplicating it', () => {
-		const board = parseBoard('---\nextraboard:\n  version: 1\n---\n## A\n\n- Card @{color|red}\n');
+		const board = parseBoard('---\nextraboard: true\n---\n## A\n\n- Card @{color|red}\n');
 		const next = ops.setCardColor(board, ref, 'blue');
 		expect(cardAt(next, 0, 0).properties).toHaveLength(1);
 		expect(serializeBody(next)).toContain('- Card @{color|blue}');

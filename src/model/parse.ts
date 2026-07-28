@@ -1,7 +1,8 @@
 // Markdown -> Board. Spec: docs/specs/markdown-format.md. Pure; no `obsidian`.
 
+import { parseBoardSettings } from './boardSettings';
 import { splitChecklist } from './checklist';
-import { parseFrontmatter } from './frontmatter';
+import { splitFrontmatter } from './frontmatter';
 import { stripMarkers } from './markers';
 import { parseValue } from './properties';
 import {
@@ -267,11 +268,12 @@ export function parseBody(
 /** Parse full board file text into a Board. */
 export function parseBoard(text: string): Board {
 	const normalized = text.replace(/\r\n/g, '\n');
-	const fm = parseFrontmatter(normalized);
-	const { preamble, stacks, archive } = parseBody(fm.body, fm.config);
+	const split = splitFrontmatter(normalized);
+	const settings = parseBoardSettings(split ? split.body : normalized);
+	const { preamble, stacks, archive } = parseBody(settings.body, settings.config);
 	return {
-		config: fm.config,
-		frontmatterDoc: fm.doc,
+		config: settings.config,
+		frontmatter: split ? split.frontmatter : null,
 		preamble,
 		stacks,
 		...(archive && { archive }),

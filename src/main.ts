@@ -16,7 +16,7 @@ import { BoardView } from './view/BoardView';
 import { ICONS, VIEW_TYPE_BOARD } from './util/constants';
 import { clearReadableCache } from './util/color';
 import { NEW_BOARD_BASENAME, newBoardConfig, newBoardText } from './util/newBoard';
-import { parseFrontmatter } from './model/frontmatter';
+import { isBoardText } from './model/frontmatter';
 import type { BoardConfig } from './model/types';
 import { setLanguage, t } from './i18n';
 
@@ -242,12 +242,12 @@ export default class ExtraboardPlugin extends Plugin {
 		});
 	}
 
-	/** True iff frontmatter carries the top-level `extraboard` key. */
+	/** True iff cached frontmatter carries the top-level `extraboard: true` marker. */
 	private hasBoardKey(fm: unknown): boolean {
 		return (
 			typeof fm === 'object' &&
 			fm !== null &&
-			Object.prototype.hasOwnProperty.call(fm, 'extraboard')
+			(fm as Record<string, unknown>).extraboard === true
 		);
 	}
 
@@ -269,7 +269,7 @@ export default class ExtraboardPlugin extends Plugin {
 		if (cache) return this.hasBoardKey(cache.frontmatter);
 		try {
 			const content = await this.app.vault.cachedRead(file);
-			return parseFrontmatter(content).isBoard;
+			return isBoardText(content);
 		} catch {
 			return false;
 		}

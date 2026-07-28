@@ -1,40 +1,24 @@
-// Board frontmatter <-> BoardConfig, using the `yaml` Document API so that
-// foreign frontmatter keys and comments survive a load->save cycle.
+// Board frontmatter: the `extraboard: true` marker, and nothing else. The
+// block is kept as raw text and read by hand — the configuration lives in the
+// `extraboard-settings` code block (`boardSettings.ts`), so there is no reason
+// to pull a YAML parser in to read one boolean, and never reformatting the text
+// is what preserves foreign keys and comments.
 // Spec: docs/specs/markdown-format.md §2. Pure; no `obsidian` imports.
 
-import { Document, parseDocument } from 'yaml';
-import {
-	BoardConfig,
-	defaultBoardConfig,
-	PropertyDef,
-	PropertyType,
-	StringListOption,
-	BadgeColor,
-} from './types';
-import { normalizeViews, parseViews, upgradeLegacyViews } from './views';
-import type { DateHighlightRule, HighlightUnit } from './dateHighlights';
+/** The line that marks a Markdown file as an Extraboard board. */
+export const BOARD_MARKER = 'extraboard: true';
 
-const PROPERTY_TYPES: ReadonlySet<string> = new Set<PropertyType>([
-	'color', 'string', 'string-list', 'integer', 'percent',
-	'datetime', 'date-range', 'recurrence', 'date-list', 'checkbox',
-]);
-
-export interface Frontmatter {
-	/** Opaque YAML document (null if the file has no frontmatter). */
-	doc: Document | null;
-	config: BoardConfig;
+export interface SplitFile {
+	/** Text between the `---` delimiters, verbatim; "" when the block is empty. */
+	frontmatter: string;
 	body: string;
-	/** True iff a top-level `extraboard` mapping is present. */
-	isBoard: boolean;
 }
 
 /**
- * Split leading YAML frontmatter from the body. Returns null if the text does
- * not begin with a `---` delimited block.
+ * Split leading frontmatter from the body. Returns null if the text does not
+ * begin with a `---` delimited block.
  */
-export function splitFrontmatter(
-	text: string,
-): { yamlText: string; body: string } | null {
+export function splitFrontmatter(text: string): SplitFile | null {
 	const firstNl = text.indexOf('\n');
 	if (firstNl === -1) return null;
 	if (text.slice(0, firstNl).replace(/\r$/, '') !== '---') return null;
@@ -46,7 +30,7 @@ export function splitFrontmatter(
 		const line = text.slice(searchStart, lineEnd).replace(/\r$/, '');
 		if (line === '---') {
 			return {
-				yamlText: text.slice(firstNl + 1, searchStart),
+				frontmatter: text.slice(firstNl + 1, searchStart),
 				body: nl === -1 ? '' : text.slice(nl + 1),
 			};
 		}
@@ -55,185 +39,31 @@ export function splitFrontmatter(
 	}
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-	return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
-function asString(v: unknown): string | undefined {
-	return typeof v === 'string' ? v : undefined;
-}
-
-function toBadgeColor(v: unknown): BadgeColor | undefined {
-	if (!isRecord(v)) return undefined;
-	const bg = asString(v.bg);
-	const fg = asString(v.fg);
-	if (bg === undefined && fg === undefined) return undefined;
-	return { ...(bg !== undefined && { bg }), ...(fg !== undefined && { fg }) };
-}
-
-const HIGHLIGHT_UNITS: ReadonlySet<string> = new Set<HighlightUnit>([
-	'hour', 'day', 'week', 'month',
-]);
-
 /**
- * One `dateHighlights` entry. A malformed rule is dropped rather than kept as
- * junk the matcher would have to guard against on every render; the editor is
- * where an incomplete rule is flagged and preserved (i18n-and-dates.md §3.3).
+ * The marker has to be a top-level key, so it is matched at column 0: YAML
+ * indents everything nested (including block scalar content), which is what
+ * keeps a `extraboard: true` line inside some other key from counting.
  */
-function toHighlightRule(v: unknown): DateHighlightRule | null {
-	if (!isRecord(v)) return null;
-	const when = asString(v.when);
-	const unit = asString(v.unit);
-	const color = asString(v.color);
-	if (when !== 'before' && when !== 'after') return null;
-	if (unit === undefined || !HIGHLIGHT_UNITS.has(unit)) return null;
-	if (color === undefined) return null;
-	if (typeof v.amount !== 'number' || !Number.isInteger(v.amount) || v.amount < 0) return null;
-	const property = asString(v.property);
-	return {
-		...(property !== undefined && property !== '' && { property }),
-		when,
-		amount: v.amount,
-		unit: unit as HighlightUnit,
-		color,
-	};
+const MARKER_RE = /^extraboard[ \t]*:[ \t]*true[ \t]*\r?$/m;
+
+/** True iff the frontmatter block declares the top-level board marker. */
+export function hasBoardMarker(frontmatter: string): boolean {
+	return MARKER_RE.test(frontmatter);
 }
 
-function toPropertyDef(v: unknown): PropertyDef | null {
-	if (!isRecord(v)) return null;
-	const name = asString(v.name);
-	const type = asString(v.type);
-	if (!name || !type || !PROPERTY_TYPES.has(type)) return null;
-	const def: PropertyDef = { name, type: type as PropertyType };
-	if (typeof v.strict === 'boolean') def.strict = v.strict;
-	if (Array.isArray(v.options)) {
-		const options: StringListOption[] = [];
-		for (const o of v.options) {
-			if (!isRecord(o)) continue;
-			const value = asString(o.value);
-			if (value === undefined) continue;
-			const bg = asString(o.bg);
-			const fg = asString(o.fg);
-			options.push({ value, ...(bg !== undefined && { bg }), ...(fg !== undefined && { fg }) });
-		}
-		def.options = options;
-	}
-	const time = asString(v.time);
-	if (time === 'none' || time === 'optional' || time === 'required') def.time = time;
-	return def;
+/** The block with the marker guaranteed present, foreign keys untouched. */
+export function withBoardMarker(frontmatter: string | null): string {
+	if (frontmatter !== null && hasBoardMarker(frontmatter)) return frontmatter;
+	return `${BOARD_MARKER}\n${frontmatter ?? ''}`;
 }
 
-function toConfig(eb: unknown): BoardConfig {
-	const config: BoardConfig = defaultBoardConfig();
-	if (!isRecord(eb)) return config;
-
-	if (typeof eb.version === 'number') config.version = eb.version;
-	if (typeof eb.showCardCheckbox === 'boolean') config.showCardCheckbox = eb.showCardCheckbox;
-
-	const dir = asString(eb.cardContentDir);
-	if (dir !== undefined) config.cardContentDir = dir;
-
-	const style = asString(eb.progressStyle);
-	if (style === 'ring' || style === 'fraction' || style === 'percent') {
-		config.progressStyle = style;
-	}
-
-	// Read only when the key is present: an empty list is a board saying "no
-	// highlights", which is different from following the plugin setting (§3.2).
-	if ('dateHighlights' in eb) {
-		config.dateHighlights = Array.isArray(eb.dateHighlights)
-			? eb.dateHighlights.map(toHighlightRule).filter((r): r is DateHighlightRule => r !== null)
-			: [];
-	}
-
-	if (Array.isArray(eb.properties)) {
-		config.properties = eb.properties
-			.map(toPropertyDef)
-			.filter((d): d is PropertyDef => d !== null);
-	}
-
-	// Views are resolved after the properties, because upgrading a legacy
-	// `view: calendar` has to check its date property against them (views.md §1.1).
-	if ('views' in eb) {
-		config.views = normalizeViews(parseViews(eb.views));
-		const active = asString(eb.activeView)?.trim();
-		config.activeView = active && config.views.some((v) => v.id === active)
-			? active
-			: (config.views[0]?.id ?? 'v1');
-	} else {
-		const upgraded = upgradeLegacyViews(eb.view, eb.calendar, config.properties);
-		config.views = upgraded.views;
-		config.activeView = upgraded.activeView;
-	}
-
-	if (isRecord(eb.tagColors)) {
-		for (const [tag, v] of Object.entries(eb.tagColors)) {
-			const c = toBadgeColor(v);
-			if (c) config.tagColors[tag] = c;
-		}
-	}
-
-	return config;
+/** Reassemble a frontmatter block + body into full file text. */
+export function serializeFrontmatter(frontmatter: string, body: string): string {
+	return `---\n${frontmatter}---\n${body}`;
 }
 
-/** Parse frontmatter and body; read the `extraboard` config into a BoardConfig. */
-export function parseFrontmatter(text: string): Frontmatter {
-	const split = splitFrontmatter(text);
-	if (!split) {
-		return { doc: null, config: defaultBoardConfig(), body: text, isBoard: false };
-	}
-	const doc = parseDocument(split.yamlText);
-	const js = doc.toJS() as unknown;
-	const eb = isRecord(js) ? js.extraboard : undefined;
-	return {
-		doc,
-		config: toConfig(eb),
-		body: split.body,
-		isBoard: isRecord(js) && 'extraboard' in js,
-	};
-}
-
-/** Reassemble frontmatter block + body into full file text. */
-export function serializeFrontmatter(doc: Document | null, body: string): string {
-	if (!doc) return body;
-	let docStr = String(doc);
-	if (!docStr.endsWith('\n')) docStr += '\n';
-	return `---\n${docStr}---\n${body}`;
-}
-
-/**
- * Minimal, empty-pruned plain object for writing `extraboard` config. Writing
- * `views` is what upgrades a legacy board: the old `view` / `calendar` keys are
- * simply not emitted (views.md §1.1).
- */
-function configToPlain(config: BoardConfig): Record<string, unknown> {
-	const eb: Record<string, unknown> = { version: config.version };
-	const views = normalizeViews(config.views);
-	eb.views = views.map((v) =>
-		v.type === 'calendar'
-			? { id: v.id, name: v.name, type: v.type, dateProperty: v.dateProperty, mode: v.mode }
-			: { id: v.id, name: v.name, type: v.type },
-	);
-	// The first view is the default, so naming it would be noise.
-	if (config.activeView && config.activeView !== views[0]?.id) eb.activeView = config.activeView;
-	if (config.showCardCheckbox) eb.showCardCheckbox = true;
-	if (config.cardContentDir) eb.cardContentDir = config.cardContentDir;
-	if (config.progressStyle) eb.progressStyle = config.progressStyle;
-	// An empty array is written on purpose — it is how a board says "no
-	// highlights" instead of "follow the plugin setting".
-	if (config.dateHighlights) eb.dateHighlights = config.dateHighlights;
-	if (config.properties.length) eb.properties = config.properties;
-	if (Object.keys(config.tagColors).length) eb.tagColors = config.tagColors;
-	return eb;
-}
-
-/** Write config back into an existing document's `extraboard` node. */
-export function writeConfig(doc: Document, config: BoardConfig): void {
-	doc.set('extraboard', configToPlain(config));
-}
-
-/** Build a fresh document for a new board file. */
-export function configToDoc(config: BoardConfig): Document {
-	const doc = new Document({ extraboard: configToPlain(config) });
-	return doc;
+/** True iff this file text is a board. Board detection for callers that only have text. */
+export function isBoardText(text: string): boolean {
+	const split = splitFrontmatter(text.replace(/\r\n/g, '\n'));
+	return split !== null && hasBoardMarker(split.frontmatter);
 }

@@ -1,5 +1,5 @@
 // Plugin-global settings. Per-board configuration (views, properties, paths)
-// lives in each board file's YAML frontmatter, not here.
+// lives in each board file's `extraboard-settings` block, not here.
 // Spec: docs/specs/settings.md.
 
 import type { ProgressStyle, PropertyDef } from './model/types';
@@ -9,7 +9,7 @@ import type { DateFormatMode, WeekStart } from './i18n/dates';
 
 export interface ExtraboardSettings {
 	/**
-	 * Property definitions written into the frontmatter of every newly created
+	 * Property definitions written into the settings block of every newly created
 	 * board. Editing them never touches boards that already exist.
 	 */
 	defaultProperties: PropertyDef[];
@@ -20,7 +20,7 @@ export interface ExtraboardSettings {
 	cardNoteFolder: string;
 	/**
 	 * Default shape of the checklist `N/M` indicator and of `percent` badges.
-	 * A board may override it in its own frontmatter (settings.md).
+	 * A board may override it in its own settings block (settings.md).
 	 */
 	progressStyle: ProgressStyle;
 	/**
@@ -66,7 +66,7 @@ export interface ExtraboardSettings {
 	/**
 	 * Ordered rules coloring a date badge as its date approaches or after it has
 	 * passed; the first match wins. A board may replace the whole list in its own
-	 * frontmatter (i18n-and-dates.md §3).
+	 * settings block (i18n-and-dates.md §3).
 	 */
 	dateHighlights: DateHighlightRule[];
 }

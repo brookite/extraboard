@@ -1,6 +1,6 @@
 // Board configuration modal. Reachable at any time from an open board (view
-// header action + command), not only at creation: it rewrites the `extraboard`
-// frontmatter node in place. Spec: kanban-view.md §5.4, markdown-format.md §2.
+// header action + command), not only at creation: it rewrites the
+// `extraboard-settings` block. Spec: kanban-view.md §5.4, markdown-format.md §2.
 
 import { App, Modal, Setting, normalizePath } from 'obsidian';
 import { invalidatedValues } from '../model/ops';

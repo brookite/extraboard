@@ -2,7 +2,6 @@
 // Spec: docs/specs/data-model.md and docs/specs/properties.md.
 // This module (and all of src/model/**) is pure and must not import `obsidian`.
 
-import type { Document as YamlDocument } from 'yaml';
 import type { ChecklistItem } from './checklist';
 // Type-only, so the `dateHighlights.ts` <-> `types.ts` pair stays a compile-time
 // cycle that erases away, exactly like `ChecklistItem` above.
@@ -171,9 +170,12 @@ export interface ArchivedCard {
 
 export interface Board {
 	config: BoardConfig;
-	/** Opaque YAML document preserving foreign frontmatter keys/comments. */
-	frontmatterDoc: YamlDocument | null;
-	/** Body text before the first stack, verbatim ("" if none). */
+	/**
+	 * Raw frontmatter text between the `---` delimiters, never reformatted, so
+	 * foreign keys and comments survive; null iff the file has no frontmatter.
+	 */
+	frontmatter: string | null;
+	/** Body text between the settings block and the first stack, verbatim ("" if none). */
 	preamble: string;
 	stacks: Stack[];
 	/** The archive section; absent iff the file has none. */

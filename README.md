@@ -18,8 +18,10 @@ with its own file format, not a fork.
 ## Features
 
 - **Your board is a normal note.** `## Heading` is a stack, `- item` is a card,
-  configuration lives in the frontmatter. Any other frontmatter you keep in the
-  file — including comments — survives a load/save cycle untouched.
+  and the board's configuration is JSON in an `extraboard-settings` code block at
+  the top of the file. Frontmatter carries a single `extraboard: true` marker;
+  anything else you keep there — including comments — survives a load/save cycle
+  untouched.
 - **Two views over the same file:** a Kanban board and a month/week calendar. A
   board can define several views and cycle through them from its header.
 - **Drag and drop** cards within and across stacks, whole stacks, and cards onto

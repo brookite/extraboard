@@ -383,7 +383,7 @@ export const en = {
 		},
 	},
 	notice: {
-		notABoard: 'Not a board: add an "extraboard" key to the note frontmatter.',
+		notABoard: 'Not a board: add "extraboard: true" to the note frontmatter.',
 		createBoardFailed: 'Extraboard: could not create the board file.',
 		searchDisabled: 'Search is disabled — enable it to search by tag.',
 		noCompletedCards: 'No completed cards to archive.',

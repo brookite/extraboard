@@ -385,7 +385,7 @@ export const ru: DeepPartial<typeof en> = {
 		},
 	},
 	notice: {
-		notABoard: 'Это не доска: добавьте ключ «extraboard» во frontmatter заметки.',
+		notABoard: 'Это не доска: добавьте «extraboard: true» во frontmatter заметки.',
 		createBoardFailed: 'Extraboard: не удалось создать файл доски.',
 		searchDisabled: 'Поиск отключён — включите его, чтобы искать по тегу.',
 		noCompletedCards: 'Нет выполненных карточек для архивации.',

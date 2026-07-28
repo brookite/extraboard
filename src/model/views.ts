@@ -1,5 +1,5 @@
-// A board's view list: defaults, resolution, validation, and the legacy
-// upgrade. Spec: docs/specs/views.md §2. Pure; no `obsidian` imports.
+// A board's view list: defaults, resolution, validation, and parsing.
+// Spec: docs/specs/views.md §2. Pure; no `obsidian` imports.
 
 import type { BoardConfig, CalendarMode, PropertyDef, PropertyType, ViewDef, ViewKind } from './types';
 
@@ -122,9 +122,9 @@ export function toCalendarMode(v: unknown): CalendarMode {
 }
 
 /**
- * Read one frontmatter view definition, or `null` when it cannot be one — an
- * unusable definition is dropped exactly as an unparseable property def is
- * (views.md §2.3).
+ * Read one view definition from the settings block, or `null` when it cannot be
+ * one — an unusable definition is dropped exactly as an unparseable property
+ * def is (views.md §2.3).
  */
 export function toViewDef(v: unknown, id: string): ViewDef | null {
 	if (!isRecord(v)) return null;
@@ -161,34 +161,6 @@ export function parseViews(raw: unknown): ViewDef[] {
 		if (view) views.push(view);
 	}
 	return views;
-}
-
-/**
- * Upgrade a pre-M8 config (views.md §1.1): a Kanban view is always synthesized,
- * and a legacy `view: calendar` becomes a second, active view only when its
- * `dateProperty` is usable — a broken calendar is dropped rather than shown.
- */
-export function upgradeLegacyViews(
-	legacyView: unknown,
-	legacyCalendar: unknown,
-	properties: PropertyDef[],
-): { views: ViewDef[]; activeView: string } {
-	const views: ViewDef[] = [kanbanView('v1')];
-	if (legacyView === 'calendar' && isRecord(legacyCalendar)) {
-		const dateProperty = asString(legacyCalendar.dateProperty)?.trim();
-		const def = properties.find((p) => p.name === dateProperty);
-		if (dateProperty && isCalendarProperty(def)) {
-			views.push({
-				id: 'v2',
-				name: defaultViewName('calendar'),
-				type: 'calendar',
-				dateProperty,
-				mode: toCalendarMode(legacyCalendar.mode),
-			});
-			return { views, activeView: 'v2' };
-		}
-	}
-	return { views, activeView: 'v1' };
 }
 
 /** Guarantee the invariant every consumer relies on: at least one view exists. */

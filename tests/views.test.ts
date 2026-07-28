@@ -7,22 +7,32 @@ import * as ops from '../src/model/ops';
 import { activeViewOf, nextViewId, validateViews } from '../src/model/views';
 import type { Board } from '../src/model/types';
 
-const fm = (...lines: string[]): string =>
-	['---', 'extraboard:', '  version: 1', ...lines.map((l) => `  ${l}`), '---', '', '## To do', '', '- A card', ''].join('\n');
+/** A board file whose settings block carries `settings`. */
+const boardText = (settings: Record<string, unknown>, frontmatter = 'extraboard: true\n'): string =>
+	`---\n${frontmatter}---\n` +
+	'```extraboard-settings\n' +
+	JSON.stringify({ version: 1, ...settings }, null, 2) +
+	'\n```\n\n## To do\n\n- A card\n';
 
-const parse = (...lines: string[]): Board => parseBoard(fm(...lines));
+const parse = (settings: Record<string, unknown>): Board => parseBoard(boardText(settings));
 
-const DATE_PROPS = ['properties:', '  - { name: due, type: datetime }', '  - { name: sprint, type: date-range }'];
+const DATE_PROPS = {
+	properties: [
+		{ name: 'due', type: 'datetime' },
+		{ name: 'sprint', type: 'date-range' },
+	],
+};
 
 describe('views: parsing', () => {
 	it('reads a view list and its active view', () => {
-		const board = parse(
-			'activeView: v2',
-			'views:',
-			'  - { id: v1, name: Board, type: kanban }',
-			'  - { id: v2, name: Due dates, type: calendar, dateProperty: due, mode: week }',
+		const board = parse({
+			activeView: 'v2',
+			views: [
+				{ id: 'v1', name: 'Board', type: 'kanban' },
+				{ id: 'v2', name: 'Due dates', type: 'calendar', dateProperty: 'due', mode: 'week' },
+			],
 			...DATE_PROPS,
-		);
+		});
 		expect(board.config.views).toEqual([
 			{ id: 'v1', name: 'Board', type: 'kanban' },
 			{ id: 'v2', name: 'Due dates', type: 'calendar', dateProperty: 'due', mode: 'week' },
@@ -31,39 +41,40 @@ describe('views: parsing', () => {
 	});
 
 	it('falls back to the first view when activeView is unknown or absent', () => {
-		const views = ['views:', '  - { id: v1, name: Board, type: kanban }'];
-		expect(activeViewOf(parse('activeView: nope', ...views).config).id).toBe('v1');
-		expect(activeViewOf(parse(...views).config).id).toBe('v1');
+		const views = [{ id: 'v1', name: 'Board', type: 'kanban' }];
+		expect(activeViewOf(parse({ activeView: 'nope', views }).config).id).toBe('v1');
+		expect(activeViewOf(parse({ views }).config).id).toBe('v1');
 	});
 
 	it('drops a view that cannot be one, and a calendar with no date property', () => {
-		const board = parse(
-			'views:',
-			'  - { id: v1, name: Board, type: kanban }',
-			'  - { id: v2, name: Broken, type: nonsense }',
-			'  - { id: v3, name: Dateless, type: calendar }',
-			'  - not-a-mapping',
-		);
+		const board = parse({
+			views: [
+				{ id: 'v1', name: 'Board', type: 'kanban' },
+				{ id: 'v2', name: 'Broken', type: 'nonsense' },
+				{ id: 'v3', name: 'Dateless', type: 'calendar' },
+				'not-a-mapping',
+			],
+		});
 		expect(board.config.views.map((v) => v.id)).toEqual(['v1']);
 	});
 
 	it('generates ids for a hand-written list and de-duplicates them', () => {
-		const board = parse(
-			'views:',
-			'  - { name: One, type: kanban }',
-			'  - { name: Two, type: calendar, dateProperty: due }',
-			'  - { id: v1, name: Three, type: calendar, dateProperty: due }',
+		const board = parse({
+			views: [
+				{ name: 'One', type: 'kanban' },
+				{ name: 'Two', type: 'calendar', dateProperty: 'due' },
+				{ id: 'v1', name: 'Three', type: 'calendar', dateProperty: 'due' },
+			],
 			...DATE_PROPS,
-		);
+		});
 		expect(board.config.views.map((v) => v.id)).toEqual(['v1', 'v2', 'v3']);
 	});
 
 	it('defaults an empty name and an unknown mode', () => {
-		const board = parse(
-			'views:',
-			'  - { id: v1, name: "  ", type: calendar, dateProperty: due, mode: decade }',
+		const board = parse({
+			views: [{ id: 'v1', name: '  ', type: 'calendar', dateProperty: 'due', mode: 'decade' }],
 			...DATE_PROPS,
-		);
+		});
 		expect(board.config.views[0]).toEqual({
 			id: 'v1',
 			name: 'Calendar',
@@ -74,114 +85,65 @@ describe('views: parsing', () => {
 	});
 
 	it('always leaves at least one view, even for an empty list', () => {
-		const board = parse('views: []');
-		expect(board.config.views).toEqual([{ id: 'v1', name: 'Board', type: 'kanban' }]);
-	});
-});
-
-describe('views: the legacy `view` key (§1.1)', () => {
-	it('upgrades `view: kanban` into a single Kanban view', () => {
-		const board = parse('view: kanban');
-		expect(board.config.views).toEqual([{ id: 'v1', name: 'Board', type: 'kanban' }]);
-		expect(board.config.activeView).toBe('v1');
+		expect(parse({ views: [] }).config.views).toEqual([{ id: 'v1', name: 'Board', type: 'kanban' }]);
 	});
 
-	it('upgrades a usable `view: calendar` into a second, active view', () => {
-		const board = parse(
-			'view: calendar',
-			'calendar: { dateProperty: due, mode: week }',
-			...DATE_PROPS,
-		);
-		expect(board.config.views).toEqual([
-			{ id: 'v1', name: 'Board', type: 'kanban' },
-			{ id: 'v2', name: 'Calendar', type: 'calendar', dateProperty: 'due', mode: 'week' },
-		]);
-		expect(board.config.activeView).toBe('v2');
-	});
-
-	it('drops a legacy calendar whose property is missing or unusable', () => {
-		const missing = parse('view: calendar', 'calendar: { dateProperty: nope }', ...DATE_PROPS);
-		expect(missing.config.views).toHaveLength(1);
-		const unusable = parse(
-			'view: calendar',
-			'calendar: { dateProperty: title }',
-			'properties:',
-			'  - { name: title, type: string }',
-		);
-		expect(unusable.config.views).toHaveLength(1);
-	});
-
-	it('prefers `views` over the legacy keys when both are present', () => {
-		const board = parse(
-			'view: calendar',
-			'calendar: { dateProperty: due }',
-			'views:',
-			'  - { id: v9, name: Only, type: kanban }',
-			...DATE_PROPS,
-		);
-		expect(board.config.views.map((v) => v.id)).toEqual(['v9']);
-		expect(board.config.activeView).toBe('v9');
+	it('defaults the whole list when the settings block is missing or unreadable', () => {
+		const noBlock = parseBoard('---\nextraboard: true\n---\n\n## To do\n');
+		expect(noBlock.config.views).toEqual([{ id: 'v1', name: 'Board', type: 'kanban' }]);
+		const broken = parseBoard('---\nextraboard: true\n---\n```extraboard-settings\n{ nope\n```\n\n## To do\n');
+		expect(broken.config.views).toEqual([{ id: 'v1', name: 'Board', type: 'kanban' }]);
+		// An unreadable block is replaced, not duplicated, on the next save.
+		expect(broken.preamble).not.toContain('nope');
 	});
 });
 
 describe('views: serialization', () => {
-	it('leaves the legacy keys alone until the config node is rewritten', () => {
-		// A body edit never touches frontmatter, so an untouched legacy board keeps
-		// reading as one (views.md §1.1).
-		const text = serializeBoard(ops.addStack(parse('view: kanban'), 'Later'));
-		expect(text).toMatch(/^\s+view: kanban$/m);
-		expect(text).not.toContain('views:');
-	});
-
-	it('writes the list and drops the legacy keys on the first config edit', () => {
-		const board = parse('view: calendar', 'calendar: { dateProperty: due }', ...DATE_PROPS);
-		const text = serializeBoard(ops.updateView(board, 'v2', { name: 'Deadlines' }));
-		expect(text).toContain('views:');
-		expect(text).toContain('name: Deadlines');
-		expect(text).not.toMatch(/^\s+view: calendar$/m);
-		expect(text).not.toMatch(/^\s+calendar:/m);
+	it('writes the list into the settings block', () => {
+		const board = parse({
+			views: [{ id: 'v2', name: 'Deadlines', type: 'calendar', dateProperty: 'due', mode: 'month' }],
+			...DATE_PROPS,
+		});
+		const text = serializeBoard(ops.updateView(board, 'v2', { name: 'Due soon' }));
+		expect(text).toContain('```extraboard-settings');
+		expect(text).toContain('"name": "Due soon"');
 	});
 
 	it('omits activeView while the first view is active, and writes it otherwise', () => {
-		const board = parse('view: kanban');
+		const board = parse({ ...DATE_PROPS });
 		const one = ops.addView(board, { name: 'Due dates', type: 'calendar', dateProperty: 'due', mode: 'month' }, false);
 		expect(serializeBoard(one)).not.toContain('activeView');
 		const switched = ops.setActiveView(one, one.config.views[1]!.id);
-		expect(serializeBoard(switched)).toContain('activeView: v2');
+		expect(serializeBoard(switched)).toContain('"activeView": "v2"');
 	});
 
-	it('is a fixed point once the upgrade has been written', () => {
-		const upgraded = serializeBoard(
-			ops.addView(parse('view: kanban'), { name: 'Second', type: 'kanban' }, false),
-		);
-		expect(serializeBoard(parseBoard(upgraded))).toBe(upgraded);
+	it('is a fixed point', () => {
+		const once = serializeBoard(ops.addView(parse({}), { name: 'Second', type: 'kanban' }, false));
+		expect(serializeBoard(parseBoard(once))).toBe(once);
 	});
 
 	it('preserves foreign frontmatter through a view edit', () => {
-		const text = [
-			'---',
-			'title: My board',
-			'extraboard:',
-			'  version: 1',
-			'  view: kanban',
-			'---',
-			'',
-			'## To do',
-			'',
-		].join('\n');
+		const text = boardText({}, 'title: My board\nextraboard: true\n');
 		const out = serializeBoard(ops.addView(parseBoard(text), { name: 'Second', type: 'kanban' }));
+		expect(out).toContain('title: My board');
+	});
+
+	it('adds the marker to a board file that lost it', () => {
+		const out = serializeBoard(ops.addStack(parseBoard(boardText({}, 'title: My board\n')), 'Later'));
+		expect(out).toContain('extraboard: true');
 		expect(out).toContain('title: My board');
 	});
 });
 
 describe('views: ops (§2.4)', () => {
 	const twoViews = (): Board =>
-		parse(
-			'views:',
-			'  - { id: v1, name: Board, type: kanban }',
-			'  - { id: v2, name: Due dates, type: calendar, dateProperty: due, mode: month }',
+		parse({
+			views: [
+				{ id: 'v1', name: 'Board', type: 'kanban' },
+				{ id: 'v2', name: 'Due dates', type: 'calendar', dateProperty: 'due', mode: 'month' },
+			],
 			...DATE_PROPS,
-		);
+		});
 
 	it('setActiveView ignores the current view and unknown ids', () => {
 		const board = twoViews();
@@ -195,7 +157,7 @@ describe('views: ops (§2.4)', () => {
 		const second = ops.nextView(board);
 		expect(second.config.activeView).toBe('v2');
 		expect(ops.nextView(second).config.activeView).toBe('v1');
-		const single = parse('view: kanban');
+		const single = parse({});
 		expect(ops.nextView(single)).toBe(single);
 	});
 
@@ -224,7 +186,7 @@ describe('views: ops (§2.4)', () => {
 	});
 
 	it('deleteView refuses the last view and re-homes the active one', () => {
-		const single = parse('view: kanban');
+		const single = parse({});
 		expect(ops.deleteView(single, 'v1')).toBe(single);
 		const board = ops.setActiveView(twoViews(), 'v2');
 		const left = ops.deleteView(board, 'v2');
@@ -243,29 +205,26 @@ describe('views: ops (§2.4)', () => {
 
 describe('views: validation (§2.2)', () => {
 	it('reports a second Kanban view', () => {
-		const board = ops.addView(parse('view: kanban'), { name: 'Another', type: 'kanban' });
+		const board = ops.addView(parse({}), { name: 'Another', type: 'kanban' });
 		expect(validateViews(board.config)).toContainEqual({ kind: 'tooManyKanban' });
 	});
 
 	it('reports a calendar whose property is gone or is not a date', () => {
-		const board = parse(
-			'views:',
-			'  - { id: v1, name: Due, type: calendar, dateProperty: due }',
-			'properties:',
-			'  - { name: title, type: string }',
-		);
+		const titleOnly = { properties: [{ name: 'title', type: 'string' }] };
+		const board = parse({
+			views: [{ id: 'v1', name: 'Due', type: 'calendar', dateProperty: 'due' }],
+			...titleOnly,
+		});
 		expect(validateViews(board.config)).toContainEqual({
 			kind: 'missingDateProperty',
 			name: 'Due',
 			property: 'due',
 		});
 
-		const retyped = parse(
-			'views:',
-			'  - { id: v1, name: Due, type: calendar, dateProperty: title }',
-			'properties:',
-			'  - { name: title, type: string }',
-		);
+		const retyped = parse({
+			views: [{ id: 'v1', name: 'Due', type: 'calendar', dateProperty: 'title' }],
+			...titleOnly,
+		});
 		expect(validateViews(retyped.config)).toContainEqual({
 			kind: 'wrongDatePropertyType',
 			name: 'Due',
@@ -275,12 +234,13 @@ describe('views: validation (§2.2)', () => {
 	});
 
 	it('accepts a healthy board', () => {
-		const board = parse(
-			'views:',
-			'  - { id: v1, name: Board, type: kanban }',
-			'  - { id: v2, name: Due, type: calendar, dateProperty: due }',
+		const board = parse({
+			views: [
+				{ id: 'v1', name: 'Board', type: 'kanban' },
+				{ id: 'v2', name: 'Due', type: 'calendar', dateProperty: 'due' },
+			],
 			...DATE_PROPS,
-		);
+		});
 		expect(validateViews(board.config)).toEqual([]);
 	});
 });

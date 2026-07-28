@@ -17,8 +17,7 @@
 	"license": "0-BSD",
 	"dependencies": {
 		"preact": "^10.24.3",
-		"sortablejs": "^1.15.6",
-		"yaml": "^2.9.0"
+		"sortablejs": "^1.15.6"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.4",

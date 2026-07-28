@@ -459,7 +459,7 @@ export class BoardView extends TextFileView {
 
 	/**
 	 * Mount **one** view — whichever is active (views.md §3.4). An inactive view
-	 * costs nothing but its lines of frontmatter.
+	 * costs nothing but its lines in the settings block.
 	 */
 	private renderBoard(): void {
 		const el = this.ensureMount();

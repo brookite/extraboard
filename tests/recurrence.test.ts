@@ -15,6 +15,7 @@ import { placeCards, moveOccurrence, setCardDay } from '../src/model/calendar';
 import { parseBoard } from '../src/model/parse';
 import { serializeBoard } from '../src/model/serialize';
 import type { Board } from '../src/model/types';
+import { boardHead } from './boardFile';
 
 const d = (text: string): CalDate => parseDate(text)!;
 
@@ -241,18 +242,14 @@ describe('recurrence: shifting the series (§3.1)', () => {
 
 // --- on a board -------------------------------------------------------------
 
-const FM = [
-	'---',
-	'extraboard:',
-	'  version: 1',
-	'  views:',
-	'    - { id: v1, name: Repeats, type: calendar, dateProperty: repeat, mode: month }',
-	'  properties:',
-	'    - { name: repeat, type: recurrence }',
-	'    - { name: due, type: datetime }',
-	'    - { name: dates, type: date-list }',
-	'---',
-].join('\n');
+const FM = boardHead({
+	views: [{ id: 'v1', name: 'Repeats', type: 'calendar', dateProperty: 'repeat', mode: 'month' }],
+	properties: [
+		{ name: 'repeat', type: 'recurrence' },
+		{ name: 'due', type: 'datetime' },
+		{ name: 'dates', type: 'date-list' },
+	],
+});
 
 const board = (...cards: string[]): Board =>
 	parseBoard([FM, '', '## To do', '', ...cards, ''].join('\n'));

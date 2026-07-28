@@ -6,8 +6,9 @@ import { parseBoard } from '../src/model/parse';
 import { serializeBoard } from '../src/model/serialize';
 import * as ops from '../src/model/ops';
 import type { Board, Card } from '../src/model/types';
+import { boardHead } from './boardFile';
 
-const FM = ['---', 'extraboard:', '  version: 1', '  view: kanban', '  properties: []', '---'].join('\n');
+const FM = boardHead();
 
 const BOARD = [
 	FM,

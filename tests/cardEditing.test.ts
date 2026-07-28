@@ -21,7 +21,7 @@ const config: BoardConfig = {
 
 function boardFromBody(body: string): Board {
 	const { preamble, stacks } = parseBody(body, config);
-	return { config, frontmatterDoc: null, preamble, stacks, trailing: '' };
+	return { config, frontmatter: null, preamble, stacks, trailing: '' };
 }
 
 const cardAt = (board: Board, stack: number, item: number): Card => {
