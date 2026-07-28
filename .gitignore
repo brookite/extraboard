@@ -12,6 +12,7 @@ node_modules
 # These should be uploaded to GitHub releases instead of committed.
 dist/
 main.js
+release/
 
 # Exclude sourcemaps
 *.map

@@ -36,14 +36,12 @@ jobs:
             - name: Build plugin
               run: |
                   npm ci
-                  npm run build
+                  npm run lint
                   npm test
+                  npm run package
 
-            # The build writes the assembled plugin into dist/ (esbuild.config.mjs),
-            # never to the repository root — main.js and the copied manifest are
-            # gitignored there. Every path below is therefore dist/-relative; the
-            # release assets must be exactly the three files a vault's plugin
-            # folder holds.
+            # The package command writes the assembled plugin to dist/ and an
+            # installable ZIP to release/. Both directories are gitignored.
             - name: Check for optional styles
               id: styles
               run: |
@@ -65,4 +63,4 @@ jobs:
                   gh release create "$tag" \
                     --title="$tag" \
                     --draft \
-                    dist/main.js dist/manifest.json ${{ steps.styles.outputs.exists == 'true' && 'dist/styles.css' || '' }}
+                    dist/main.js dist/manifest.json ${{ steps.styles.outputs.exists == 'true' && 'dist/styles.css' || '' }} release/obsidian-extraboard-*.zip

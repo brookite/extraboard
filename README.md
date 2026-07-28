@@ -57,9 +57,9 @@ with its own file format, not a fork.
 ## Status
 
 **Early development** — the MVP is being implemented milestone by milestone.
-Everything listed above works; what is left before a first release is a pass
-over mobile verification, packaging and release automation. This section will be
-replaced with setup and usage instructions once the MVP is complete.
+Everything listed above works; what is left before a first release is mobile
+verification. Packaging and the draft GitHub Release are automated. This section
+will be replaced with setup and usage instructions once the MVP is complete.
 
 ## Development
 
@@ -67,14 +67,19 @@ replaced with setup and usage instructions once the MVP is complete.
 npm install       # install dependencies
 npm run dev       # watch build
 npm run build     # production build (tsc type-check + esbuild bundle)
+npm run package   # build a distributable ZIP
 npm run lint      # eslint
 npm test          # run the unit tests
 ```
 
 The build assembles the complete plugin into **`dist/`** (`main.js`,
-`manifest.json`, `styles.css`). For manual testing, copy or symlink `dist/` to
-`<Vault>/.obsidian/plugins/extraboard/`, then reload Obsidian and enable the
-plugin under **Settings → Community plugins**.
+`manifest.json`, `styles.css`). Run `npm run package` to also create
+`release/obsidian-extraboard-<version>.zip`; it contains an
+`obsidian-extraboard/` directory with those plugin files. For manual testing,
+copy or symlink `dist/` to `<Vault>/.obsidian/plugins/extraboard/`, then reload
+Obsidian and enable the plugin under **Settings → Community plugins**. Pushing a
+version-matching Git tag automatically creates a draft GitHub Release with both
+the ZIP and the individual plugin files.
 
 ## License
 
