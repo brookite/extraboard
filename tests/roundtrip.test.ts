@@ -118,7 +118,7 @@ describe('full file: frontmatter + settings block + body round-trip', () => {
 		'---\n' +
 		'aliases:\n' +
 		'  - Project Board\n' +
-		'extraboard: true\n' +
+		'extraboard: "Board"\n' +
 		'# a trailing comment\n' +
 		'---\n' +
 		'```extraboard-settings\n' +
@@ -180,7 +180,7 @@ describe('a freshly created board file', () => {
 	const text = newBoardText(newBoardConfig([{ name: 'priority', type: 'integer' }]));
 
 	it('carries the marker and a settings block, and is a fixed point', () => {
-		expect(text.startsWith('---\nextraboard: true\n---\n```extraboard-settings\n')).toBe(true);
+		expect(text.startsWith('---\nextraboard: "Board"\n---\n```extraboard-settings\n')).toBe(true);
 		expect(serializeBoard(parseBoard(text))).toBe(text);
 	});
 

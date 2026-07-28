@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseBoard } from '../src/model/parse';
 import { serializeBoard } from '../src/model/serialize';
+import { isBoardText } from '../src/model/frontmatter';
 import * as ops from '../src/model/ops';
 import { activeViewOf, nextViewId, validateViews } from '../src/model/views';
 import type { Board } from '../src/model/types';
@@ -99,6 +100,23 @@ describe('views: parsing', () => {
 });
 
 describe('views: serialization', () => {
+	it('recognizes any top-level marker value and saves the active view name into it', () => {
+		const source = boardText(
+			{
+				activeView: 'v2',
+				views: [
+					{ id: 'v1', name: 'Board', type: 'kanban' },
+					{ id: 'v2', name: 'Due dates', type: 'calendar', dateProperty: 'due', mode: 'month' },
+				],
+				...DATE_PROPS,
+			},
+			'title: My board\nextraboard: true\n',
+		);
+
+		expect(isBoardText(source.replace('extraboard: true', 'extraboard: legacy value'))).toBe(true);
+		expect(serializeBoard(parseBoard(source))).toContain('extraboard: "Due dates"');
+	});
+
 	it('writes the list into the settings block', () => {
 		const board = parse({
 			views: [{ id: 'v2', name: 'Deadlines', type: 'calendar', dateProperty: 'due', mode: 'month' }],
@@ -128,9 +146,9 @@ describe('views: serialization', () => {
 		expect(out).toContain('title: My board');
 	});
 
-	it('adds the marker to a board file that lost it', () => {
+	it('adds the active view name as the marker to a board file that lost it', () => {
 		const out = serializeBoard(ops.addStack(parseBoard(boardText({}, 'title: My board\n')), 'Later'));
-		expect(out).toContain('extraboard: true');
+		expect(out).toContain('extraboard: "Board"');
 		expect(out).toContain('title: My board');
 	});
 });

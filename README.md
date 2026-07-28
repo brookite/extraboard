@@ -19,7 +19,8 @@ with its own file format, not a fork.
 
 - **Your board is a normal note.** `## Heading` is a stack, `- item` is a card,
   and the board's configuration is JSON in an `extraboard-settings` code block at
-  the top of the file. Frontmatter carries a single `extraboard: true` marker;
+  the top of the file. Frontmatter carries a single `extraboard` property whose
+  value is the active view name;
   anything else you keep there — including comments — survives a load/save cycle
   untouched.
 - **Three views over the same file:** a Kanban board, a month/week calendar, and

@@ -242,12 +242,12 @@ export default class ExtraboardPlugin extends Plugin {
 		});
 	}
 
-	/** True iff cached frontmatter carries the top-level `extraboard: true` marker. */
+	/** True iff cached frontmatter carries the top-level `extraboard` marker. */
 	private hasBoardKey(fm: unknown): boolean {
 		return (
 			typeof fm === 'object' &&
 			fm !== null &&
-			(fm as Record<string, unknown>).extraboard === true
+			Object.prototype.hasOwnProperty.call(fm, 'extraboard')
 		);
 	}
 

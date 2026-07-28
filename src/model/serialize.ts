@@ -7,6 +7,7 @@ import { serializeFrontmatter, withBoardMarker } from './frontmatter';
 import { withMarkers } from './markers';
 import { formatToken } from './properties';
 import { Board, BoardConfig, Card, Divider, Stack } from './types';
+import { activeViewOf } from './views';
 
 const COLLAPSE = '%%collapsed%%';
 const ARCHIVE = '%%archive%%';
@@ -104,7 +105,7 @@ export function serializeBody(board: Board): string {
  */
 export function serializeBoard(board: Board): string {
 	return serializeFrontmatter(
-		withBoardMarker(board.frontmatter),
+		withBoardMarker(board.frontmatter, activeViewOf(board.config).name),
 		serializeSettingsBlock(board.config) + serializeBody(board),
 	);
 }
