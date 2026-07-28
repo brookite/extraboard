@@ -1,7 +1,17 @@
 // A board's view list: defaults, resolution, validation, and parsing.
 // Spec: docs/specs/views.md §2. Pure; no `obsidian` imports.
 
-import type { BoardConfig, CalendarMode, PropertyDef, PropertyType, ViewDef, ViewKind } from './types';
+import type {
+	BoardConfig,
+	CalendarMode,
+	ListControls,
+	PropertyDef,
+	PropertyType,
+	SectionSort,
+	SectionState,
+	ViewDef,
+	ViewKind,
+} from './types';
 
 /**
  * Property types a calendar view can be computed from (views.md §4.3).
@@ -19,11 +29,17 @@ const ID_RE = /^[A-Za-z0-9_-]{1,32}$/;
 
 /** Default label of a view of this kind, used when the user leaves the name empty. */
 export function defaultViewName(type: ViewKind): string {
-	return type === 'calendar' ? 'Calendar' : 'Board';
+	if (type === 'calendar') return 'Calendar';
+	return type === 'list' ? 'List' : 'Board';
 }
 
 export function kanbanView(id: string, name = defaultViewName('kanban')): ViewDef {
 	return { id, name, type: 'kanban' };
+}
+
+/** A list view in its default shape: dynamic controls, nothing sorted or filtered. */
+export function listView(id: string, name = defaultViewName('list')): ViewDef {
+	return { id, name, type: 'list', controls: 'dynamic' };
 }
 
 /** Lowest free `v<n>` id for a view list. */
@@ -68,7 +84,20 @@ export type ViewDiagnostic =
 	| { kind: 'duplicateId'; id: string }
 	| { kind: 'missingDateProperty'; name: string; property: string }
 	| { kind: 'wrongDatePropertyType'; name: string; property: string; type: string }
+	/** A list view sorted by a property the board no longer declares as a date. */
+	| { kind: 'missingSortProperty'; name: string; property: string }
 	| { kind: 'tooManyKanban' };
+
+/** Every distinct sort a list view carries — the view's own and its sections'. */
+function sortsOf(view: Extract<ViewDef, { type: 'list' }>): SectionSort[] {
+	const out: SectionSort[] = [];
+	const add = (sort: SectionSort | undefined): void => {
+		if (sort && !out.some((s) => s.property === sort.property)) out.push(sort);
+	};
+	add(view.sort);
+	for (const state of Object.values(view.sections ?? {})) add(state.sort);
+	return out;
+}
 
 /**
  * Non-fatal diagnostics, in the shape `validatePropertyDefs` uses: reported to
@@ -83,6 +112,16 @@ export function validateViews(config: BoardConfig): ViewDiagnostic[] {
 		else if (seen.has(view.id)) diags.push({ kind: 'duplicateId', id: view.id });
 		seen.add(view.id);
 		if (view.type === 'kanban') kanban++;
+		// A list sorted by a property that stopped being a date still renders —
+		// unsorted (list-view.md §3.1) — so this is a diagnostic, not a repair.
+		if (view.type === 'list') {
+			for (const sort of sortsOf(view)) {
+				const def = config.properties.find((p) => p.name === sort.property);
+				if (!def || !CALENDAR_TYPES.has(def.type)) {
+					diags.push({ kind: 'missingSortProperty', name: view.name, property: sort.property });
+				}
+			}
+		}
 		if (view.type === 'calendar') {
 			const def = config.properties.find((p) => p.name === view.dateProperty);
 			if (!def) {
@@ -121,6 +160,52 @@ export function toCalendarMode(v: unknown): CalendarMode {
 	return v === 'week' ? 'week' : 'month';
 }
 
+/** Anything but the two named modes is `dynamic`, the default (list-view.md §5). */
+export function toListControls(v: unknown): ListControls {
+	return v === 'fixed' || v === 'session' ? v : 'dynamic';
+}
+
+/**
+ * A section sort, or `undefined` for document order. Display state, so a
+ * malformed value reads as absent instead of dropping the view (list-view.md §5).
+ */
+function toSectionSort(v: unknown): SectionSort | undefined {
+	if (!isRecord(v)) return undefined;
+	const property = asString(v.property)?.trim();
+	if (!property) return undefined;
+	return { property, dir: v.dir === 'desc' ? 'desc' : 'asc' };
+}
+
+/** A tag list: strings only, `#` stripped, blanks and duplicates dropped. */
+function toTags(v: unknown): string[] | undefined {
+	if (!Array.isArray(v)) return undefined;
+	const out: string[] = [];
+	for (const entry of v) {
+		const tag = asString(entry)?.trim().replace(/^#/, '');
+		if (tag && !out.includes(tag)) out.push(tag);
+	}
+	return out.length ? out : undefined;
+}
+
+function toSectionState(v: unknown): SectionState | undefined {
+	if (!isRecord(v)) return undefined;
+	const sort = toSectionSort(v.sort);
+	const tags = toTags(v.tags);
+	const collapsed = v.collapsed === true;
+	if (!sort && !tags && !collapsed) return undefined;
+	return { ...(sort && { sort }), ...(tags && { tags }), ...(collapsed && { collapsed }) };
+}
+
+function toSections(v: unknown): Record<string, SectionState> | undefined {
+	if (!isRecord(v)) return undefined;
+	const out: Record<string, SectionState> = {};
+	for (const [name, value] of Object.entries(v)) {
+		const state = toSectionState(value);
+		if (state) out[name] = state;
+	}
+	return Object.keys(out).length ? out : undefined;
+}
+
 /**
  * Read one view definition from the settings block, or `null` when it cannot be
  * one — an unusable definition is dropped exactly as an unparseable property
@@ -131,6 +216,20 @@ export function toViewDef(v: unknown, id: string): ViewDef | null {
 	const type = asString(v.type);
 	const name = (asString(v.name) ?? '').trim();
 	if (type === 'kanban') return { id, name: name || defaultViewName('kanban'), type };
+	if (type === 'list') {
+		const sort = toSectionSort(v.sort);
+		const tags = toTags(v.tags);
+		const sections = toSections(v.sections);
+		return {
+			id,
+			name: name || defaultViewName('list'),
+			type,
+			controls: toListControls(v.controls),
+			...(sort && { sort }),
+			...(tags && { tags }),
+			...(sections && { sections }),
+		};
+	}
 	if (type !== 'calendar') return null;
 	const dateProperty = asString(v.dateProperty)?.trim();
 	// A calendar without a date property is not a view (views.md §4.3).

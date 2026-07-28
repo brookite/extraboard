@@ -4,7 +4,15 @@
 
 import { App, Modal, Setting, setIcon } from 'obsidian';
 import * as ops from '../model/ops';
-import type { Board, CalendarMode, PropertyDef, ViewDef, ViewKind } from '../model/types';
+import type {
+	Board,
+	CalendarMode,
+	ListControls,
+	PropertyDef,
+	SectionSort,
+	ViewDef,
+	ViewKind,
+} from '../model/types';
 import { dateProperties, defaultViewName, hasKanbanView, isViewUsable } from '../model/views';
 import type { BoardApi } from '../view/api';
 import { ICONS, viewIcon } from '../util/constants';
@@ -147,26 +155,17 @@ class ViewsModal extends Modal {
 				type,
 				dateProperty: dates.length === 1 ? dates[0]?.name : undefined,
 				mode: 'month',
+				controls: 'dynamic',
+				sortProperty: '',
+				sortDir: 'asc',
+				tags: '',
 			},
 			lockType: false,
 			kanbanTaken,
 			dates,
 		}).then((fields) => {
 			if (!fields) return;
-			this.options.api.update((b) =>
-				ops.addView(
-					b,
-					fields.type === 'calendar'
-						? {
-								name: fields.name || defaultViewName('calendar'),
-								type: 'calendar',
-								dateProperty: fields.dateProperty ?? '',
-								mode: fields.mode,
-							}
-						: { name: fields.name || defaultViewName('kanban'), type: 'kanban' },
-					false,
-				),
-			);
+			this.options.api.update((b) => ops.addView(b, newViewOf(fields), false));
 			this.render();
 		});
 	}
@@ -182,6 +181,10 @@ class ViewsModal extends Modal {
 				type: view.type,
 				dateProperty: view.type === 'calendar' ? view.dateProperty : undefined,
 				mode: view.type === 'calendar' ? view.mode : 'month',
+				controls: view.type === 'list' ? view.controls : 'dynamic',
+				sortProperty: view.type === 'list' ? (view.sort?.property ?? '') : '',
+				sortDir: view.type === 'list' ? (view.sort?.dir ?? 'asc') : 'asc',
+				tags: view.type === 'list' ? (view.tags ?? []).join(', ') : '',
 			},
 			lockType: true,
 			kanbanTaken: hasKanbanView(board.config.views),
@@ -194,6 +197,11 @@ class ViewsModal extends Modal {
 					...(fields.type === 'calendar' && {
 						dateProperty: fields.dateProperty,
 						mode: fields.mode,
+					}),
+					...(fields.type === 'list' && {
+						controls: fields.controls,
+						sort: sortOf(fields),
+						tags: tagsOf(fields),
 					}),
 				}),
 			);
@@ -220,6 +228,13 @@ class ViewsModal extends Modal {
 
 /** Subtitle of a view card: what it is, and what it is computed from. */
 function describe(board: Board, view: ViewDef): string {
+	if (view.type === 'list') {
+		const mode = t(`modal.views.controls.${view.controls}`);
+		const sort = view.sort
+			? t('modal.views.sortedBy', { name: view.sort.property })
+			: t('list.sort.document');
+		return `${t('modal.views.list')} · ${mode} · ${sort}`;
+	}
 	if (view.type !== 'calendar') return t('modal.views.kanban');
 	const mode = view.mode === 'month' ? t('modal.views.mode.month') : t('modal.views.mode.week');
 	const suffix = isViewUsable(board.config, view) ? '' : t('modal.views.missingProperty');
@@ -233,6 +248,43 @@ interface ViewFields {
 	type: ViewKind;
 	dateProperty?: string;
 	mode: CalendarMode;
+	/** List only (list-view.md §3.4). */
+	controls: ListControls;
+	/** List only: the view-wide sort, `''` for document order. */
+	sortProperty: string;
+	sortDir: 'asc' | 'desc';
+	/** List only: the view-wide filter as the user types it, comma separated. */
+	tags: string;
+}
+
+/** The view-wide sort a `fixed` list carries, or `null` for document order. */
+function sortOf(fields: ViewFields): SectionSort | null {
+	return fields.sortProperty ? { property: fields.sortProperty, dir: fields.sortDir } : null;
+}
+
+function tagsOf(fields: ViewFields): string[] {
+	return fields.tags
+		.split(',')
+		.map((tag) => tag.trim().replace(/^#/, ''))
+		.filter(Boolean);
+}
+
+/** The definition `addView` is handed, by type. */
+function newViewOf(fields: ViewFields): ops.NewView {
+	const name = fields.name || defaultViewName(fields.type);
+	if (fields.type === 'calendar') {
+		return { name, type: 'calendar', dateProperty: fields.dateProperty ?? '', mode: fields.mode };
+	}
+	if (fields.type !== 'list') return { name, type: 'kanban' };
+	const sort = sortOf(fields);
+	const tags = tagsOf(fields);
+	return {
+		name,
+		type: 'list',
+		controls: fields.controls,
+		...(sort && { sort }),
+		...(tags.length && { tags }),
+	};
 }
 
 interface ViewFormOptions {
@@ -294,11 +346,18 @@ class ViewFormModal extends Modal {
 
 		const typeSetting = new Setting(el).setName(t('modal.views.type')).addDropdown((dropdown) => {
 			dropdown
-				.addOptions({ kanban: t('modal.views.kanban'), calendar: t('modal.views.calendar') })
+				.addOptions({
+					kanban: t('modal.views.kanban'),
+					list: t('modal.views.list'),
+					calendar: t('modal.views.calendar'),
+				})
 				.setValue(this.fields.type)
 				.onChange((value) => {
+					const previous = this.fields.type;
 					this.fields.type = value as ViewKind;
-					if (this.fields.name === defaultViewName(other(this.fields.type))) {
+					// A name still reading as the previous type's default is a name the
+					// user never typed, so it follows the type.
+					if (this.fields.name === defaultViewName(previous)) {
 						this.fields.name = defaultViewName(this.fields.type);
 					}
 					if (this.fields.type === 'calendar' && !this.fields.dateProperty && dates.length === 1) {
@@ -333,6 +392,64 @@ class ViewFormModal extends Modal {
 				this.close();
 				this.options.openBoardSettings();
 			});
+		}
+
+		if (this.fields.type === 'list') {
+			new Setting(el)
+				.setName(t('modal.views.controls.label'))
+				.setDesc(t('modal.views.controls.desc'))
+				.addDropdown((dropdown) =>
+					dropdown
+						.addOptions({
+							dynamic: t('modal.views.controls.dynamic'),
+							fixed: t('modal.views.controls.fixed'),
+							session: t('modal.views.controls.session'),
+						})
+						.setValue(this.fields.controls)
+						.onChange((value) => {
+							this.fields.controls = value as ListControls;
+							// `fixed` is the only mode whose sort and filter are the view's
+							// own, so the two fields appear and disappear with it (§3.4).
+							this.render();
+						}),
+				);
+
+			// Under the other two modes each section owns its sort and filter, so
+			// there is nothing view-wide to set here.
+			if (this.fields.controls === 'fixed') {
+				new Setting(el)
+					.setName(t('modal.views.listSort'))
+					.setDesc(t('modal.views.listSortDesc'))
+					.addDropdown((dropdown) => {
+						const options: Record<string, string> = { '': t('list.sort.document') };
+						for (const def of dates) options[def.name] = def.name;
+						dropdown
+							.addOptions(options)
+							.setValue(this.fields.sortProperty)
+							.onChange((value) => {
+								this.fields.sortProperty = value;
+								this.render();
+							});
+					})
+					.addDropdown((dropdown) => {
+						dropdown
+							.addOptions({ asc: t('list.sort.ascShort'), desc: t('list.sort.descShort') })
+							.setValue(this.fields.sortDir)
+							.onChange((value) => {
+								this.fields.sortDir = value as 'asc' | 'desc';
+							});
+						dropdown.selectEl.disabled = !this.fields.sortProperty;
+					});
+
+				new Setting(el)
+					.setName(t('modal.views.listTags'))
+					.setDesc(t('modal.views.listTagsDesc'))
+					.addText((text) =>
+						text.setValue(this.fields.tags).onChange((value) => {
+							this.fields.tags = value;
+						}),
+					);
+			}
 		}
 
 		if (this.fields.type === 'calendar' && calendarPossible) {
@@ -378,6 +495,7 @@ class ViewFormModal extends Modal {
 
 	/** A calendar without a date property is never created (views.md §4.3). */
 	private usable(): boolean {
+		if (this.fields.type === 'list') return true;
 		if (this.fields.type === 'kanban') {
 			return this.options.lockType || !this.options.kanbanTaken;
 		}
@@ -390,8 +508,4 @@ class ViewFormModal extends Modal {
 		this.done(fields === null ? null : { ...fields, name: fields.name.trim() });
 		if (fields !== null) this.close();
 	}
-}
-
-function other(type: ViewKind): ViewKind {
-	return type === 'kanban' ? 'calendar' : 'kanban';
 }

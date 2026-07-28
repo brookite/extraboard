@@ -244,3 +244,98 @@ describe('views: validation (§2.2)', () => {
 		expect(validateViews(board.config)).toEqual([]);
 	});
 });
+
+// --- list views (M13) -------------------------------------------------------
+// Spec: docs/specs/list-view.md §5.
+
+describe('views: list views', () => {
+	const LIST = {
+		id: 'v1',
+		name: 'All tasks',
+		type: 'list',
+		controls: 'fixed',
+		sort: { property: 'due', dir: 'desc' },
+		tags: ['bug'],
+		sections: {
+			'': { collapsed: true },
+			Backlog: { sort: { property: 'due', dir: 'asc' }, tags: ['ops'] },
+		},
+	};
+
+	it('reads every list key back', () => {
+		const view = parse({ views: [LIST], ...DATE_PROPS }).config.views[0]!;
+		expect(view).toEqual({
+			id: 'v1',
+			name: 'All tasks',
+			type: 'list',
+			controls: 'fixed',
+			sort: { property: 'due', dir: 'desc' },
+			tags: ['bug'],
+			sections: {
+				'': { collapsed: true },
+				Backlog: { sort: { property: 'due', dir: 'asc' }, tags: ['ops'] },
+			},
+		});
+	});
+
+	it('round-trips a full list view unchanged', () => {
+		const text = boardText({ views: [LIST], ...DATE_PROPS });
+		expect(serializeBoard(parseBoard(text))).toBe(text);
+	});
+
+	it('defaults the controls mode and omits it when it is the default', () => {
+		const board = parse({ views: [{ id: 'v1', name: 'L', type: 'list', controls: 'nonsense' }] });
+		const view = board.config.views[0]!;
+		expect(view.type === 'list' && view.controls).toBe('dynamic');
+		expect(serializeBoard(board)).not.toContain('controls');
+	});
+
+	it('drops display state it cannot read, and keeps the view', () => {
+		const view = parse({
+			views: [
+				{
+					id: 'v1',
+					name: 'L',
+					type: 'list',
+					sort: { dir: 'asc' },
+					tags: ['#bug', '  ', 7, 'bug'],
+					sections: { Backlog: 'nope', Other: {} },
+				},
+			],
+		}).config.views[0]!;
+		expect(view.type).toBe('list');
+		expect(view.type === 'list' && 'sort' in view).toBe(false);
+		expect(view.type === 'list' && view.tags).toEqual(['bug']);
+		expect(view.type === 'list' && view.sections).toBeUndefined();
+	});
+
+	it('names a list view by default and allows several per board', () => {
+		const board = parse({
+			views: [
+				{ id: 'v1', type: 'list' },
+				{ id: 'v2', type: 'list' },
+				{ id: 'v3', name: 'Board', type: 'kanban' },
+			],
+		});
+		expect(board.config.views.map((v) => v.name)).toEqual(['List', 'List', 'Board']);
+		expect(validateViews(board.config)).toEqual([]);
+	});
+
+	it('reports a sort property the board no longer declares as a date', () => {
+		const board = parse({
+			views: [
+				{
+					id: 'v1',
+					name: 'L',
+					type: 'list',
+					sort: { property: 'gone', dir: 'asc' },
+					sections: { A: { sort: { property: 'due', dir: 'asc' } } },
+				},
+			],
+			...DATE_PROPS,
+		});
+		expect(validateViews(board.config)).toEqual([
+			{ kind: 'missingSortProperty', name: 'L', property: 'gone' },
+		]);
+	});
+});

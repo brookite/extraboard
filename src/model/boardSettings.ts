@@ -7,8 +7,10 @@ import {
 	defaultBoardConfig,
 	PropertyDef,
 	PropertyType,
+	SectionState,
 	StringListOption,
 	BadgeColor,
+	ViewDef,
 } from './types';
 import { normalizeViews, parseViews } from './views';
 import type { DateHighlightRule, HighlightUnit } from './dateHighlights';
@@ -140,15 +142,44 @@ export function toConfig(raw: unknown): BoardConfig {
 	return config;
 }
 
+/** Section state, empty-pruned; `undefined` when the section holds none. */
+function sectionStateToPlain(state: SectionState): Record<string, unknown> | undefined {
+	const out: Record<string, unknown> = {};
+	if (state.sort) out.sort = { property: state.sort.property, dir: state.sort.dir };
+	if (state.tags?.length) out.tags = state.tags;
+	if (state.collapsed) out.collapsed = true;
+	return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * One view, minimally. A list view writes `controls` only when it is not the
+ * default, and its display state only when it holds any: an untouched list is
+ * three keys (list-view.md §5).
+ */
+function viewToPlain(v: ViewDef): Record<string, unknown> {
+	if (v.type === 'calendar') {
+		return { id: v.id, name: v.name, type: v.type, dateProperty: v.dateProperty, mode: v.mode };
+	}
+	if (v.type !== 'list') return { id: v.id, name: v.name, type: v.type };
+
+	const out: Record<string, unknown> = { id: v.id, name: v.name, type: v.type };
+	if (v.controls !== 'dynamic') out.controls = v.controls;
+	if (v.sort) out.sort = { property: v.sort.property, dir: v.sort.dir };
+	if (v.tags?.length) out.tags = v.tags;
+	const sections: Record<string, unknown> = {};
+	for (const [name, state] of Object.entries(v.sections ?? {})) {
+		const plain = sectionStateToPlain(state);
+		if (plain) sections[name] = plain;
+	}
+	if (Object.keys(sections).length) out.sections = sections;
+	return out;
+}
+
 /** Minimal, empty-pruned plain object written into the settings block. */
 export function configToPlain(config: BoardConfig): Record<string, unknown> {
 	const out: Record<string, unknown> = { version: config.version };
 	const views = normalizeViews(config.views);
-	out.views = views.map((v) =>
-		v.type === 'calendar'
-			? { id: v.id, name: v.name, type: v.type, dateProperty: v.dateProperty, mode: v.mode }
-			: { id: v.id, name: v.name, type: v.type },
-	);
+	out.views = views.map(viewToPlain);
 	// The first view is the default, so naming it would be noise.
 	if (config.activeView && config.activeView !== views[0]?.id) out.activeView = config.activeView;
 	if (config.showCardCheckbox) out.showCardCheckbox = true;

@@ -40,6 +40,12 @@ interface Props {
 	/** Called once `forceEdit` has been acted on, so the caller can clear it.
 	 * Must be stable (`useCallback`) or it defeats the memo for every card. */
 	onForceEditConsumed?: () => void;
+	/**
+	 * Extra items for the card menu, added by the view the tile is mounted in —
+	 * the list view's "Move to section" (list-view.md §4.4). Must be stable
+	 * across renders, or it defeats this card's memo.
+	 */
+	menuExtra?: (menu: Menu, ref: ops.ItemRef) => void;
 }
 
 /** The board's single `color` property paints the card instead of a badge. */
@@ -58,6 +64,7 @@ function CardTileInner({
 	settings,
 	forceEdit,
 	onForceEditConsumed,
+	menuExtra,
 }: Props) {
 	const [editing, setEditing] = useState(false);
 
@@ -243,6 +250,7 @@ function CardTileInner({
 				}
 			});
 		}
+		menuExtra?.(menu, ref);
 		menu.addSeparator();
 		menu.addItem((item) =>
 			item

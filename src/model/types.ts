@@ -7,13 +7,38 @@ import type { ChecklistItem } from './checklist';
 // cycle that erases away, exactly like `ChecklistItem` above.
 import type { DateHighlightRule } from './dateHighlights';
 
-export type ViewKind = 'kanban' | 'calendar';
+export type ViewKind = 'kanban' | 'calendar' | 'list';
 
 export type CalendarMode = 'month' | 'week';
 
 /**
+ * How a list view's per-section sort and filter behave (list-view.md §3.4):
+ * `dynamic` — set per section and written into the view; `fixed` — one sort and
+ * filter for the whole view, set on the view form; `session` — set per section
+ * and never written.
+ */
+export type ListControls = 'dynamic' | 'fixed' | 'session';
+
+/** A list section's sort: a date-family property, ascending or descending. */
+export interface SectionSort {
+	property: string;
+	dir: 'asc' | 'desc';
+}
+
+/**
+ * Display state of one list section (list-view.md §5), keyed in `sections` by
+ * the section name — the empty string being the sectionless group.
+ */
+export interface SectionState {
+	sort?: SectionSort;
+	/** Tag names without `#`; a card matching any of them is shown. */
+	tags?: string[];
+	collapsed?: boolean;
+}
+
+/**
  * One of a board's views. `id` is generated and stable; `name` is the user's
- * label. Spec: docs/specs/views.md §1–§2.
+ * label. Spec: docs/specs/views.md §1–§2 and docs/specs/list-view.md §5.
  */
 export type ViewDef =
 	| { id: string; name: string; type: 'kanban' }
@@ -24,6 +49,18 @@ export type ViewDef =
 			/** Board property the grid is computed from; required. */
 			dateProperty: string;
 			mode: CalendarMode;
+	  }
+	| {
+			id: string;
+			name: string;
+			type: 'list';
+			controls: ListControls;
+			/** The view-wide sort; the only one that applies under `fixed`. */
+			sort?: SectionSort;
+			/** The view-wide tag filter; the only one that applies under `fixed`. */
+			tags?: string[];
+			/** Per-section state, by section name (`''` = the sectionless group). */
+			sections?: Record<string, SectionState>;
 	  };
 
 /** Shape of the checklist `N/M` indicator and of `percent` badges. */

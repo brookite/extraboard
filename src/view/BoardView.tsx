@@ -21,6 +21,7 @@ import { ICONS, VIEW_TYPE_BOARD, viewIcon } from '../util/constants';
 import { BoardApi, confirmDestructive, searchTag } from './api';
 import { CalendarView } from './CalendarView';
 import { KanbanView, addStack } from './KanbanView';
+import { ListView } from './ListView';
 import { NowContext, currentNow } from './now';
 import { ReloadContext } from './reload';
 import { t } from '../i18n';
@@ -494,6 +495,8 @@ export class BoardView extends TextFileView {
 				<ReloadContext.Provider value={this.reloadToken}>
 					{view.type === 'calendar' ? (
 						<CalendarView board={this.board} view={view} api={this.api} settings={settings} />
+					) : view.type === 'list' ? (
+						<ListView board={this.board} view={view} api={this.api} settings={settings} />
 					) : (
 						<KanbanView board={this.board} api={this.api} settings={settings} />
 					)}

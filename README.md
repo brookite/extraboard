@@ -1,6 +1,6 @@
 # Extraboard
 
-A Markdown-backed Kanban and calendar board plugin for [Obsidian](https://obsidian.md).
+A Markdown-backed Kanban, calendar and list board plugin for [Obsidian](https://obsidian.md).
 
 Each board is a single Markdown file: stacks are headings, cards are list items,
 and card properties are stored inline. The board is deserialized on open and
@@ -22,8 +22,12 @@ with its own file format, not a fork.
   the top of the file. Frontmatter carries a single `extraboard: true` marker;
   anything else you keep there — including comments — survives a load/save cycle
   untouched.
-- **Two views over the same file:** a Kanban board and a month/week calendar. A
-  board can define several views and cycle through them from its header.
+- **Three views over the same file:** a Kanban board, a month/week calendar, and
+  a **list** that groups every card by its named dividers into collapsible
+  sections — each one sortable by date and filterable by tag, with a composer
+  that picks which stack the new card goes to. A board can define several views
+  and cycle through them from its header, and a new board can open as a list
+  instead of a board.
 - **Drag and drop** cards within and across stacks, whole stacks, and cards onto
   a calendar day to move their date. Touch drag works on mobile.
 - **Typed card properties** written inline as `@{name|value}`: text, number,

@@ -10,6 +10,7 @@ import { PropertyDefsEditor, cloneDefs } from './PropertyDefsEditor';
 import { DateHighlightsEditor } from './DateHighlightsEditor';
 import { FolderSuggest } from './FolderSuggest';
 import { cloneRules, type DateHighlightRule } from '../model/dateHighlights';
+import { kanbanView, listView } from '../model/views';
 import { t } from '../i18n';
 
 interface TagRow {
@@ -60,6 +61,26 @@ export class BoardSettingsModal extends Modal {
 		this.modalEl.addClass('eb-board-settings');
 		const { contentEl } = this;
 		contentEl.empty();
+
+		// Only while the board is being created: afterwards views are managed in
+		// the manage-views modal, which can do far more than pick one
+		// (list-view.md §6). A calendar is not offered — it needs a date property
+		// this board may not have declared yet (views.md §4.3).
+		if (!this.options.board) {
+			new Setting(contentEl)
+				.setName(t('modal.boardSettings.defaultView.name'))
+				.setDesc(t('modal.boardSettings.defaultView.desc'))
+				.addDropdown((drop) =>
+					drop
+						.addOption('kanban', t('modal.views.kanban'))
+						.addOption('list', t('modal.views.list'))
+						.setValue(this.config.views[0]?.type === 'list' ? 'list' : 'kanban')
+						.onChange((value) => {
+							const view = value === 'list' ? listView('v1') : kanbanView('v1');
+							this.config = { ...this.config, views: [view], activeView: view.id };
+						}),
+				);
+		}
 
 		new Setting(contentEl)
 			.setName(t('modal.boardSettings.showCardCheckbox.name'))

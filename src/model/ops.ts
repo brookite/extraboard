@@ -12,6 +12,14 @@ import { processCardText } from './cardText';
 import { parseCardLink, unlinkedTitle } from './link';
 import { parseCardContent } from './parse';
 import { formatValue, parseValue } from './properties';
+import {
+	dividerIndex,
+	groupRange,
+	sectionName,
+	sectionOf,
+	sectionOrder,
+	type SectionKey,
+} from './sections';
 import type {
 	ArchivedCard,
 	Board,
@@ -19,8 +27,11 @@ import type {
 	CalendarMode,
 	Card,
 	Divider,
+	ListControls,
 	PropertyDef,
 	PropertyValue,
+	SectionSort,
+	SectionState,
 	Stack,
 	StackItem,
 	ViewDef,
@@ -608,6 +619,258 @@ export function moveItem(board: Board, from: ItemRef, toStack: number, before: I
 	return { ...board, stacks };
 }
 
+// --- sections ---------------------------------------------------------------
+//
+// The list view's edits (list-view.md §4). A "section" is a divider read across
+// stacks: named sections merge, an unnamed one stands alone, and the cards
+// above a stack's first divider belong to no section at all. Every op here is
+// expressed in those terms and lands on ordinary divider/card moves, so the
+// Kanban side sees nothing unusual in the file.
+
+/**
+ * Where a stack's divider for `name` belongs, so the stack stays consistent
+ * with the board's section order (§1.2): before this stack's divider of the
+ * first section that follows `name` globally, else at the end of the stack.
+ */
+export function sectionInsertIndex(board: Board, stackIndex: number, name: string): number {
+	const stack = board.stacks[stackIndex];
+	if (!stack) return 0;
+	const order = sectionOrder(board);
+	const at = order.indexOf(name);
+	if (at !== -1) {
+		for (const later of order.slice(at + 1)) {
+			const index = dividerIndex(stack, later);
+			if (index !== -1) return index;
+		}
+	}
+	return stack.items.length;
+}
+
+/**
+ * The board with a divider named `name` present in `stackIndex`, plus that
+ * divider's index. Creating one is what makes a section exist in a stack (§4.2);
+ * a stack that already holds it is returned untouched.
+ */
+function ensureSection(
+	board: Board,
+	stackIndex: number,
+	name: string,
+): { board: Board; index: number } {
+	const stack = board.stacks[stackIndex];
+	if (!stack) return { board, index: -1 };
+	const existing = dividerIndex(stack, name);
+	if (existing !== -1) return { board, index: existing };
+	const at = sectionInsertIndex(board, stackIndex, name);
+	return { board: addDivider(board, stackIndex, name, at), index: at };
+}
+
+/** A ref as it reads after an item was inserted at `at` in the same stack. */
+function shifted(ref: ItemRef, stackIndex: number, at: number): ItemRef {
+	return ref.stack === stackIndex && ref.item >= at ? { ...ref, item: ref.item + 1 } : ref;
+}
+
+/**
+ * The item index a card lands on when it enters `key` in this stack: the end of
+ * that section's group, or — for the sectionless group — the top or the end of
+ * the head group, as `atTop` says (§4.2).
+ *
+ * Returns `null` when the section is not in this stack, which only happens for
+ * an anonymous section: the caller creates named ones first.
+ */
+function sectionEntryIndex(
+	board: Board,
+	stackIndex: number,
+	key: SectionKey,
+	atTop: boolean,
+): number | null {
+	const stack = board.stacks[stackIndex];
+	if (!stack) return null;
+	if (key.kind === 'none') return atTop ? 0 : groupRange(stack, null).end;
+	const at =
+		key.kind === 'named'
+			? dividerIndex(stack, key.name)
+			: key.ref.stack === stackIndex && stack.items[key.ref.item]?.kind === 'divider'
+				? key.ref.item
+				: -1;
+	if (at === -1) return null;
+	return groupRange(stack, at).end;
+}
+
+/**
+ * Add a card to a section, in the stack the composer picked (§4.2). A named
+ * section missing from that stack is **created** on the way in — a section with
+ * a card in it exists, one without does not (§1.1) — and the insertion itself
+ * goes through `addCard`, so a completing stack completes the card as it would
+ * anywhere else.
+ */
+export function addCardToSection(
+	board: Board,
+	stackIndex: number,
+	key: SectionKey,
+	text: string,
+	atTop = false,
+): Board {
+	return addCardToSectionAt(board, stackIndex, key, text, atTop).board;
+}
+
+/**
+ * The same insertion, plus **where the card landed**. The composer opens the
+ * card it just created for editing (§4.2), and the only honest way to know
+ * which tile that is, on a board where the op may also have created a divider
+ * above it, is for the op to say so.
+ *
+ * `ref` is `null` exactly when nothing was inserted.
+ */
+export function addCardToSectionAt(
+	board: Board,
+	stackIndex: number,
+	key: SectionKey,
+	text: string,
+	atTop = false,
+): { board: Board; ref: ItemRef | null } {
+	if (!board.stacks[stackIndex]) return { board, ref: null };
+	let next = board;
+	if (key.kind === 'named') {
+		const ensured = ensureSection(next, stackIndex, key.name);
+		if (ensured.index === -1) return { board, ref: null };
+		next = ensured.board;
+	}
+	const at = sectionEntryIndex(next, stackIndex, key, atTop);
+	if (at === null) return { board, ref: null };
+	const withCard = addCard(next, stackIndex, text, at);
+	if (withCard === next) return { board, ref: null };
+	return { board: withCard, ref: { stack: stackIndex, item: at } };
+}
+
+/**
+ * Move a card into `key` in `toStack` (§4.3). The two callers are the row's
+ * section change — where `toStack` is the card's own stack, so it keeps it —
+ * and the row's stack badge, which keeps the section instead.
+ *
+ * `before` is a card of the destination group the moved card lands in front of;
+ * `null` means the end of the group. It is resolved by identity like every
+ * other move, so it may be read off the pre-move board.
+ */
+export function moveCardToSection(
+	board: Board,
+	from: ItemRef,
+	toStack: number,
+	key: SectionKey,
+	before: ItemRef | null = null,
+): Board {
+	const entry = board.stacks[from.stack]?.items[from.item];
+	if (entry?.kind !== 'card' || !board.stacks[toStack]) return board;
+
+	let next = board;
+	let ref = from;
+	let target = before;
+	if (key.kind === 'named') {
+		const ensured = ensureSection(next, toStack, key.name);
+		if (ensured.index === -1) return board;
+		if (ensured.board !== next) {
+			ref = shifted(ref, toStack, ensured.index);
+			if (target) target = shifted(target, toStack, ensured.index);
+			next = ensured.board;
+		}
+	}
+
+	// A position inside the group beats the group's end: the user pointed at it.
+	const at =
+		target && target.stack === toStack && next.stacks[toStack]?.items[target.item]?.kind === 'card'
+			? target.item
+			: sectionEntryIndex(next, toStack, key, false);
+	if (at === null) return board;
+	const moved = moveItem(next, ref, toStack, at);
+	return moved === next && next === board ? board : moved;
+}
+
+/**
+ * Move a card to another stack, keeping the section its row is in (§4.3) — the
+ * row's stack badge. The section is created in the target stack when it has
+ * none, exactly as adding a card there would.
+ */
+export function moveCardToStack(board: Board, from: ItemRef, toStack: number): Board {
+	if (from.stack === toStack) return board;
+	return moveCardToSection(board, from, toStack, sectionOf(board, from));
+}
+
+/**
+ * Move a whole section before `beforeName` in the list order, or to the end
+ * with `null` (§4.1). In **every stack holding it**, the divider and the group
+ * under it move together; a stack that holds neither section is left alone, so
+ * the move is applied exactly where it means something.
+ */
+export function moveSection(board: Board, name: string, beforeName: string | null): Board {
+	if (name === '' || name === beforeName) return board;
+	let changed = false;
+	const stacks = board.stacks.map((stack) => {
+		const at = dividerIndex(stack, name);
+		if (at === -1) return stack;
+		const { end } = groupRange(stack, at);
+		const items = stack.items.slice();
+		const moved = items.splice(at, end - at);
+
+		let target: number;
+		if (beforeName === null) {
+			target = items.length;
+		} else {
+			target = items.findIndex(
+				(entry) => entry.kind === 'divider' && sectionName(entry.divider.name) === beforeName,
+			);
+			// Nothing to sit in front of here: this stack has no opinion about the
+			// two sections' order, so it keeps the layout it has.
+			if (target === -1) return stack;
+		}
+		if (target === at) return stack;
+		items.splice(target, 0, ...moved);
+		changed = true;
+		return normalizeStack({ ...stack, items });
+	});
+	return changed ? { ...board, stacks } : board;
+}
+
+/**
+ * Rename a section: every divider carrying the old name takes the new one
+ * (§4.4). Renaming onto a name that already exists **merges** the two sections,
+ * which is what the list then shows — no divider is deleted for it.
+ */
+export function renameSection(board: Board, oldName: string, newName: string): Board {
+	const name = newName.trim();
+	if (!name || !oldName || name === oldName) return board;
+	let changed = false;
+	const stacks = board.stacks.map((stack) => {
+		let touched = false;
+		const items = stack.items.map((entry) => {
+			if (entry.kind !== 'divider' || sectionName(entry.divider.name) !== oldName) return entry;
+			touched = true;
+			return { kind: 'divider' as const, divider: { ...entry.divider, name } };
+		});
+		if (!touched) return stack;
+		changed = true;
+		return normalizeStack({ ...stack, items });
+	});
+	return changed ? { ...board, stacks } : board;
+}
+
+/**
+ * Remove a section: its divider goes from every stack and **the cards stay
+ * where they are**, joining the group above them (§4.4). Nothing is archived
+ * and nothing is deleted, which is why the item needs no confirmation.
+ */
+export function removeSection(board: Board, name: string): Board {
+	if (!name) return board;
+	let changed = false;
+	const stacks = board.stacks.map((stack) => {
+		const items = stack.items.filter(
+			(entry) => !(entry.kind === 'divider' && sectionName(entry.divider.name) === name),
+		);
+		if (items.length === stack.items.length) return stack;
+		changed = true;
+		return normalizeStack({ ...stack, items });
+	});
+	return changed ? { ...board, stacks } : board;
+}
+
 // --- archive ----------------------------------------------------------------
 //
 // Writing never reads the archive: a card is serialized and prepended to the
@@ -839,7 +1102,15 @@ export function addView(board: Board, def: NewView, activate = true): Board {
 export function updateView(
 	board: Board,
 	id: string,
-	patch: { name?: string; dateProperty?: string; mode?: CalendarMode },
+	patch: {
+		name?: string;
+		dateProperty?: string;
+		mode?: CalendarMode;
+		controls?: ListControls;
+		/** `null` clears the view-wide sort back to document order. */
+		sort?: SectionSort | null;
+		tags?: string[];
+	},
 ): Board {
 	const at = board.config.views.findIndex((v) => v.id === id);
 	const view = board.config.views[at];
@@ -852,11 +1123,99 @@ export function updateView(
 		if (dateProperty && dateProperty !== next.dateProperty) next = { ...next, dateProperty };
 		if (patch.mode && patch.mode !== next.mode) next = { ...next, mode: patch.mode };
 	}
+	if (next.type === 'list') {
+		if (patch.controls && patch.controls !== next.controls) next = { ...next, controls: patch.controls };
+		if (patch.sort !== undefined) next = withSort(next, patch.sort);
+		if (patch.tags !== undefined) next = withTags(next, patch.tags);
+	}
 	if (next === view) return board;
 
 	const views = board.config.views.slice();
 	views[at] = next;
 	return withViews(board, views);
+}
+
+type ListView = Extract<ViewDef, { type: 'list' }>;
+
+/** `view` with `sort` set, or without one when it is `null` — never both keys. */
+function withSort(view: ListView, sort: SectionSort | null): ListView {
+	if (sort === null) {
+		if (view.sort === undefined) return view;
+		const { sort: _dropped, ...rest } = view;
+		return rest;
+	}
+	if (view.sort?.property === sort.property && view.sort.dir === sort.dir) return view;
+	return { ...view, sort };
+}
+
+/** `view` with the tag filter set; an empty list drops the key altogether. */
+function withTags(view: ListView, tags: string[]): ListView {
+	const next = tags.map((tag) => tag.trim().replace(/^#/, '')).filter(Boolean);
+	const current = view.tags ?? [];
+	if (next.length === current.length && next.every((tag, i) => tag === current[i])) return view;
+	if (!next.length) {
+		const { tags: _dropped, ...rest } = view;
+		return rest;
+	}
+	return { ...view, tags: next };
+}
+
+/**
+ * Write one list section's display state into the view definition
+ * (list-view.md §3.4, §5). The caller decides whether the mode wants it
+ * persisted at all — a `session` view keeps its state in the component instead
+ * and never comes here.
+ *
+ * An entry naming a section that no longer exists is deliberately **kept**: the
+ * section returns as soon as a card is put in it, and its sort returns with it.
+ */
+export function setSectionState(
+	board: Board,
+	viewId: string,
+	key: string,
+	patch: Partial<SectionState>,
+): Board {
+	const at = board.config.views.findIndex((v) => v.id === viewId);
+	const view = board.config.views[at];
+	if (view?.type !== 'list') return board;
+
+	const current = view.sections?.[key] ?? {};
+	const merged: SectionState = { ...current, ...patch };
+	// Prune what is at its default, so an untouched section writes nothing.
+	if (!merged.sort) delete merged.sort;
+	if (!merged.tags?.length) delete merged.tags;
+	if (!merged.collapsed) delete merged.collapsed;
+
+	const sections = { ...view.sections };
+	if (Object.keys(merged).length) sections[key] = merged;
+	else delete sections[key];
+	if (sameSections(view.sections ?? {}, sections)) return board;
+
+	const next: ListView = Object.keys(sections).length
+		? { ...view, sections }
+		: (() => {
+				const { sections: _dropped, ...rest } = view;
+				return rest;
+			})();
+	const views = board.config.views.slice();
+	views[at] = next;
+	return withViews(board, views);
+}
+
+function sameSections(a: Record<string, SectionState>, b: Record<string, SectionState>): boolean {
+	const keys = Object.keys(a);
+	if (keys.length !== Object.keys(b).length) return false;
+	return keys.every((key) => {
+		const x = a[key];
+		const y = b[key];
+		if (!x || !y) return false;
+		return (
+			x.collapsed === y.collapsed &&
+			x.sort?.property === y.sort?.property &&
+			x.sort?.dir === y.sort?.dir &&
+			(x.tags ?? []).join(' ') === (y.tags ?? []).join(' ')
+		);
+	});
 }
 
 /**

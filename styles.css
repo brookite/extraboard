@@ -44,6 +44,10 @@
    A new nested component must be added here, not patched around. */
 .eb-stack,
 .eb-stack-body,
+.eb-list,
+.eb-section,
+.eb-section-body,
+.eb-list-row,
 .eb-item,
 .eb-card,
 .eb-card-head,
@@ -2076,4 +2080,191 @@ body.is-mobile .eb-cal-tray-head,
 body.is-mobile .eb-add-card,
 body.is-mobile .eb-add-stack-button {
 	min-height: 36px;
+}
+
+/* ---------------------------------------------------------------------------
+   List view (list-view.md §2). One vertical scroller of sections; on a wide
+   window the column is capped and centred, so a card stays a card instead of a
+   banner. On a phone the cap is inert and the list runs edge to edge.
+   --------------------------------------------------------------------------- */
+
+.eb-list {
+	--eb-list-width: 720px;
+	height: 100%;
+	max-width: var(--eb-list-width);
+	margin-inline: auto;
+	padding: var(--size-4-3, 12px);
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+.eb-list-empty {
+	padding: 2em;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+.eb-section {
+	margin-bottom: var(--size-4-3, 12px);
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	/* The same invariant the stacks hold: nothing inside may widen the section
+	   (mobile.md §2), the embedded editor included. */
+	min-width: 0;
+}
+
+.eb-section-header {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.eb-section-grip {
+	display: flex;
+	align-items: center;
+	color: var(--text-faint);
+	cursor: grab;
+}
+
+.eb-section-grip svg {
+	width: 14px;
+	height: 14px;
+}
+
+.eb-section-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	font-weight: var(--font-medium, 500);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: text;
+}
+
+.eb-section-name.is-muted {
+	color: var(--text-muted);
+	cursor: default;
+}
+
+.eb-section-name-editor {
+	flex: 1;
+	min-width: 0;
+}
+
+.eb-section-sort,
+.eb-section-filter,
+.eb-list-stack {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex: 0 0 auto;
+	max-width: 40%;
+	overflow: hidden;
+	padding: 1px 6px;
+	background: var(--background-modifier-border);
+	color: var(--text-muted);
+	border: none;
+	box-shadow: none;
+	font-size: var(--font-ui-smaller, 0.8em);
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	cursor: pointer;
+}
+
+.eb-section-sort svg,
+.eb-section-filter svg,
+.eb-list-stack svg {
+	width: 12px;
+	height: 12px;
+	flex: 0 0 auto;
+}
+
+.eb-section-sort.is-active,
+.eb-section-filter.is-active {
+	color: var(--text-accent);
+}
+
+.eb-section-sort:disabled,
+.eb-section-filter:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
+.eb-section-count {
+	flex: 0 0 auto;
+	padding: 0 4px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller, 0.8em);
+}
+
+.eb-section-body {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px;
+	/* Keep an empty section a usable drop target. */
+	min-height: 24px;
+	min-width: 0;
+}
+
+/* `display: flex` would otherwise beat the browser default for [hidden] —
+   the same rule `.eb-stack-body` needs, for the same reason. */
+.eb-section-body[hidden] {
+	display: none;
+}
+
+.eb-section.is-collapsed .eb-section-header {
+	border-bottom: none;
+}
+
+/* A row is the card plus the badge naming its stack; the badge sits to the
+   right of the tile on a wide list and under it when there is no room. */
+.eb-list-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	min-width: 0;
+}
+
+.eb-list-row > .eb-card {
+	flex: 1;
+	min-width: 0;
+}
+
+.eb-list-row .eb-list-stack {
+	margin-top: 4px;
+	max-width: 30%;
+}
+
+/* "Add card" plus the stack it writes into: the button grows, the badge keeps
+   its own width so the stack name stays readable. */
+.eb-section-compose {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0 8px 8px;
+	min-width: 0;
+}
+
+.eb-section-compose .eb-add-card {
+	flex: 1;
+	min-width: 0;
+	width: auto;
+}
+
+/* Phones: the cap is inert, the badges wrap under the card, and the composer
+   stacks so its three controls keep touch-sized targets (mobile.md §3). */
+.is-phone .eb-list {
+	padding: var(--size-4-2, 8px);
+}
+
+.is-phone .eb-list-row {
+	flex-wrap: wrap;
+}
+
+.is-phone .eb-list-row .eb-list-stack {
+	max-width: 100%;
 }

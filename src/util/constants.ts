@@ -1,5 +1,7 @@
 // Shared constants for the Extraboard plugin.
 
+import type { ViewKind } from '../model/types';
+
 /** Custom view type id for the board view. Stable API — do not rename. */
 export const VIEW_TYPE_BOARD = 'extraboard-board';
 
@@ -9,6 +11,7 @@ export const ICONS = {
 	add: 'plus',
 	markdown: 'file-text',
 	calendar: 'calendar-days',
+	list: 'list-tree',
 	settings: 'sliders-horizontal',
 	archive: 'archive',
 	views: 'layers',
@@ -20,6 +23,7 @@ export const ICONS = {
 } as const;
 
 /** Icon of a view, by type — the switch wears the active view's (views.md §3.1). */
-export function viewIcon(type: 'kanban' | 'calendar'): string {
-	return type === 'calendar' ? ICONS.calendar : ICONS.board;
+export function viewIcon(type: ViewKind): string {
+	if (type === 'calendar') return ICONS.calendar;
+	return type === 'list' ? ICONS.list : ICONS.board;
 }
