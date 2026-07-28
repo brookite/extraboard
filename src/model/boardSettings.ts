@@ -240,6 +240,6 @@ export function parseBoardSettings(body: string): { config: BoardConfig; body: s
 
 /** The settings block for a config, including its trailing newline. */
 export function serializeSettingsBlock(config: BoardConfig): string {
-	const json = JSON.stringify(configToPlain(config), null, 2);
+	const json = JSON.stringify(configToPlain(config));
 	return '```' + SETTINGS_LANG + '\n' + json + '\n```\n';
 }

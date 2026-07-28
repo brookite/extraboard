@@ -133,8 +133,8 @@ describe('board configuration rewriting', () => {
 		const text = serializeBoard(next);
 
 		expect(text).toContain('aliases:');
-		expect(text).toContain('"showCardCheckbox": true');
-		expect(text).toContain('"name": "status"');
+		expect(text).toContain('"showCardCheckbox":true');
+		expect(text).toContain('"name":"status"');
 		expect(text).toContain('"urgent"');
 
 		const reparsed = parseBoard(text);

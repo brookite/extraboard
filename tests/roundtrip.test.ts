@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseBoard, parseBody } from '../src/model/parse';
 import { serializeBoard, serializeBody } from '../src/model/serialize';
+import { serializeSettingsBlock } from '../src/model/boardSettings';
 import type { Board, BoardConfig } from '../src/model/types';
 import { newBoardConfig, newBoardText } from '../src/util/newBoard';
 
@@ -158,6 +159,20 @@ describe('full file: frontmatter + settings block + body round-trip', () => {
 	it('normalizes CRLF to LF', () => {
 		const crlf = input.replace(/\n/g, '\r\n');
 		expect(serializeBoard(parseBoard(crlf))).not.toContain('\r');
+	});
+
+	it('writes settings as compact JSON without escaping Unicode', () => {
+		const config: BoardConfig = {
+			...bodyConfig,
+			cardContentDir: 'Карточки',
+			properties: [{ name: 'важность', type: 'integer' }],
+		};
+
+		expect(serializeSettingsBlock(config)).toBe(
+			'```extraboard-settings\n' +
+			'{"version":1,"views":[{"id":"v1","name":"Board","type":"kanban"}],"cardContentDir":"Карточки","properties":[{"name":"важность","type":"integer"}]}\n' +
+			'```\n',
+		);
 	});
 });
 

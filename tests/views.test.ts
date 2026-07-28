@@ -106,7 +106,7 @@ describe('views: serialization', () => {
 		});
 		const text = serializeBoard(ops.updateView(board, 'v2', { name: 'Due soon' }));
 		expect(text).toContain('```extraboard-settings');
-		expect(text).toContain('"name": "Due soon"');
+		expect(text).toContain('"name":"Due soon"');
 	});
 
 	it('omits activeView while the first view is active, and writes it otherwise', () => {
@@ -114,7 +114,7 @@ describe('views: serialization', () => {
 		const one = ops.addView(board, { name: 'Due dates', type: 'calendar', dateProperty: 'due', mode: 'month' }, false);
 		expect(serializeBoard(one)).not.toContain('activeView');
 		const switched = ops.setActiveView(one, one.config.views[1]!.id);
-		expect(serializeBoard(switched)).toContain('"activeView": "v2"');
+		expect(serializeBoard(switched)).toContain('"activeView":"v2"');
 	});
 
 	it('is a fixed point', () => {
@@ -278,9 +278,11 @@ describe('views: list views', () => {
 		});
 	});
 
-	it('round-trips a full list view unchanged', () => {
+	it('normalizes a full list view to compact settings JSON', () => {
 		const text = boardText({ views: [LIST], ...DATE_PROPS });
-		expect(serializeBoard(parseBoard(text))).toBe(text);
+		const serialized = serializeBoard(parseBoard(text));
+		expect(serialized).toContain('```extraboard-settings\n{"version":1,');
+		expect(parseBoard(serialized).config.views).toEqual(parseBoard(text).config.views);
 	});
 
 	it('defaults the controls mode and omits it when it is the default', () => {

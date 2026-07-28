@@ -128,7 +128,7 @@ describe('board config round-trip', () => {
 
 	it('writes and reads back an explicit `false`', () => {
 		const text = withConfig({ addToTopOther: false });
-		expect(text).toContain('"addToTopOther": false');
+		expect(text).toContain('"addToTopOther":false');
 		expect(parseBoard(text).config.addToTopOther).toBe(false);
 	});
 
