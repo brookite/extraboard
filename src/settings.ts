@@ -2,16 +2,37 @@
 // lives in each board file's `extraboard-settings` block, not here.
 // Spec: docs/specs/settings.md.
 
-import type { ProgressStyle, PropertyDef } from './model/types';
+import type { BoardConfig, ProgressStyle, PropertyDef, Stack } from './model/types';
 import type { DateHighlightRule } from './model/dateHighlights';
 import type { Lang } from './i18n';
 import type { DateFormatMode, WeekStart } from './i18n/dates';
-import type { ArchiveOpts } from './model/ops';
+import type { ArchiveOpts, InsertPos } from './model/ops';
 import { formatDate } from './model/dates';
 
 /** Bounds of `archiveLimit`, shared by the settings tab and the clamp below. */
 export const ARCHIVE_LIMIT_MIN = 1;
 export const ARCHIVE_LIMIT_MAX = 16000;
+
+/**
+ * Where a card entering `stack` is inserted (kanban-view.md §6.7): `0` for the
+ * top, `null` for the end — the `InsertPos` every card-inserting op already
+ * takes. Completing stacks and the rest are configured separately, and a board
+ * override wins over the plugin setting.
+ *
+ * Every path that puts a card *into* a stack resolves through here, so the
+ * composer, "Complete card", restore and the calendar's day modal agree. Drag &
+ * drop does not: there the user picked the position themselves.
+ */
+export function cardEntryPos(
+	stack: Pick<Stack, 'completes'> | undefined,
+	config: BoardConfig,
+	settings: ExtraboardSettings,
+): InsertPos {
+	const top = stack?.completes
+		? (config.addToTopCompleting ?? settings.addToTopCompleting)
+		: (config.addToTopOther ?? settings.addToTopOther);
+	return top ? 0 : null;
+}
 
 /**
  * The archiving options for "now": this is the one place the clock is read, so
@@ -78,6 +99,14 @@ export interface ExtraboardSettings {
 	 */
 	archiveNewestFirst: boolean;
 	/**
+	 * Where a card entering a **completing** stack goes: `true` — the top,
+	 * `false` — the end. A board may override it in its own settings block
+	 * (kanban-view.md §6.7).
+	 */
+	addToTopCompleting: boolean;
+	/** The same for every **other** stack, configured separately. */
+	addToTopOther: boolean;
+	/**
 	 * UI language. `auto` follows Obsidian's own configured language; anything
 	 * other than `ru` falls back to English (i18n-and-dates.md §1).
 	 */
@@ -117,6 +146,8 @@ export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	allowDeleteWithoutArchive: false,
 	archiveLimit: 10000,
 	archiveNewestFirst: true,
+	addToTopCompleting: true,
+	addToTopOther: true,
 	language: 'auto',
 	dateFormat: 'system',
 	timeFormat: 'system',

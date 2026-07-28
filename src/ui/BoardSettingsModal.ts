@@ -71,6 +71,42 @@ export class BoardSettingsModal extends Modal {
 				}),
 			);
 
+		// Tri-state: a board may follow the plugin or override it, and "follow"
+		// has to stay expressible — it is the default and the common case (§6.7).
+		const addToSetting = (
+			key: 'addToTopOther' | 'addToTopCompleting',
+			name: string,
+			desc: string,
+		): void => {
+			new Setting(contentEl)
+				.setName(name)
+				.setDesc(desc)
+				.addDropdown((drop) =>
+					drop
+						.addOption('inherit', t('modal.boardSettings.addTo.inherit'))
+						.addOption('top', t('settings.addTo.top'))
+						.addOption('end', t('settings.addTo.end'))
+						.setValue(
+							this.config[key] === undefined ? 'inherit' : this.config[key] ? 'top' : 'end',
+						)
+						.onChange((value) => {
+							if (value === 'inherit') delete this.config[key];
+							else this.config[key] = value === 'top';
+						}),
+				);
+		};
+
+		addToSetting(
+			'addToTopOther',
+			t('modal.boardSettings.addToTopOther.name'),
+			t('modal.boardSettings.addToTopOther.desc'),
+		);
+		addToSetting(
+			'addToTopCompleting',
+			t('modal.boardSettings.addToTopCompleting.name'),
+			t('modal.boardSettings.addToTopCompleting.desc'),
+		);
+
 		new Setting(contentEl)
 			.setName(t('modal.boardSettings.cardNoteFolder.name'))
 			.setDesc(t('modal.boardSettings.cardNoteFolder.desc'))

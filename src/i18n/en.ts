@@ -351,6 +351,17 @@ export const en = {
 				name: 'Show checkbox on cards',
 				desc: 'Offer a task checkbox on cards that are not task list items yet. Cards that already are tasks always show one.',
 			},
+			addTo: {
+				inherit: 'Follow plugin setting',
+			},
+			addToTopOther: {
+				name: 'New cards go',
+				desc: 'Where a card is inserted when it enters an ordinary stack on this board. "Follow plugin setting" is the default.',
+			},
+			addToTopCompleting: {
+				name: 'Completed cards go',
+				desc: 'The same, for stacks on this board that mark cards as completed.',
+			},
 			cardNoteFolder: {
 				name: 'Card note folder',
 				desc: 'Where this board creates card notes. Empty uses the folder from plugin settings, which defaults to the vault root.',
@@ -464,6 +475,18 @@ export const en = {
 		allowDeleteWithoutArchive: {
 			name: 'Allow deleting cards without archiving',
 			desc: 'Adds a delete action back to the card menu. Off by default: a card leaves the board through the archive, where it can be restored or destroyed.',
+		},
+		addTo: {
+			top: 'To the top',
+			end: 'To the end',
+		},
+		addToTopOther: {
+			name: 'New cards go',
+			desc: 'Where a card is inserted when it enters an ordinary stack — from the composer, the calendar, "Move to" or the archive. Dragging a card always puts it where you dropped it.',
+		},
+		addToTopCompleting: {
+			name: 'Completed cards go',
+			desc: 'The same, for stacks that mark cards as completed. Set separately, because the stack collecting finished work is the one most often wanted the other way round.',
 		},
 		archiveLimit: {
 			name: 'Archive size limit',

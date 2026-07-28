@@ -2,7 +2,7 @@ import { Menu } from 'obsidian';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { BoardConfig, Stack } from '../../model/types';
-import { archiveOpts, type ExtraboardSettings } from '../../settings';
+import { archiveOpts, cardEntryPos, type ExtraboardSettings } from '../../settings';
 import { editStack } from '../../ui/StackModal';
 import type { BoardApi } from '../api';
 import { memo } from '../memo';
@@ -64,10 +64,13 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 	const setCollapsed = (value: boolean): void =>
 		api.update((b) => ops.setStackCollapsed(b, index, value));
 
-	/** Insert a blank card at the top and open it for editing right away. */
+	// Where a new card lands, and so which tile the composer must open (§6.7).
+	const entryPos = cardEntryPos(stack, config, settings);
+
+	/** Insert a blank card and open it for editing right away. */
 	const addCard = (): void => {
 		setCollapsed(false);
-		api.update((b) => ops.addCard(b, index, '', 0));
+		api.update((b) => ops.addCard(b, index, '', entryPos));
 		setPendingNewCard(true);
 	};
 
@@ -266,7 +269,7 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 							groupColor={ops.groupColor(stack, i)}
 							api={api}
 							settings={settings}
-							forceEdit={i === 0 && pendingNewCard}
+							forceEdit={i === (entryPos === 0 ? 0 : stack.items.length - 1) && pendingNewCard}
 							onForceEditConsumed={clearPendingNewCard}
 						/>
 					) : (

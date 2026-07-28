@@ -3,7 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { parseCardLink, unlinkedTitle } from '../../model/link';
 import * as ops from '../../model/ops';
 import type { BoardConfig, Card } from '../../model/types';
-import { archiveOpts, type ExtraboardSettings } from '../../settings';
+import { archiveOpts, cardEntryPos, type ExtraboardSettings } from '../../settings';
 import { ChecklistModal } from '../../ui/ChecklistModal';
 import { styleMenuItem, submenuOf } from '../../util/menu';
 import type { BoardApi } from '../api';
@@ -193,8 +193,9 @@ function CardTileInner({
 		if (completing !== -1 || stacks.length > 1) menu.addSeparator();
 
 		// "Complete card" is the shortcut for the move a board with a completing
-		// stack makes over and over: the card lands at the end of that stack and
-		// `moveItem` marks it done on the way in (§3.2). Green, because it is the
+		// stack makes over and over: the card lands wherever that stack takes
+		// entering cards (§6.7) and `moveItem` marks it done on the way in (§3.2).
+		// Green, because it is the
 		// menu's one affirmative action among neutral and destructive ones — and
 		// the mirror of "Archive card"'s red at the other end.
 		if (completing !== -1 && completing !== stackIndex) {
@@ -202,7 +203,11 @@ function CardTileInner({
 				item
 					.setTitle(t('card.completeCard'))
 					.setIcon('circle-check-big')
-					.onClick(() => api.update((b) => ops.moveItem(b, ref, completing, null)));
+					.onClick(() =>
+						api.update((b) =>
+							ops.moveItem(b, ref, completing, cardEntryPos(b.stacks[completing], b.config, settings)),
+						),
+					);
 				styleMenuItem(item, 'eb-menu-success');
 			});
 		}

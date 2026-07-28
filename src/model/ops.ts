@@ -714,12 +714,30 @@ function withArchivedCards(board: Board, cards: ArchivedCard[]): Board {
 	return { ...board, archive: { ...archive, body: serializeArchive(cards, board.config) } };
 }
 
+/** Index of the stack an archived card is restored into, or -1 for "none yet". */
+function restoreTargetIndex(board: Board, entry: ArchivedCard): number {
+	const named = entry.from === undefined ? -1 : board.stacks.findIndex((s) => s.name === entry.from);
+	if (named !== -1) return named;
+	return board.stacks.length ? 0 : -1;
+}
+
+/**
+ * The stack an archived card would be restored into (§5.3), or `undefined` when
+ * one would have to be created for it. Exported so a caller can resolve the
+ * insert position against the very stack the op will pick
+ * (kanban-view.md §6.7) instead of guessing at it.
+ */
+export function restoreTarget(board: Board, entry: ArchivedCard): Stack | undefined {
+	const index = restoreTargetIndex(board, entry);
+	return index === -1 ? undefined : board.stacks[index];
+}
+
 /**
  * Put an archived card back on the board (§5.3): into the stack named by its
- * origin, else the first stack, else a stack created for it. It is appended at
- * the end of that stack and comes back exactly as it went in.
+ * origin, else the first stack, else a stack created for it. `at` says where in
+ * that stack it lands (§6.7); it comes back exactly as it went in.
  */
-export function restoreCard(board: Board, index: number): Board {
+export function restoreCard(board: Board, index: number, at: InsertPos = null): Board {
 	const cards = archivedCards(board);
 	const entry = cards[index];
 	if (!entry) return board;
@@ -728,15 +746,19 @@ export function restoreCard(board: Board, index: number): Board {
 	rest.splice(index, 1);
 	let next = withArchivedCards(board, rest);
 
-	let target = entry.from === undefined ? -1 : next.stacks.findIndex((s) => s.name === entry.from);
-	if (target === -1 && next.stacks.length) target = 0;
+	let target = restoreTargetIndex(next, entry);
 	if (target === -1) {
 		next = addStack(next, entry.from ?? 'Restored');
 		target = next.stacks.length - 1;
 	}
 	const stack = next.stacks[target]!;
 	const card = enteringCard(entry.card, stack);
-	return withItems(next, target, [...stack.items, { kind: 'card' as const, card }]);
+	const items = stack.items.slice();
+	items.splice(at === null ? items.length : Math.max(0, Math.min(at, items.length)), 0, {
+		kind: 'card' as const,
+		card,
+	});
+	return withItems(next, target, items);
 }
 
 /** Destroy one archived card (§5.4). Confirmed by the modal, not here. */

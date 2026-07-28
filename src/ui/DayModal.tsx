@@ -12,7 +12,7 @@ import { occurrencesOn, placeCards, setCardDay } from '../model/calendar';
 import { CalDate, compareDates } from '../model/dates';
 import * as ops from '../model/ops';
 import type { Board, PropertyType, ViewDef } from '../model/types';
-import type { ExtraboardSettings } from '../settings';
+import { cardEntryPos, type ExtraboardSettings } from '../settings';
 import type { BoardApi } from '../view/api';
 import { CardTile } from '../view/components/Card';
 import { Icon } from '../view/components/Icon';
@@ -191,11 +191,12 @@ interface ComposerProps {
 	day: CalDate;
 	propertyType: PropertyType;
 	stackIndex: number;
+	settings: ExtraboardSettings;
 	onStack: (index: number) => void;
 }
 
 /** Creates a card already dated to this day, in a stack chosen here (§5.3). */
-function Composer({ board, api, view, day, propertyType, stackIndex, onStack }: ComposerProps) {
+function Composer({ board, api, view, day, propertyType, stackIndex, settings, onStack }: ComposerProps) {
 	const [text, setText] = useState('');
 	const inputRef = useRef<HTMLInputElement>(null);
 	const stack = board.stacks[stackIndex] ?? board.stacks[0];
@@ -208,9 +209,10 @@ function Composer({ board, api, view, day, propertyType, stackIndex, onStack }: 
 		// One edit: a created card is never left dateless in the file.
 		api.update((b) => {
 			const target = Math.min(stackIndex, b.stacks.length - 1);
-			const withCard = ops.addCard(b, target, title);
+			const at = cardEntryPos(b.stacks[target], b.config, settings);
+			const withCard = ops.addCard(b, target, title, at);
 			const items = withCard.stacks[target]?.items.length ?? 0;
-			const ref = { stack: target, item: items - 1 };
+			const ref = { stack: target, item: at === 0 ? 0 : items - 1 };
 			return setCardDay(withCard, ref, view.dateProperty, propertyType, day);
 		});
 		inputRef.current?.focus();
@@ -338,6 +340,7 @@ class DayModal extends Modal {
 						day={day}
 						propertyType={propertyType}
 						stackIndex={Math.min(this.composerStack, board.stacks.length - 1)}
+						settings={settings}
 						onStack={(index) => {
 							this.composerStack = index;
 							this.render();

@@ -105,6 +105,11 @@ export function toConfig(raw: unknown): BoardConfig {
 		config.progressStyle = style;
 	}
 
+	// Read only when present: absent is "follow the plugin setting", which is
+	// different from an explicit `false` (kanban-view.md §6.7).
+	if (typeof raw.addToTopCompleting === 'boolean') config.addToTopCompleting = raw.addToTopCompleting;
+	if (typeof raw.addToTopOther === 'boolean') config.addToTopOther = raw.addToTopOther;
+
 	// Read only when the key is present: an empty list is a board saying "no
 	// highlights", which is different from following the plugin setting (§3.2).
 	if ('dateHighlights' in raw) {
@@ -149,6 +154,10 @@ export function configToPlain(config: BoardConfig): Record<string, unknown> {
 	if (config.showCardCheckbox) out.showCardCheckbox = true;
 	if (config.cardContentDir) out.cardContentDir = config.cardContentDir;
 	if (config.progressStyle) out.progressStyle = config.progressStyle;
+	// Written whenever set, `false` included: it is an override, and omitting a
+	// `false` would silently turn it back into "follow the plugin".
+	if (config.addToTopCompleting !== undefined) out.addToTopCompleting = config.addToTopCompleting;
+	if (config.addToTopOther !== undefined) out.addToTopOther = config.addToTopOther;
 	// An empty array is written on purpose — it is how a board says "no
 	// highlights" instead of "follow the plugin setting".
 	if (config.dateHighlights) out.dateHighlights = config.dateHighlights;

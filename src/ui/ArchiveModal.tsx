@@ -12,7 +12,7 @@ import { App, Modal } from 'obsidian';
 import { render } from 'preact';
 import * as ops from '../model/ops';
 import type { ArchivedCard, Board } from '../model/types';
-import type { ExtraboardSettings } from '../settings';
+import { cardEntryPos, type ExtraboardSettings } from '../settings';
 import type { BoardApi } from '../view/api';
 import { Icon, IconButton } from '../view/components/Icon';
 import { MarkdownText, hasMarkdown } from '../view/components/MarkdownText';
@@ -193,7 +193,11 @@ export class ArchiveModal extends Modal {
 							api={this.api}
 							settings={this.settings}
 							onRestore={() => {
-								this.api.update((b) => ops.restoreCard(b, index));
+								// The target stack is resolved inside the op, so where the card
+								// lands has to be resolved against the same board (§6.7).
+								this.api.update((b) =>
+									ops.restoreCard(b, index, cardEntryPos(ops.restoreTarget(b, cards[index]!), b.config, this.settings)),
+								);
 								this.render();
 							}}
 							onDelete={() => {

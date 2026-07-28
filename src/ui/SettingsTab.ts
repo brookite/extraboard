@@ -170,6 +170,36 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 				}),
 			);
 
+		// Two settings, not one: the stack that collects finished work is the one
+		// people most often want filled the other way round (§6.7).
+		new Setting(containerEl)
+			.setName(t('settings.addToTopOther.name'))
+			.setDesc(t('settings.addToTopOther.desc'))
+			.addDropdown((drop) =>
+				drop
+					.addOption('top', t('settings.addTo.top'))
+					.addOption('end', t('settings.addTo.end'))
+					.setValue(this.plugin.settings.addToTopOther ? 'top' : 'end')
+					.onChange((value) => {
+						this.plugin.settings.addToTopOther = value === 'top';
+						void this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName(t('settings.addToTopCompleting.name'))
+			.setDesc(t('settings.addToTopCompleting.desc'))
+			.addDropdown((drop) =>
+				drop
+					.addOption('top', t('settings.addTo.top'))
+					.addOption('end', t('settings.addTo.end'))
+					.setValue(this.plugin.settings.addToTopCompleting ? 'top' : 'end')
+					.onChange((value) => {
+						this.plugin.settings.addToTopCompleting = value === 'top';
+						void this.plugin.saveSettings();
+					}),
+			);
+
 		// A number, not a slider: the useful range spans four orders of magnitude,
 		// and the value people care about is an exact one they typed.
 		new Setting(containerEl)

@@ -77,6 +77,14 @@ export interface BoardConfig {
 	/** Board override for the plugin's `progressStyle`; absent => follow it. */
 	progressStyle?: ProgressStyle;
 	/**
+	 * Where a card entering a **completing** stack goes: `true` — the top,
+	 * `false` — the end. Absent => follow the plugin setting
+	 * (kanban-view.md §6.7).
+	 */
+	addToTopCompleting?: boolean;
+	/** The same for every **other** stack, configured separately. */
+	addToTopOther?: boolean;
+	/**
 	 * Board override for the plugin's date highlight rules; absent => follow it.
 	 * An empty list is not "absent": it means this board wants no highlights at
 	 * all (i18n-and-dates.md §3.2).
