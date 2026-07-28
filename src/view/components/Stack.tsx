@@ -7,6 +7,7 @@ import { editStack } from '../../ui/StackModal';
 import type { BoardApi } from '../api';
 import { memo } from '../memo';
 import { useCloseOnReload } from '../reload';
+import { revealStack } from '../revealStack';
 import { useSortable } from '../useSortable';
 import { CardTile } from './Card';
 import { DividerRow } from './Divider';
@@ -44,6 +45,7 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 	// reload can put a different stack at this index (view/reload.ts).
 	useCloseOnReload(() => setRenaming(false));
 	const bodyRef = useRef<HTMLDivElement>(null);
+	const rootRef = useRef<HTMLDivElement>(null);
 
 	useSortable(bodyRef, { group: 'eb-items', draggable: '.eb-item' }, (drop) => {
 		const from = { stack: drop.fromList, item: drop.fromIndex };
@@ -177,13 +179,24 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 		<div
 			class={`eb-stack${collapsed ? ' is-collapsed' : ''}`}
 			data-index={index}
+			ref={rootRef}
 			onContextMenu={(e) => {
 				if (e.target instanceof Element && e.target.closest('.eb-item')) return;
 				e.preventDefault();
 				openMenu(e);
 			}}
 		>
-			<div class="eb-stack-header">
+			{/* Clicking the stack's own chrome — the grip included — brings a
+			    column that hangs off either end of the board fully into view (§2).
+			    It runs alongside whatever the click also did (collapse, rename,
+			    open the menu) and does nothing when the stack is already whole, so
+			    it never competes with those targets. */}
+			<div
+				class="eb-stack-header"
+				onClick={() => {
+					if (rootRef.current) revealStack(rootRef.current);
+				}}
+			>
 				{/* The only drag zone for the stack (`handle` in KanbanView), so the
 				    rest of the header keeps its click targets. */}
 				<span class="eb-stack-grip" title={t('modal.checklist.dragToReorder')} aria-hidden="true">
