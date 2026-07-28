@@ -112,10 +112,10 @@ describe('completion stacks', () => {
 	});
 
 	it('completes a card restored into the stack', () => {
-		const archived = ops.archiveCard(board(), { stack: 0, item: 3 });
+		const archived = ops.archiveCard(board(), { stack: 0, item: 3 }, {});
 		// The origin stack is "To do", so restore it into the completing one by
 		// deleting the origin first: restore then falls back to the first stack.
-		const done = ops.deleteStack(archived, 0);
+		const done = ops.deleteStack(archived, 0, {});
 		const next = ops.restoreCard(done, 0);
 		expect(cardAt(next, 0, 1).task).toBe('x');
 	});

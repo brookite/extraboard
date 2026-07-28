@@ -2,7 +2,7 @@ import { Menu } from 'obsidian';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { BoardConfig, Stack } from '../../model/types';
-import type { ExtraboardSettings } from '../../settings';
+import { archiveOpts, type ExtraboardSettings } from '../../settings';
 import { editStack } from '../../ui/StackModal';
 import type { BoardApi } from '../api';
 import { memo } from '../memo';
@@ -51,7 +51,7 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 		const from = { stack: drop.fromList, item: drop.fromIndex };
 		// Dropping a card on the archive target is not a move (archive.md §5.5).
 		if (drop.toArchive) {
-			api.update((b) => ops.archiveCard(b, from));
+			api.update((b) => ops.archiveCard(b, from, archiveOpts(settings)));
 			return;
 		}
 		api.update((b) => ops.moveItem(b, from, drop.toList, drop.before));
@@ -107,7 +107,7 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 			);
 			if (!ok) return;
 		}
-		api.update((b) => ops.deleteStack(b, index));
+		api.update((b) => ops.deleteStack(b, index, archiveOpts(settings)));
 	};
 
 	const openMenu = (event: MouseEvent): void => {

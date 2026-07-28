@@ -320,6 +320,9 @@ export const en = {
 			restoreCard: 'Restore card',
 			deleteCard: 'Delete card',
 			unknownOrigin: 'Unknown',
+			unknownTime: 'Undated',
+			sortNewestFirst: 'Newest first',
+			sortOldestFirst: 'Oldest first',
 			clearArchive: 'Clear archive',
 			close: 'Close',
 			delete: 'Delete',
@@ -461,6 +464,10 @@ export const en = {
 		allowDeleteWithoutArchive: {
 			name: 'Allow deleting cards without archiving',
 			desc: 'Adds a delete action back to the card menu. Off by default: a card leaves the board through the archive, where it can be restored or destroyed.',
+		},
+		archiveLimit: {
+			name: 'Archive size limit',
+			desc: 'How many cards a board archive keeps, from 1 to 16000. When archiving pushes it past this, the oldest cards fall off the end and are gone for good.',
 		},
 		defaultProperties: {
 			heading: 'Default properties',

@@ -6,6 +6,32 @@ import type { ProgressStyle, PropertyDef } from './model/types';
 import type { DateHighlightRule } from './model/dateHighlights';
 import type { Lang } from './i18n';
 import type { DateFormatMode, WeekStart } from './i18n/dates';
+import type { ArchiveOpts } from './model/ops';
+import { formatDate } from './model/dates';
+
+/** Bounds of `archiveLimit`, shared by the settings tab and the clamp below. */
+export const ARCHIVE_LIMIT_MIN = 1;
+export const ARCHIVE_LIMIT_MAX = 16000;
+
+/**
+ * The archiving options for "now": this is the one place the clock is read, so
+ * `src/model/**` stays pure and every archive path stamps its cards the same
+ * way (archive.md §4.1).
+ */
+export function archiveOpts(settings: ExtraboardSettings, now: Date = new Date()): ArchiveOpts {
+	return {
+		at: formatDate({
+			y: now.getFullYear(),
+			m: now.getMonth() + 1,
+			d: now.getDate(),
+			minutes: now.getHours() * 60 + now.getMinutes(),
+		}),
+		limit: Math.min(
+			ARCHIVE_LIMIT_MAX,
+			Math.max(ARCHIVE_LIMIT_MIN, Math.floor(settings.archiveLimit)),
+		),
+	};
+}
 
 export interface ExtraboardSettings {
 	/**
@@ -40,6 +66,17 @@ export interface ExtraboardSettings {
 	 * actions are unaffected.
 	 */
 	allowDeleteWithoutArchive: boolean;
+	/**
+	 * How many cards an archive may hold, 1..16000. When archiving pushes it past
+	 * this, the **oldest** cards fall off the end (archive.md §4.2).
+	 */
+	archiveLimit: number;
+	/**
+	 * Archive list order: `true` — most recently archived first (the default),
+	 * `false` — oldest first. Toggled from the archive modal itself, which is
+	 * where the list being ordered is (archive.md §4.1).
+	 */
+	archiveNewestFirst: boolean;
 	/**
 	 * UI language. `auto` follows Obsidian's own configured language; anything
 	 * other than `ru` falls back to English (i18n-and-dates.md §1).
@@ -78,6 +115,8 @@ export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	showRawPropertyTokens: false,
 	fillCardWithColor: false,
 	allowDeleteWithoutArchive: false,
+	archiveLimit: 10000,
+	archiveNewestFirst: true,
 	language: 'auto',
 	dateFormat: 'system',
 	timeFormat: 'system',

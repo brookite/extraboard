@@ -156,7 +156,7 @@ describe('ops: stacks and dividers', () => {
 		expect(text(b)).toContain('## Backlog %%collapsed%%');
 		b = ops.setStackCollapsed(b, 2, false);
 		expect(text(b)).toContain('## Done\n');
-		b = ops.deleteStack(b, 0);
+		b = ops.deleteStack(b, 0, {});
 		expect(text(b).startsWith('## Doing')).toBe(true);
 	});
 

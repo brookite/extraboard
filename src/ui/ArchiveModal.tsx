@@ -14,12 +14,26 @@ import * as ops from '../model/ops';
 import type { ArchivedCard, Board } from '../model/types';
 import type { ExtraboardSettings } from '../settings';
 import type { BoardApi } from '../view/api';
-import { IconButton } from '../view/components/Icon';
+import { Icon, IconButton } from '../view/components/Icon';
 import { MarkdownText, hasMarkdown } from '../view/components/MarkdownText';
 import { ChecklistProgress, progressStyleFor } from '../view/components/Progress';
 import { PropertyBadge } from '../view/components/PropertyBadge';
 import { styleFor } from '../view/components/style';
 import { t } from '../i18n';
+import { dateTimeOptsFor, formatCalDate } from '../i18n/dates';
+import { parseDate } from '../model/dates';
+import { archiveOrder } from '../model/archive';
+
+/**
+ * The `%%at|…%%` stamp as the user's own date format (i18n-and-dates.md §2).
+ * It is stored in the plugin's canonical `YYYY-MM-DD HH:mm`, so a value that
+ * does not parse is shown verbatim rather than dropped — it is still what the
+ * file says, and the list is still ordered by it.
+ */
+function formatStamp(at: string, settings: ExtraboardSettings): string {
+	const date = parseDate(at);
+	return date ? formatCalDate(date, dateTimeOptsFor(settings)) : at;
+}
 
 interface RowProps {
 	entry: ArchivedCard;
@@ -68,8 +82,13 @@ function ArchiveRow({ entry, board, api, settings, onRestore, onDelete, onOpenLi
 				<IconButton icon="trash-2" label={t('modal.archive.deleteCard')} onClick={onDelete} />
 			</div>
 			<div class="eb-card-props">
-				{/* The origin comes first: it is what Restore will use (§5.3). */}
+				{/* The origin comes first: it is what Restore will use (§5.3). Then
+				    the archived-at stamp, which is what the list is ordered by — an
+				    order sorted on an invisible key is one a user cannot check. */}
 				<span class="eb-badge eb-archive-from">{entry.from ?? t('modal.archive.unknownOrigin')}</span>
+				<span class="eb-badge eb-archive-at">
+					{entry.at ? formatStamp(entry.at, settings) : t('modal.archive.unknownTime')}
+				</span>
 				{badges.map((pv, i) => (
 					<PropertyBadge
 						key={i}
@@ -111,6 +130,9 @@ export class ArchiveModal extends Modal {
 		app: App,
 		private readonly api: BoardApi,
 		private readonly settings: ExtraboardSettings,
+		/** Persist the sort order the toolbar just changed; it is a plugin setting
+		 * so the choice survives closing the modal (§4.1). */
+		private readonly onSettingsChange: () => void,
 	) {
 		super(app);
 	}
@@ -138,13 +160,35 @@ export class ArchiveModal extends Modal {
 			return;
 		}
 
+		// Display order only: `index` stays the entry's position in the file,
+		// because that is what every op addresses (§4.1).
+		const order = archiveOrder(cards, this.settings.archiveNewestFirst);
+
 		render(
 			<>
+				<div class="eb-archive-toolbar">
+					<button
+						type="button"
+						class="eb-archive-sort"
+						onClick={() => {
+							this.settings.archiveNewestFirst = !this.settings.archiveNewestFirst;
+							this.onSettingsChange();
+							this.render();
+						}}
+					>
+						<Icon name={this.settings.archiveNewestFirst ? 'arrow-down-narrow-wide' : 'arrow-up-narrow-wide'} />
+						<span>
+							{this.settings.archiveNewestFirst
+								? t('modal.archive.sortNewestFirst')
+								: t('modal.archive.sortOldestFirst')}
+						</span>
+					</button>
+				</div>
 				<div class="eb-archive-list">
-					{cards.map((entry, index) => (
+					{order.map((index) => (
 						<ArchiveRow
 							key={index}
-							entry={entry}
+							entry={cards[index]!}
 							board={board}
 							api={this.api}
 							settings={this.settings}
@@ -153,7 +197,7 @@ export class ArchiveModal extends Modal {
 								this.render();
 							}}
 							onDelete={() => {
-								void this.confirmDelete(entry, index);
+								void this.confirmDelete(cards[index]!, index);
 							}}
 							onOpenLink={() => this.close()}
 						/>

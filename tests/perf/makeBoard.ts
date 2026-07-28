@@ -197,7 +197,7 @@ function fillArchive(board: Board): Board {
 	for (let i = 0; i < ARCHIVED; i++) {
 		next = ops.addCard(next, stack, cardText(stack, i), null);
 	}
-	return ops.deleteStack(next, stack);
+	return ops.deleteStack(next, stack, {});
 }
 
 function main(): void {

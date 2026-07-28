@@ -3,7 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { parseCardLink, unlinkedTitle } from '../../model/link';
 import * as ops from '../../model/ops';
 import type { BoardConfig, Card } from '../../model/types';
-import type { ExtraboardSettings } from '../../settings';
+import { archiveOpts, type ExtraboardSettings } from '../../settings';
 import { ChecklistModal } from '../../ui/ChecklistModal';
 import { styleMenuItem, submenuOf } from '../../util/menu';
 import type { BoardApi } from '../api';
@@ -246,7 +246,7 @@ function CardTileInner({
 				// Warning styling: it is the item that takes the card off the board,
 				// so it has to read as one at a glance (kanban-view.md §5.3).
 				.setWarning(true)
-				.onClick(() => api.update((b) => ops.archiveCard(b, ref))),
+				.onClick(() => api.update((b) => ops.archiveCard(b, ref, archiveOpts(settings)))),
 		);
 		// Archiving is the non-destructive default, so deleting is opt-in
 		// (settings.md, archive.md §1).

@@ -27,6 +27,21 @@ import type {
 } from './types';
 import { nextViewId } from './views';
 
+/**
+ * What an archiving op needs that the model cannot know: **when** the cards are
+ * being archived, and **how many** the archive may keep (archive.md §4.1, §4.2).
+ * Both come from outside — a pure op must read neither the clock nor the plugin
+ * settings — so every caller states them, and a test states them as constants.
+ *
+ * `at` absent writes no `%%at|…%%` marker; `limit` absent enforces none.
+ */
+export interface ArchiveOpts {
+	/** Canonical `YYYY-MM-DD HH:mm` local time, written as each card's `%%at|…%%`. */
+	at?: string;
+	/** Cards the archive may hold; the oldest beyond it are dropped. */
+	limit?: number;
+}
+
 /** Address of an item inside a board. */
 export interface ItemRef {
 	stack: number;
@@ -175,14 +190,16 @@ export function setStackCompletes(board: Board, index: number, completes: boolea
  * (archive.md §5.6), each recording this stack as its origin; dividers carry no
  * content and go with it, as do untitled cards.
  */
-export function deleteStack(board: Board, index: number): Board {
+export function deleteStack(board: Board, index: number, opts: ArchiveOpts): Board {
 	const stack = board.stacks[index];
 	if (!stack) return board;
-	const lines = archiveLines(stack.items, stack, board.config);
+	const lines = archiveLines(stack.items, stack, board.config, opts);
 	const stacks = board.stacks.slice();
 	stacks.splice(index, 1);
 	const next = { ...board, stacks };
-	return lines.length ? { ...next, archive: prependToArchive(next.archive, lines) } : next;
+	return lines.length
+		? { ...next, archive: prependToArchive(next.archive, lines, opts.limit) }
+		: next;
 }
 
 /** Move a stack before the stack currently at `before` (or to the end). */
@@ -608,11 +625,21 @@ function originOf(stack: Stack): string | undefined {
  * it instead of filling the archive with blanks (archive.md §5.1) — the same
  * rule "Delete untitled cards" already follows.
  */
-function archiveLines(items: StackItem[], stack: Stack, config: BoardConfig): string[] {
+function archiveLines(
+	items: StackItem[],
+	stack: Stack,
+	config: BoardConfig,
+	opts: ArchiveOpts,
+): string[] {
 	const lines: string[] = [];
 	for (const item of items) {
 		if (item.kind !== 'card' || isCardUntitled(item.card)) continue;
-		lines.push(...serializeArchivedCard(item.card, originOf(stack), config));
+		const entry = {
+			card: item.card,
+			...(originOf(stack) !== undefined && { from: originOf(stack) }),
+			...(opts.at !== undefined && { at: opts.at }),
+		};
+		lines.push(...serializeArchivedCard(entry, config));
 	}
 	return lines;
 }
@@ -621,16 +648,20 @@ function archiveLines(items: StackItem[], stack: Stack, config: BoardConfig): st
  * Move one card off the board and into the archive (archive.md §5.1). An
  * untitled card is **deleted** instead: there is nothing in it to bring back.
  */
-export function archiveCard(board: Board, ref: ItemRef): Board {
+export function archiveCard(board: Board, ref: ItemRef, opts: ArchiveOpts): Board {
 	const stack = board.stacks[ref.stack];
 	const entry = stack?.items[ref.item];
 	if (!stack || entry?.kind !== 'card') return board;
 	if (isCardUntitled(entry.card)) return deleteItem(board, ref);
 
-	const lines = serializeArchivedCard(entry.card, originOf(stack), board.config);
+	const lines = archiveLines([entry], stack, board.config, opts);
 	const items = stack.items.slice();
 	items.splice(ref.item, 1);
-	return withItems({ ...board, archive: prependToArchive(board.archive, lines) }, ref.stack, items);
+	return withItems(
+		{ ...board, archive: prependToArchive(board.archive, lines, opts.limit) },
+		ref.stack,
+		items,
+	);
 }
 
 /** Cards whose own task marker is `x`/`X` — the only notion of "done" (§5.2). */
@@ -650,7 +681,7 @@ export function countCompletedCards(board: Board): number {
  * Cards under collapsed stacks and dividers are included; a completed card that
  * is untitled leaves the board without being written to the archive.
  */
-export function archiveCompletedCards(board: Board): Board {
+export function archiveCompletedCards(board: Board, opts: ArchiveOpts): Board {
 	const lines: string[] = [];
 	let next = board;
 	let removed = 0;
@@ -658,7 +689,7 @@ export function archiveCompletedCards(board: Board): Board {
 		const done = stack.items.filter((item) => item.kind === 'card' && isCardDone(item.card));
 		if (!done.length) return;
 		removed += done.length;
-		lines.push(...archiveLines(done, stack, board.config));
+		lines.push(...archiveLines(done, stack, board.config, opts));
 		next = withItems(
 			next,
 			i,
@@ -666,7 +697,9 @@ export function archiveCompletedCards(board: Board): Board {
 		);
 	});
 	if (!removed) return board;
-	return lines.length ? { ...next, archive: prependToArchive(next.archive, lines) } : next;
+	return lines.length
+		? { ...next, archive: prependToArchive(next.archive, lines, opts.limit) }
+		: next;
 }
 
 /** The archive as cards. Parses on every call — nothing caches it (§4). */

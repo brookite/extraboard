@@ -321,6 +321,9 @@ export const ru: DeepPartial<typeof en> = {
 			restoreCard: 'Восстановить карточку',
 			deleteCard: 'Удалить карточку',
 			unknownOrigin: 'Неизвестно',
+			unknownTime: 'Без даты',
+			sortNewestFirst: 'Сначала новые',
+			sortOldestFirst: 'Сначала старые',
 			clearArchive: 'Очистить архив',
 			close: 'Закрыть',
 			delete: 'Удалить',
@@ -463,6 +466,10 @@ export const ru: DeepPartial<typeof en> = {
 		allowDeleteWithoutArchive: {
 			name: 'Разрешить удаление карточек без архивации',
 			desc: 'Возвращает пункт удаления в меню карточки. По умолчанию выключено: карточка покидает доску через архив, откуда её можно восстановить или уничтожить.',
+		},
+		archiveLimit: {
+			name: 'Ограничение размера архива',
+			desc: 'Сколько карточек хранит архив доски, от 1 до 16000. Если при архивации предел превышен, самые старые карточки исчезают с конца безвозвратно.',
 		},
 		defaultProperties: {
 			heading: 'Свойства по умолчанию',

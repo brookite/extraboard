@@ -7,7 +7,7 @@ import { render } from 'preact';
 import type ExtraboardPlugin from '../main';
 import type { Board } from '../model/types';
 import { highlightsFor } from '../model/dateHighlights';
-import type { ExtraboardSettings } from '../settings';
+import { archiveOpts, type ExtraboardSettings } from '../settings';
 import * as ops from '../model/ops';
 import { parseBoard } from '../model/parse';
 import { serializeBoard } from '../model/serialize';
@@ -394,7 +394,9 @@ export class BoardView extends TextFileView {
 	 */
 	openArchive(): void {
 		if (!this.board) return;
-		new ArchiveModal(this.app, this.api, this.plugin.settings).open();
+		new ArchiveModal(this.app, this.api, this.plugin.settings, () =>
+			void this.plugin.saveSettings(),
+		).open();
 	}
 
 	/**
@@ -409,7 +411,7 @@ export class BoardView extends TextFileView {
 			new Notice(t('notice.noCompletedCards'));
 			return;
 		}
-		this.applyEdit((b) => ops.archiveCompletedCards(b));
+		this.applyEdit((b) => ops.archiveCompletedCards(b, archiveOpts(this.plugin.settings)));
 		new Notice(
 			count === 1
 				? t('notice.archivedOne')

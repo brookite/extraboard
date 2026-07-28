@@ -15,6 +15,7 @@ import {
 	type WeekStart,
 } from '../i18n/dates';
 import { today } from '../model/dates';
+import { ARCHIVE_LIMIT_MAX, ARCHIVE_LIMIT_MIN, DEFAULT_SETTINGS } from '../settings';
 import { PropertyDefsEditor } from './PropertyDefsEditor';
 import { DateHighlightsEditor } from './DateHighlightsEditor';
 import { FolderSuggest } from './FolderSuggest';
@@ -168,6 +169,31 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 					this.plugin.refreshBoards();
 				}),
 			);
+
+		// A number, not a slider: the useful range spans four orders of magnitude,
+		// and the value people care about is an exact one they typed.
+		new Setting(containerEl)
+			.setName(t('settings.archiveLimit.name'))
+			.setDesc(t('settings.archiveLimit.desc'))
+			.addText((text) => {
+				text.inputEl.type = 'number';
+				text.inputEl.min = String(ARCHIVE_LIMIT_MIN);
+				text.inputEl.max = String(ARCHIVE_LIMIT_MAX);
+				text.setValue(String(this.plugin.settings.archiveLimit)).onChange((value) => {
+					const parsed = Number.parseInt(value, 10);
+					// An unparseable or out-of-range entry falls back to the default
+					// rather than to a bound: nothing is trimmed by a typo.
+					this.plugin.settings.archiveLimit = Number.isFinite(parsed)
+						? Math.min(ARCHIVE_LIMIT_MAX, Math.max(ARCHIVE_LIMIT_MIN, parsed))
+						: DEFAULT_SETTINGS.archiveLimit;
+					void this.plugin.saveSettings();
+				});
+				// Show the clamp: the field must not keep displaying a value the
+				// plugin has already rejected.
+				text.inputEl.addEventListener('blur', () => {
+					text.setValue(String(this.plugin.settings.archiveLimit));
+				});
+			});
 
 		new Setting(containerEl).setName(t('settings.defaultProperties.heading')).setHeading();
 		containerEl.createDiv({

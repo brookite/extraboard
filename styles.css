@@ -1197,9 +1197,47 @@ body.eb-dragging-card .eb-archive-drop {
 	cursor: default;
 }
 
-.eb-archive-from {
+.eb-archive-from,
+.eb-archive-at {
 	color: var(--text-muted);
 	background: var(--background-modifier-border);
+}
+
+/* The archived-at stamp is the key the list is ordered by, not a property of
+   the card, so it reads quieter than the origin chip beside it. */
+.eb-archive-at {
+	background: transparent;
+	border: 1px solid var(--background-modifier-border);
+}
+
+/* Sits above the list and scrolls with nothing: the order applies to the whole
+   archive, however far down it is read (archive.md §4.1). */
+.eb-archive-toolbar {
+	display: flex;
+	justify-content: flex-end;
+	padding-bottom: 8px;
+}
+
+.eb-archive-sort {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px;
+	font-size: var(--font-ui-smaller, 12px);
+	color: var(--text-muted);
+	background: transparent;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.eb-archive-sort:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.eb-archive-sort .svg-icon {
+	width: 15px;
+	height: 15px;
 }
 
 /* Nothing in a row edits anything: its chips and indicator are inert. */

@@ -166,6 +166,13 @@ export interface ArchivedCard {
 	card: Card;
 	/** Origin stack name from `%%from|…%%`; absent when unknown. */
 	from?: string;
+	/**
+	 * When the card was archived, from `%%at|…%%`: canonical `YYYY-MM-DD HH:mm`
+	 * local time (dates.ts `formatDate`), so it both sorts as text and reads as a
+	 * date. Absent when unknown — every card archived before the marker existed
+	 * is that case. It lives **only** in the archive: restoring drops it.
+	 */
+	at?: string;
 }
 
 export interface Board {
