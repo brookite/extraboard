@@ -5,7 +5,7 @@
 // card menu all work exactly as they do on the Kanban side — plus the two
 // badges a calendar needs, the card's **stack** and its **named divider**.
 
-import { App, Menu, Modal } from 'obsidian';
+import { App, Modal } from 'obsidian';
 import { render } from 'preact';
 import { useRef, useState } from 'preact/hooks';
 import { occurrencesOn, placeCards, setCardDay } from '../model/calendar';
@@ -19,6 +19,7 @@ import { Icon } from '../view/components/Icon';
 import { safeColor } from '../view/components/style';
 import { currentLanguage, t } from '../i18n';
 import { dateTimeFormat } from '../i18n/intl';
+import { showDropdownMenu } from '../util/menu';
 
 type CalendarDef = Extract<ViewDef, { type: 'calendar' }>;
 
@@ -99,50 +100,50 @@ function DayRow({ board, refItem, api, settings }: RowProps) {
 	if (!stack || entry?.kind !== 'card') return null;
 
 	const chooseStack = (event: MouseEvent): void => {
-		const menu = new Menu();
-		board.stacks.forEach((target, i) => {
-			menu.addItem((item) =>
-				item
-					.setTitle(target.name || t('modal.archive.untitled'))
-					.setIcon('square-kanban')
-					.setDisabled(i === refItem.stack)
-					.onClick(() => {
-						// The card lands at the end of the target stack — which means in
-						// that stack's last group, so the divider badge recomputes itself
-						// (§5.2). A completing stack completes it, like any other move.
-						api.update((b) => ops.moveItem(b, refItem, i, null));
-					}),
-			);
+		showDropdownMenu(event, (menu) => {
+			board.stacks.forEach((target, i) => {
+				menu.addItem((item) =>
+					item
+						.setTitle(target.name || t('modal.archive.untitled'))
+						.setIcon('square-kanban')
+						.setDisabled(i === refItem.stack)
+						.onClick(() => {
+							// The card lands at the end of the target stack — which means in
+							// that stack's last group, so the divider badge recomputes itself
+							// (§5.2). A completing stack completes it, like any other move.
+							api.update((b) => ops.moveItem(b, refItem, i, null));
+						}),
+				);
+			});
 		});
-		menu.showAtMouseEvent(event);
 	};
 
 	const chooseDivider = (event: MouseEvent): void => {
-		const menu = new Menu();
-		const groups = namedDividers(board, refItem.stack);
-		menu.addItem((item) =>
-			item
-				.setTitle(t('modal.day.noGroupOption'))
-				.setIcon('minus')
-				.setChecked(divider === null)
-				.onClick(() => {
-					api.update((b) => ops.moveItem(b, refItem, refItem.stack, endOfGroup(b, refItem.stack, null)));
-				}),
-		);
-		for (const group of groups) {
+		showDropdownMenu(event, (menu) => {
+			const groups = namedDividers(board, refItem.stack);
 			menu.addItem((item) =>
 				item
-					.setTitle(group.name)
-					.setIcon('heading')
-					.setChecked(divider?.index === group.index)
+					.setTitle(t('modal.day.noGroupOption'))
+					.setIcon('minus')
+					.setChecked(divider === null)
 					.onClick(() => {
-						api.update((b) =>
-							ops.moveItem(b, refItem, refItem.stack, endOfGroup(b, refItem.stack, group.index)),
-						);
+						api.update((b) => ops.moveItem(b, refItem, refItem.stack, endOfGroup(b, refItem.stack, null)));
 					}),
 			);
-		}
-		menu.showAtMouseEvent(event);
+			for (const group of groups) {
+				menu.addItem((item) =>
+					item
+						.setTitle(group.name)
+						.setIcon('heading')
+						.setChecked(divider?.index === group.index)
+						.onClick(() => {
+							api.update((b) =>
+								ops.moveItem(b, refItem, refItem.stack, endOfGroup(b, refItem.stack, group.index)),
+							);
+						}),
+				);
+			}
+		});
 	};
 
 	const dividerColor = safeColor(divider?.color);
@@ -219,17 +220,17 @@ function Composer({ board, api, view, day, propertyType, stackIndex, settings, o
 	};
 
 	const chooseStack = (event: MouseEvent): void => {
-		const menu = new Menu();
-		board.stacks.forEach((target, i) => {
-			menu.addItem((item) =>
-				item
-					.setTitle(target.name || t('modal.archive.untitled'))
-					.setIcon('square-kanban')
-					.setChecked(i === stackIndex)
-					.onClick(() => onStack(i)),
-			);
+		showDropdownMenu(event, (menu) => {
+			board.stacks.forEach((target, i) => {
+				menu.addItem((item) =>
+					item
+						.setTitle(target.name || t('modal.archive.untitled'))
+						.setIcon('square-kanban')
+						.setChecked(i === stackIndex)
+						.onClick(() => onStack(i)),
+				);
+			});
 		});
-		menu.showAtMouseEvent(event);
 	};
 
 	return (

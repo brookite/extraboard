@@ -1,4 +1,3 @@
-import { Menu } from 'obsidian';
 import { useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { Divider } from '../../model/types';
@@ -9,6 +8,7 @@ import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
 import { safeColor } from './style';
 import { t } from '../../i18n';
+import { showDropdownMenu } from '../../util/menu';
 
 /** Identity-stable props, so the memo below holds across an unrelated edit
  * (m10-perf.md §2) — the divider object, never the board. */
@@ -47,20 +47,20 @@ function DividerRowInner({ divider, stackIndex, index, api, hiddenCount }: Props
 	};
 
 	const openMenu = (event: MouseEvent): void => {
-		const menu = new Menu();
-		menu.addItem((item) =>
+		showDropdownMenu(event, (menu) => {
+			menu.addItem((item) =>
 			item
 				.setTitle(toggleLabel)
 				.setIcon(divider.collapsed ? 'chevron-down' : 'chevron-right')
 				.onClick(toggle),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(named ? t('divider.renameDivider') : t('divider.nameDivider'))
 				.setIcon('pencil')
 				.onClick(() => setEditing(true)),
-		);
-		if (named) {
+			);
+			if (named) {
 			// Only a named divider can carry a color: there is no label to hold it
 			// and no group to read as a band (§4.2).
 			menu.addItem((item) =>
@@ -77,16 +77,16 @@ function DividerRowInner({ divider, stackIndex, index, api, hiddenCount }: Props
 					.setIcon('minus')
 					.onClick(() => api.update((b) => ops.renameDivider(b, ref, undefined))),
 			);
-		}
-		menu.addSeparator();
-		menu.addItem((item) =>
+			}
+			menu.addSeparator();
+			menu.addItem((item) =>
 			item
 				.setTitle(t('divider.deleteDivider'))
 				.setIcon('trash-2')
 				.setWarning(true)
 				.onClick(() => api.update((b) => ops.deleteItem(b, ref))),
-		);
-		menu.showAtMouseEvent(event);
+			);
+		});
 	};
 
 	if (editing) {

@@ -18,12 +18,14 @@ import { pickColor } from '../ui/ColorPicker';
 import { openViewsModal } from '../ui/ViewsModal';
 import { createCardNote, resolveNoteFolder } from '../util/cardNote';
 import { ICONS, VIEW_TYPE_BOARD, viewIcon } from '../util/constants';
+import { showDropdownMenu } from '../util/menu';
 import { BoardApi, confirmDestructive, searchTag } from './api';
 import { CalendarView } from './CalendarView';
 import { KanbanView, addStack } from './KanbanView';
 import { ListView } from './ListView';
 import { NowContext, currentNow } from './now';
 import { ReloadContext } from './reload';
+import { boardSaveNeeded, PluginSaveRequests } from './saveGuard';
 import { t } from '../i18n';
 
 export class BoardView extends TextFileView {
@@ -42,6 +44,8 @@ export class BoardView extends TextFileView {
 	private indicatorTimer?: number;
 	/** Board-change subscribers outside the board's own tree (`BoardApi.onChange`). */
 	private listeners = new Set<() => void>();
+	/** Saves requested by `applyEdit`, tracked separately from host lifecycle saves. */
+	private saveRequests = new PluginSaveRequests();
 	/**
 	 * The settings as the rendered tree last saw them. Its **identity** is how a
 	 * display-setting change reaches memoized components: `refresh()` replaces the
@@ -141,6 +145,29 @@ export class BoardView extends TextFileView {
 		return this.data;
 	}
 
+	override async save(clear?: boolean): Promise<void> {
+		const generation = this.saveRequests.pending();
+		if (generation === null) {
+			await super.save(clear);
+			return;
+		}
+
+		const board = this.board;
+		const file = this.file;
+		if (
+			this.plugin.settings.reduceBoardFileWrites &&
+			board &&
+			file &&
+			!(await boardSaveNeeded(board, () => this.app.vault.read(file)))
+		) {
+			this.saveRequests.markHandled(generation);
+			return;
+		}
+
+		await super.save(clear);
+		this.saveRequests.markHandled(generation);
+	}
+
 	setViewData(data: string, clear: boolean): void {
 		// Saving our own edits echoes back through the file watcher; re-parsing
 		// then would throw away in-progress UI state for no reason.
@@ -233,16 +260,16 @@ export class BoardView extends TextFileView {
 	 */
 	private openViewMenu(event: MouseEvent): void {
 		if (!this.board) return;
-		const menu = new Menu();
-		this.addViewItems(menu);
-		menu.addSeparator();
-		menu.addItem((item) =>
-			item
-				.setTitle(t('menu.file.manageViews'))
-				.setIcon(ICONS.views)
-				.onClick(() => this.manageViews()),
-		);
-		menu.showAtMouseEvent(event);
+		showDropdownMenu(event, (menu) => {
+			this.addViewItems(menu);
+			menu.addSeparator();
+			menu.addItem((item) =>
+				item
+					.setTitle(t('menu.file.manageViews'))
+					.setIcon(ICONS.views)
+					.onClick(() => this.manageViews()),
+			);
+		});
 	}
 
 	/** One item per view, the active one checked. Flat, so it reads the same on a phone. */
@@ -456,6 +483,7 @@ export class BoardView extends TextFileView {
 		if (next === this.board) return;
 		this.board = next;
 		this.data = serializeBoard(next);
+		this.saveRequests.request();
 		this.requestSave();
 		this.renderBoard();
 	}

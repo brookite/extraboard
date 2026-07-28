@@ -3,11 +3,35 @@
 // so the plugin's whole untyped surface is a single file to revisit when the
 // typings catch up — and a single place a runtime guard has to live.
 
-import type { Menu, MenuItem } from 'obsidian';
+import { Menu, type MenuItem } from 'obsidian';
+import { MenuToggleController } from './menuToggle';
 
 interface UntypedMenuItem {
 	setSubmenu?: () => Menu;
 	dom?: HTMLElement;
+}
+
+const dropdowns = new MenuToggleController<Menu>();
+
+/**
+ * Toggle a plugin-owned dropdown anchored to its button rather than to the
+ * click's changing pointer coordinates. A repeated click closes it; a click on
+ * another dropdown trigger replaces it.
+ */
+export function showDropdownMenu(event: MouseEvent, fill: (menu: Menu) => void): void {
+	const trigger = event.currentTarget;
+	if (!trigger || typeof trigger !== 'object') return;
+	const menu = dropdowns.toggle(trigger, () => new Menu());
+	if (!menu) return;
+	fill(menu);
+
+	const element = trigger as HTMLElement;
+	if (typeof element.getBoundingClientRect !== 'function') {
+		menu.showAtMouseEvent(event);
+		return;
+	}
+	const rect = element.getBoundingClientRect();
+	menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 }, element.ownerDocument);
 }
 
 /**

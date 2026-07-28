@@ -4,7 +4,7 @@ A Markdown-backed Kanban, calendar and list board plugin for [Obsidian](https://
 
 Each board is a single Markdown file: stacks are headings, cards are list items,
 and card properties are stored inline. The board is deserialized on open and
-re-serialized on every change, so the underlying note stays clean and portable.
+re-serialized after changes, so the underlying note stays clean and portable.
 Designed to be mobile-friendly.
 
 Inspired by [obsidian-kanban](https://github.com/obsidian-community/obsidian-kanban)
@@ -49,6 +49,9 @@ with its own file format, not a fork.
 - **English and Russian interfaces**, with configurable date/time formats
   (including relative dates and custom `moment.js` patterns) and first day of
   the week.
+- **Optional reduced filesystem writes:** before a save requested by the board
+  view, Extraboard can compare the complete logical board state with the file
+  and skip the write when debounced edits were reverted.
 
 ## Status
 

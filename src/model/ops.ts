@@ -628,6 +628,17 @@ export function moveItem(board: Board, from: ItemRef, toStack: number, before: I
 // Kanban side sees nothing unusual in the file.
 
 /**
+ * Add an empty named section from the list view. Its one physical divider is
+ * appended to the first stack, after every card; other stacks receive their
+ * divider only when a card enters the section there.
+ */
+export function addSection(board: Board, name: string): Board {
+	const normalized = sectionName(name);
+	if (!normalized || !board.stacks.length || sectionOrder(board).includes(normalized)) return board;
+	return addDivider(board, 0, normalized);
+}
+
+/**
  * Where a stack's divider for `name` belongs, so the stack stays consistent
  * with the board's section order (§1.2): before this stack's divider of the
  * first section that follows `name` globally, else at the end of the stack.

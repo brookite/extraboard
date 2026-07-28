@@ -6,11 +6,12 @@
 // comes back, so closing the modal is not a commit and dismissing it undoes
 // nothing.
 
-import { App, Menu, Modal, setIcon } from 'obsidian';
+import { App, Modal, setIcon } from 'obsidian';
 import Sortable from 'sortablejs';
 import * as cl from '../model/checklist';
 import type { ChecklistItem, ChecklistPath } from '../model/checklist';
 import { t } from '../i18n';
+import { showDropdownMenu } from '../util/menu';
 
 export interface ChecklistModalOptions {
 	/** The card's display text, shown as the modal title. */
@@ -263,44 +264,44 @@ export class ChecklistModal extends Modal {
 
 	private openRowMenu(evt: MouseEvent, path: ChecklistPath, input: HTMLInputElement): void {
 		this.commitText(path, input.value);
-		const menu = new Menu();
-		const structural = (
+		showDropdownMenu(evt, (menu) => {
+			const structural = (
 			title: string,
 			icon: string,
 			mutate: (items: ChecklistItem[]) => { items: ChecklistItem[]; path: ChecklistPath },
-		): void => {
+			): void => {
+				menu.addItem((mi) =>
+					mi
+						.setTitle(title)
+						.setIcon(icon)
+						.onClick(() => {
+							this.change((items) => {
+								const r = mutate(items);
+								this.focusPath = r.path;
+								return r.items;
+							});
+						}),
+				);
+			};
+
+			structural(t('modal.checklist.indent'), 'indent', (items) => cl.indent(items, path));
+			structural(t('modal.checklist.outdent'), 'outdent', (items) => cl.outdent(items, path));
+			structural(t('propertyDefs.moveUp'), 'arrow-up', (items) => cl.move(items, path, -1));
+			structural(t('propertyDefs.moveDown'), 'arrow-down', (items) => cl.move(items, path, 1));
+			menu.addSeparator();
 			menu.addItem((mi) =>
 				mi
-					.setTitle(title)
-					.setIcon(icon)
+					.setTitle(t('modal.checklist.deleteItem'))
+					.setIcon('trash-2')
+					.setWarning(true)
 					.onClick(() => {
 						this.change((items) => {
-							const r = mutate(items);
-							this.focusPath = r.path;
-							return r.items;
+							this.focusPath = null;
+							return cl.removeAt(items, path);
 						});
 					}),
 			);
-		};
-
-		structural(t('modal.checklist.indent'), 'indent', (items) => cl.indent(items, path));
-		structural(t('modal.checklist.outdent'), 'outdent', (items) => cl.outdent(items, path));
-		structural(t('propertyDefs.moveUp'), 'arrow-up', (items) => cl.move(items, path, -1));
-		structural(t('propertyDefs.moveDown'), 'arrow-down', (items) => cl.move(items, path, 1));
-		menu.addSeparator();
-		menu.addItem((mi) =>
-			mi
-				.setTitle(t('modal.checklist.deleteItem'))
-				.setIcon('trash-2')
-				.setWarning(true)
-				.onClick(() => {
-					this.change((items) => {
-						this.focusPath = null;
-						return cl.removeAt(items, path);
-					});
-				}),
-		);
-		menu.showAtMouseEvent(evt);
+		});
 	}
 
 	private applyFocus(): void {

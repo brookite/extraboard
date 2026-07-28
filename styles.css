@@ -23,6 +23,11 @@
 	overflow-y: hidden;
 }
 
+/* Keep the desktop scrollbar below the stack cards rather than against them. */
+body:not(.is-mobile) .eb-board {
+	padding-bottom: calc(var(--size-4-3, 12px) + 8px);
+}
+
 .eb-stack {
 	display: flex;
 	flex-direction: column;
@@ -2182,6 +2187,20 @@ body.is-mobile .eb-add-stack-button {
 	flex: 0 0 auto;
 }
 
+/* Keep the host — not the SVG itself — on the button's centreline. Making the
+   SVG a flex container prevents Obsidian's icon from painting on mobile. */
+.eb-list button .eb-button-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	line-height: 0;
+}
+
+.eb-list button .eb-button-icon .svg-icon {
+	display: block;
+}
+
 .eb-section-sort.is-active,
 .eb-section-filter.is-active {
 	color: var(--text-accent);
@@ -2239,6 +2258,49 @@ body.is-mobile .eb-add-stack-button {
 	max-width: 30%;
 }
 
+/* Desktop owns a different stack control inside `.eb-card-head`; this sibling
+   remains exclusively the mobile footer. */
+body:not(.is-mobile) .eb-list-row > .eb-list-stack {
+	display: none;
+}
+
+.eb-card-stack {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	flex: 0 1 auto;
+	max-width: 40%;
+	height: 20px;
+	min-height: 20px;
+	padding: 1px 5px;
+	overflow: hidden;
+	font-size: var(--font-ui-smaller, 0.8em);
+	line-height: 1;
+	white-space: nowrap;
+}
+
+.eb-card-stack > span:last-child {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+body:not(.is-mobile) .eb-list-row:hover .eb-card-stack,
+body:not(.is-mobile) .eb-list-row:focus-within .eb-card-stack,
+body:not(.is-mobile) .eb-list-row:hover .eb-card-menu,
+body:not(.is-mobile) .eb-list-row:focus-within .eb-card-menu {
+	opacity: 1;
+}
+
+body:not(.is-mobile) .eb-card-edit-actions {
+	display: flex;
+	justify-content: flex-end;
+	padding-bottom: 4px;
+}
+
+body.is-mobile .eb-card-stack {
+	display: none;
+}
+
 /* "Add card" plus the stack it writes into: the button grows, the badge keeps
    its own width so the stack name stays readable. */
 .eb-section-compose {
@@ -2255,16 +2317,100 @@ body.is-mobile .eb-add-stack-button {
 	width: auto;
 }
 
+.eb-list-add-section {
+	padding-bottom: var(--size-4-3, 12px);
+}
+
+.eb-list-add-section-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 8px;
+	color: var(--text-muted);
+	background: none;
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.eb-list-add-section-button:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.eb-list-add-section-button:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
+.eb-list-add-section-editor {
+	width: 100%;
+	min-width: 0;
+}
+
 /* Phones: the cap is inert, the badges wrap under the card, and the composer
    stacks so its three controls keep touch-sized targets (mobile.md §3). */
 .is-phone .eb-list {
 	padding: var(--size-4-2, 8px);
 }
 
+.is-phone .eb-section-header {
+	gap: 2px;
+	padding-inline: 6px;
+}
+
+/* Full localized sort/filter values consume the section title on narrow
+   screens and inherit the mobile theme's oversized button metrics. Their
+   tooltips and menus retain the details; the header keeps centred glyphs. */
+.is-phone .eb-section-sort,
+.is-phone .eb-section-filter {
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	min-width: 32px;
+	min-height: 32px;
+	max-width: none;
+	padding: 0;
+}
+
+.is-phone .eb-section-sort-label,
+.is-phone .eb-section-filter-label {
+	display: none;
+}
+
 .is-phone .eb-list-row {
+	flex-direction: column;
 	flex-wrap: wrap;
+	gap: 0;
+	border-radius: 6px;
+	box-shadow: var(--shadow-s, 0 1px 2px rgba(0, 0, 0, 0.08));
+}
+
+.is-phone .eb-list-row > .eb-card {
+	flex-basis: auto;
+	width: 100%;
+	border-bottom-right-radius: 0;
+	border-bottom-left-radius: 0;
+	box-shadow: none;
+}
+
+.is-phone .eb-list-row > .eb-card.is-editing .eb-card-editor {
+	border-bottom-right-radius: 0;
+	border-bottom-left-radius: 0;
 }
 
 .is-phone .eb-list-row .eb-list-stack {
+	justify-content: flex-start;
+	width: 100%;
+	height: 32px;
+	min-height: 32px;
 	max-width: 100%;
+	margin-top: 0;
+	padding-block: 2px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-top: none;
+	border-radius: 0 0 6px 6px;
 }

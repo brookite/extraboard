@@ -1,4 +1,3 @@
-import { Menu } from 'obsidian';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { BoardConfig, Stack } from '../../model/types';
@@ -14,6 +13,7 @@ import { DividerRow } from './Divider';
 import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
 import { t } from '../../i18n';
+import { showDropdownMenu } from '../../util/menu';
 
 /** Identity-stable props, so the memo below holds across an edit in another
  * stack (m10-perf.md §2) — the stack object and the board's config, never the
@@ -114,68 +114,68 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 	};
 
 	const openMenu = (event: MouseEvent): void => {
-		const menu = new Menu();
-		menu.addItem((item) =>
+		showDropdownMenu(event, (menu) => {
+			menu.addItem((item) =>
 			item
 				.setTitle(t('stack.addCard'))
 				.setIcon('plus')
 				.onClick(addCard),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(t('stack.addDivider'))
 				.setIcon('minus')
 				.onClick(() => api.update((b) => ops.addDivider(b, index, undefined))),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(t('stack.addNamedDivider'))
 				.setIcon('heading')
 				.onClick(() => api.update((b) => ops.addDivider(b, index, 'Group'))),
-		);
-		menu.addSeparator();
+			);
+			menu.addSeparator();
 		// "Edit", not "Rename": the flag belongs to the same form as the name
 		// (stack-completion-and-divider-colors.md §3.3). Clicking the name still
 		// renames inline, which is the faster path when that is all one wants.
-		menu.addItem((item) =>
+			menu.addItem((item) =>
 			item
 				.setTitle(t('modal.stack.editTitle'))
 				.setIcon('pencil')
 				.onClick(() => {
 					void editParameters();
 				}),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(toggleLabel)
 				.setIcon(collapsed ? 'chevron-down' : 'chevron-right')
 				.onClick(() => setCollapsed(!collapsed)),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(t('stack.insertLeft'))
 				.setIcon('arrow-left')
 				.onClick(() => {
 					void insertStack(index);
 				}),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(t('stack.insertRight'))
 				.setIcon('arrow-right')
 				.onClick(() => {
 					void insertStack(index + 1);
 				}),
-		);
-		menu.addSeparator();
-		menu.addItem((item) =>
+			);
+			menu.addSeparator();
+			menu.addItem((item) =>
 			item
 				.setTitle(t('stack.deleteStack'))
 				.setIcon('trash-2')
 				.setWarning(true)
 				.onClick(() => void deleteStack()),
-		);
-		menu.showAtMouseEvent(event);
+			);
+		});
 	};
 
 	return (

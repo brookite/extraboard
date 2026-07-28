@@ -241,6 +241,16 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 			},
 		);
 		editor.render();
+
+		new Setting(containerEl)
+			.setName(t('settings.reduceBoardFileWrites.name'))
+			.setDesc(t('settings.reduceBoardFileWrites.desc'))
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.reduceBoardFileWrites).onChange((value) => {
+					this.plugin.settings.reduceBoardFileWrites = value;
+					void this.plugin.saveSettings();
+				}),
+			);
 	}
 
 	/**

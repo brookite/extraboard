@@ -135,6 +135,11 @@ export interface ExtraboardSettings {
 	 * settings block (i18n-and-dates.md §3).
 	 */
 	dateHighlights: DateHighlightRule[];
+	/**
+	 * Before a plugin-requested board save, compare the complete logical board
+	 * state with the file and skip the write when they match.
+	 */
+	reduceBoardFileWrites: boolean;
 }
 
 export const DEFAULT_SETTINGS: ExtraboardSettings = {
@@ -155,4 +160,5 @@ export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	timePattern: '',
 	weekStart: 'auto',
 	dateHighlights: [],
+	reduceBoardFileWrites: false,
 };

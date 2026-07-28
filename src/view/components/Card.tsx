@@ -5,13 +5,13 @@ import * as ops from '../../model/ops';
 import type { BoardConfig, Card } from '../../model/types';
 import { archiveOpts, cardEntryPos, type ExtraboardSettings } from '../../settings';
 import { ChecklistModal } from '../../ui/ChecklistModal';
-import { styleMenuItem, submenuOf } from '../../util/menu';
+import { showDropdownMenu, styleMenuItem, submenuOf } from '../../util/menu';
 import type { BoardApi } from '../api';
 import { CardEditor } from '../CardEditor';
 import { hoverLinkText, openLinkText, resolveCardLink } from '../links';
 import { memo } from '../memo';
 import { isDragging } from '../useSortable';
-import { IconButton } from './Icon';
+import { Icon, IconButton } from './Icon';
 import { MarkdownText, hasMarkdown } from './MarkdownText';
 import { ChecklistProgress, progressStyleFor } from './Progress';
 import { PropertyBadge } from './PropertyBadge';
@@ -46,6 +46,10 @@ interface Props {
 	 * across renders, or it defeats this card's memo.
 	 */
 	menuExtra?: (menu: Menu, ref: ops.ItemRef) => void;
+	/** List-view stack picker shown inside this card on desktop. */
+	stackLabel?: string;
+	/** Opens the stack picker for this card. Stable for memoization. */
+	onStackPick?: (event: MouseEvent, ref: ops.ItemRef) => void;
 }
 
 /** The board's single `color` property paints the card instead of a badge. */
@@ -65,6 +69,8 @@ function CardTileInner({
 	forceEdit,
 	onForceEditConsumed,
 	menuExtra,
+	stackLabel,
+	onStackPick,
 }: Props) {
 	const [editing, setEditing] = useState(false);
 
@@ -75,10 +81,29 @@ function CardTileInner({
 	}, [forceEdit]);
 
 	const ref = { stack: stackIndex, item: index };
+	const renderStackControl = (editingControl = false) =>
+		stackLabel && onStackPick ? (
+			<button
+				type="button"
+				class={`eb-badge eb-card-stack${editingControl ? '' : ' eb-hover-only'}`}
+				aria-label={`${t('card.moveToStack')}: ${stackLabel}`}
+				title={stackLabel}
+				onClick={(event) => {
+					event.stopPropagation();
+					onStackPick(event, ref);
+				}}
+			>
+				<Icon name="square-kanban" class="eb-button-icon" />
+				<span>{stackLabel}</span>
+			</button>
+		) : null;
 
 	if (editing) {
 		return (
 			<div class="eb-item eb-card is-editing" data-index={index}>
+				{stackLabel && onStackPick ? (
+					<div class="eb-card-edit-actions">{renderStackControl(true)}</div>
+				) : null}
 				<CardEditor
 					config={config}
 					card={card}
@@ -130,45 +155,45 @@ function CardTileInner({
 	};
 
 	const openMenu = (event: MouseEvent): void => {
-		const menu = new Menu();
-		menu.addItem((item) =>
+		showDropdownMenu(event, (menu) => {
+			menu.addItem((item) =>
 			item
 				.setTitle(t('card.editCard'))
 				.setIcon('pencil')
 				.onClick(() => setEditing(true)),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(t('card.duplicateCard'))
 				.setIcon('copy')
 				.onClick(() => api.update((b) => ops.duplicateItem(b, ref))),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(card.task === undefined ? t('card.addCheckbox') : t('card.removeCheckbox'))
 				.setIcon(card.task === undefined ? 'square-check' : 'square')
 				.onClick(() =>
 					api.update((b) => ops.setCardTask(b, ref, card.task === undefined ? ' ' : undefined)),
 				),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(t('card.cardColor'))
 				.setIcon('palette')
 				.onClick(() => {
 					void chooseColor();
 				}),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(t('modal.checklist.title'))
 				.setIcon('list-checks')
 				.onClick(openChecklist),
-		);
+			);
 
 		// Only the note actions that apply to this card (§2).
-		menu.addSeparator();
-		if (link) {
+			menu.addSeparator();
+			if (link) {
 			menu.addItem((item) =>
 				item
 					.setTitle(t('card.openNote'))
@@ -183,21 +208,21 @@ function CardTileInner({
 					.setIcon('unlink')
 					.onClick(() => api.update((b) => ops.unlinkCardNote(b, ref))),
 			);
-		} else {
+			} else {
 			menu.addItem((item) =>
 				item
 					.setTitle(t('card.createNote'))
 					.setIcon('file-plus')
 					.onClick(() => api.createCardNote(ref)),
 			);
-		}
+			}
 
 		// The move section (kanban-view.md §5.3). Read through the live board
 		// rather than a captured one: the menu is built at click time, and this
 		// card is not handed the board (see `Props`).
-		const stacks = api.getBoard()?.stacks ?? [];
-		const completing = stacks.findIndex((stack) => stack.completes);
-		if (completing !== -1 || stacks.length > 1) menu.addSeparator();
+			const stacks = api.getBoard()?.stacks ?? [];
+			const completing = stacks.findIndex((stack) => stack.completes);
+			if (completing !== -1 || stacks.length > 1) menu.addSeparator();
 
 		// "Complete card" is the shortcut for the move a board with a completing
 		// stack makes over and over: the card lands wherever that stack takes
@@ -205,7 +230,7 @@ function CardTileInner({
 		// Green, because it is the
 		// menu's one affirmative action among neutral and destructive ones — and
 		// the mirror of "Archive card"'s red at the other end.
-		if (completing !== -1 && completing !== stackIndex) {
+			if (completing !== -1 && completing !== stackIndex) {
 			menu.addItem((item) => {
 				item
 					.setTitle(t('card.completeCard'))
@@ -217,14 +242,14 @@ function CardTileInner({
 					);
 				styleMenuItem(item, 'eb-menu-success');
 			});
-		}
+			}
 
 		// "Move to" as a submenu, one child per stack. The flat list it replaces
 		// grew with the board and pushed "Archive card" off the bottom of a phone
 		// screen; the parent item is one row whatever the board looks like. Where
 		// submenus are unavailable the same children open as their own menu, so
 		// the action is never simply missing (§5.3).
-		if (stacks.length > 1) {
+			if (stacks.length > 1) {
 			const fill = (target: Menu): void => {
 				stacks.forEach((stack, i) => {
 					target.addItem((item) =>
@@ -249,10 +274,10 @@ function CardTileInner({
 					});
 				}
 			});
-		}
-		menuExtra?.(menu, ref);
-		menu.addSeparator();
-		menu.addItem((item) =>
+			}
+			menuExtra?.(menu, ref);
+			menu.addSeparator();
+			menu.addItem((item) =>
 			item
 				.setTitle(t('kanban.archiveCard'))
 				.setIcon('archive')
@@ -260,10 +285,10 @@ function CardTileInner({
 				// so it has to read as one at a glance (kanban-view.md §5.3).
 				.setWarning(true)
 				.onClick(() => api.update((b) => ops.archiveCard(b, ref, archiveOpts(settings)))),
-		);
+			);
 		// Archiving is the non-destructive default, so deleting is opt-in
 		// (settings.md, archive.md §1).
-		if (settings.allowDeleteWithoutArchive) {
+			if (settings.allowDeleteWithoutArchive) {
 			menu.addItem((item) =>
 				item
 					.setTitle(t('modal.archive.deleteCard'))
@@ -271,8 +296,8 @@ function CardTileInner({
 					.setWarning(true)
 					.onClick(() => api.update((b) => ops.deleteItem(b, ref))),
 			);
-		}
-		menu.showAtMouseEvent(event);
+			}
+		});
 	};
 
 	// The color property is chrome, not a badge (kanban-view.md §3).
@@ -353,6 +378,7 @@ function CardTileInner({
 						<span class="eb-placeholder">{t('modal.archive.untitled')}</span>
 					)}
 				</div>
+				{renderStackControl()}
 				<IconButton
 					icon="more-horizontal"
 					label={t('card.options')}

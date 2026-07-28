@@ -18,6 +18,7 @@ import { CardTile } from './Card';
 import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
 import { t } from '../../i18n';
+import { showDropdownMenu } from '../../util/menu';
 
 export interface SectionProps {
 	board: Board;
@@ -54,6 +55,8 @@ export interface SectionProps {
 	/** "Move to section" for the card menu — the pointer-free way to do what a
 	 * drag does (§4.3). Stable, or every row's memo misses. */
 	menuExtra: (menu: Menu, ref: ops.ItemRef) => void;
+	/** Open the stack picker inside a card header. Stable for card memoization. */
+	onStackPick: (event: MouseEvent, ref: ops.ItemRef) => void;
 	/** Section reordering, absent when this section cannot move (§1.3, §1.4). */
 	onMove?: (direction: -1 | 1) => void;
 	canMoveUp: boolean;
@@ -75,25 +78,32 @@ function StackBadge({
 	onPick: (index: number) => void;
 }) {
 	const name = board.stacks[stack]?.name;
+	const label = name || t('modal.archive.untitled');
 	const choose = (event: MouseEvent): void => {
 		event.stopPropagation();
-		const menu = new Menu();
-		board.stacks.forEach((target, i) => {
-			menu.addItem((item) =>
-				item
-					.setTitle(target.name || t('modal.archive.untitled'))
-					.setIcon('square-kanban')
-					.setChecked(mode === 'pick' && i === stack)
-					.setDisabled(mode === 'move' && i === stack)
-					.onClick(() => onPick(i)),
-			);
+		showDropdownMenu(event, (menu) => {
+			board.stacks.forEach((target, i) => {
+				menu.addItem((item) =>
+					item
+						.setTitle(target.name || t('modal.archive.untitled'))
+						.setIcon('square-kanban')
+						.setChecked(mode === 'pick' && i === stack)
+						.setDisabled(mode === 'move' && i === stack)
+						.onClick(() => onPick(i)),
+				);
+			});
 		});
-		menu.showAtMouseEvent(event);
 	};
 	return (
-		<button type="button" class={`eb-badge eb-list-stack is-${mode}`} onClick={choose}>
-			<Icon name="square-kanban" />
-			<span>{name || t('modal.archive.untitled')}</span>
+		<button
+			type="button"
+			class={`eb-badge eb-list-stack is-${mode}`}
+			aria-label={`${t('card.moveToStack')}: ${label}`}
+			title={label}
+			onClick={choose}
+		>
+			<Icon name="square-kanban" class="eb-button-icon" />
+			<span>{label}</span>
 		</button>
 	);
 }
@@ -118,6 +128,7 @@ export function SectionGroup(props: SectionProps) {
 		pending,
 		onDrop,
 		menuExtra,
+		onStackPick,
 		onMove,
 		canMoveUp,
 		canMoveDown,
@@ -161,60 +172,60 @@ export function SectionGroup(props: SectionProps) {
 		: t('list.sort.document');
 
 	const chooseSort = (event: MouseEvent): void => {
-		const menu = new Menu();
-		menu.addItem((item) =>
-			item
-				.setTitle(t('list.sort.document'))
-				.setIcon('list')
-				.setChecked(!state.sort)
-				.onClick(() => onState({ sort: undefined })),
-		);
-		for (const def of dateProps) {
-			for (const dir of ['asc', 'desc'] as const) {
-				menu.addItem((item) =>
-					item
-						.setTitle(t(dir === 'asc' ? 'list.sort.asc' : 'list.sort.desc', { name: def.name }))
-						.setIcon(dir === 'asc' ? 'arrow-up-narrow-wide' : 'arrow-down-wide-narrow')
-						.setChecked(state.sort?.property === def.name && state.sort.dir === dir)
-						.onClick(() => onState({ sort: { property: def.name, dir } })),
-				);
+		showDropdownMenu(event, (menu) => {
+			menu.addItem((item) =>
+				item
+					.setTitle(t('list.sort.document'))
+					.setIcon('list')
+					.setChecked(!state.sort)
+					.onClick(() => onState({ sort: undefined })),
+			);
+			for (const def of dateProps) {
+				for (const dir of ['asc', 'desc'] as const) {
+					menu.addItem((item) =>
+						item
+							.setTitle(t(dir === 'asc' ? 'list.sort.asc' : 'list.sort.desc', { name: def.name }))
+							.setIcon(dir === 'asc' ? 'arrow-up-narrow-wide' : 'arrow-down-wide-narrow')
+							.setChecked(state.sort?.property === def.name && state.sort.dir === dir)
+							.onClick(() => onState({ sort: { property: def.name, dir } })),
+					);
+				}
 			}
-		}
-		if (!dateProps.length) {
-			menu.addItem((item) => item.setTitle(t('list.sort.noDateProperty')).setDisabled(true));
-		}
-		menu.showAtMouseEvent(event);
+			if (!dateProps.length) {
+				menu.addItem((item) => item.setTitle(t('list.sort.noDateProperty')).setDisabled(true));
+			}
+		});
 	};
 
 	const chooseTags = (event: MouseEvent): void => {
-		const menu = new Menu();
-		const active = state.tags ?? [];
-		const available = tagsOf(board, section.cards);
-		if (!available.length) {
-			menu.addItem((item) => item.setTitle(t('list.filter.noTags')).setDisabled(true));
-		}
-		for (const tag of available) {
-			menu.addItem((item) =>
-				item
-					.setTitle(`#${tag}`)
-					.setChecked(active.includes(tag))
-					.onClick(() =>
-						onState({
-							tags: active.includes(tag) ? active.filter((x) => x !== tag) : [...active, tag],
-						}),
-					),
-			);
-		}
-		if (active.length) {
-			menu.addSeparator();
-			menu.addItem((item) =>
-				item
-					.setTitle(t('list.filter.clear'))
-					.setIcon('filter-x')
-					.onClick(() => onState({ tags: [] })),
-			);
-		}
-		menu.showAtMouseEvent(event);
+		showDropdownMenu(event, (menu) => {
+			const active = state.tags ?? [];
+			const available = tagsOf(board, section.cards);
+			if (!available.length) {
+				menu.addItem((item) => item.setTitle(t('list.filter.noTags')).setDisabled(true));
+			}
+			for (const tag of available) {
+				menu.addItem((item) =>
+					item
+						.setTitle(`#${tag}`)
+						.setChecked(active.includes(tag))
+						.onClick(() =>
+							onState({
+								tags: active.includes(tag) ? active.filter((x) => x !== tag) : [...active, tag],
+							}),
+						),
+				);
+			}
+			if (active.length) {
+				menu.addSeparator();
+				menu.addItem((item) =>
+					item
+						.setTitle(t('list.filter.clear'))
+						.setIcon('filter-x')
+						.onClick(() => onState({ tags: [] })),
+				);
+			}
+		});
 	};
 
 	const rename = (name: string): void => {
@@ -226,20 +237,20 @@ export function SectionGroup(props: SectionProps) {
 	};
 
 	const openMenu = (event: MouseEvent): void => {
-		const menu = new Menu();
-		menu.addItem((item) =>
+		showDropdownMenu(event, (menu) => {
+			menu.addItem((item) =>
 			item
 				.setTitle(t('stack.addCard'))
 				.setIcon('plus')
 				.onClick(addCard),
-		);
-		menu.addItem((item) =>
+			);
+			menu.addItem((item) =>
 			item
 				.setTitle(collapsed ? t('stack.expand') : t('stack.collapse'))
 				.setIcon(collapsed ? 'chevron-down' : 'chevron-right')
 				.onClick(() => setCollapsed(!collapsed)),
-		);
-		if (!locked) {
+			);
+			if (!locked) {
 			menu.addItem((item) =>
 				item
 					.setTitle(t('list.sort.label'))
@@ -260,8 +271,8 @@ export function SectionGroup(props: SectionProps) {
 						.onClick(() => onState({ tags: [] })),
 				);
 			}
-		}
-		if (onMove) {
+			}
+			if (onMove) {
 			menu.addSeparator();
 			menu.addItem((item) =>
 				item
@@ -277,8 +288,8 @@ export function SectionGroup(props: SectionProps) {
 					.setDisabled(!canMoveDown)
 					.onClick(() => onMove(1)),
 			);
-		}
-		if (key.kind !== 'none') {
+			}
+			if (key.kind !== 'none') {
 			menu.addSeparator();
 			menu.addItem((item) =>
 				item
@@ -286,8 +297,8 @@ export function SectionGroup(props: SectionProps) {
 					.setIcon('pencil')
 					.onClick(() => setRenaming(true)),
 			);
-		}
-		if (named) {
+			}
+			if (named) {
 			menu.addItem((item) =>
 				item
 					.setTitle(t('list.removeSection'))
@@ -296,8 +307,8 @@ export function SectionGroup(props: SectionProps) {
 					// this is not a destructive item and asks for no confirmation (§4.4).
 					.onClick(() => api.update((b) => ops.removeSection(b, key.name))),
 			);
-		}
-		menu.showAtMouseEvent(event);
+			}
+		});
 	};
 
 	const filtered = (state.tags?.length ?? 0) > 0;
@@ -319,7 +330,10 @@ export function SectionGroup(props: SectionProps) {
 					aria-label={collapsed ? t('stack.expand') : t('stack.collapse')}
 					onClick={() => setCollapsed(!collapsed)}
 				>
-					<Icon name="chevron-down" class={`eb-chevron${collapsed ? ' is-collapsed' : ''}`} />
+					<Icon
+						name="chevron-down"
+						class={`eb-button-icon eb-chevron${collapsed ? ' is-collapsed' : ''}`}
+					/>
 				</button>
 				{renaming ? (
 					<InlineEditor
@@ -346,8 +360,8 @@ export function SectionGroup(props: SectionProps) {
 					title={locked ? t('list.controlsFixed') : t('list.sort.label')}
 					onClick={chooseSort}
 				>
-					<Icon name="arrow-up-down" />
-					<span>{sortLabel}</span>
+					<Icon name="arrow-up-down" class="eb-button-icon" />
+					<span class="eb-section-sort-label">{sortLabel}</span>
 				</button>
 				<button
 					type="button"
@@ -356,8 +370,10 @@ export function SectionGroup(props: SectionProps) {
 					title={locked ? t('list.controlsFixed') : t('list.filter.label')}
 					onClick={chooseTags}
 				>
-					<Icon name="filter" />
-					{filtered ? <span>{state.tags!.map((tag) => `#${tag}`).join(' ')}</span> : null}
+					<Icon name="filter" class="eb-button-icon" />
+					{filtered ? (
+						<span class="eb-section-filter-label">{state.tags!.map((tag) => `#${tag}`).join(' ')}</span>
+					) : null}
 				</button>
 				<span class="eb-section-count">{rows.length}</span>
 				<IconButton icon="more-vertical" label={t('stack.options')} onClick={openMenu} />
@@ -379,8 +395,13 @@ export function SectionGroup(props: SectionProps) {
 								api={api}
 								settings={settings}
 								menuExtra={menuExtra}
+								stackLabel={stack.name || t('modal.archive.untitled')}
+								onStackPick={onStackPick}
 								forceEdit={pending?.stack === ref.stack && pending.item === ref.item}
 							/>
+							{/* Keep the stack control outside CardTile's read/edit
+							    switch: on phones CSS joins both into one visual card,
+							    while editing never replaces or hides this footer. */}
 							<StackBadge
 								board={board}
 								stack={ref.stack}
@@ -395,7 +416,7 @@ export function SectionGroup(props: SectionProps) {
 			{collapsed || !board.stacks.length ? null : (
 				<div class="eb-section-compose">
 					<button type="button" class="eb-add-card" onClick={addCard}>
-						<Icon name="plus" />
+						<Icon name="plus" class="eb-button-icon" />
 						<span>{t('stack.addCard')}</span>
 					</button>
 					{/* Which stack the new card is written into (§4.2) — the one

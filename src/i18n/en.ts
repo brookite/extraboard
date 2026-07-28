@@ -96,6 +96,7 @@ export const en = {
 	},
 	// The list view (M13). Spec: docs/specs/list-view.md.
 	list: {
+		addSection: 'Add section',
 		noSection: 'No section',
 		unnamedSection: 'Unnamed group ({stack})',
 		sectionNamePlaceholder: 'Section name',
@@ -544,6 +545,10 @@ export const en = {
 		dateHighlights: {
 			heading: 'Date highlights',
 			desc: 'Color a date badge as its date approaches or after it has passed. A board can replace this whole list in its own settings.',
+		},
+		reduceBoardFileWrites: {
+			name: 'Reduce board file writes',
+			desc: 'Reads and checks the complete board before each save requested by the plugin, and skips the write if nothing changed. Saving becomes slower. Editing the file externally at the same time as its board view can lose changes.',
 		},
 	},
 	common: {

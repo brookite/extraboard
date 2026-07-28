@@ -15,7 +15,9 @@ import { dateProperties } from '../model/views';
 import type { ExtraboardSettings } from '../settings';
 import type { BoardApi } from './api';
 import { SectionGroup } from './components/Section';
-import { submenuOf } from '../util/menu';
+import { Icon } from './components/Icon';
+import { InlineEditor } from './components/InlineEditor';
+import { showDropdownMenu, submenuOf } from '../util/menu';
 import { useSortable, type DropInfo } from './useSortable';
 import { t } from '../i18n';
 
@@ -46,6 +48,7 @@ function sessionKey(section: Section): string {
 
 export function ListView({ board, view, api, settings }: Props) {
 	const [session, setSession] = useState<SessionState>({});
+	const [addingSection, setAddingSection] = useState(false);
 	const rootRef = useRef<HTMLDivElement>(null);
 	// The composer's stack, per section, remembered for as long as the view is
 	// mounted — a list is filled section by section, not stack by stack (§4.2).
@@ -214,6 +217,25 @@ export function ListView({ board, view, api, settings }: Props) {
 		});
 	}, []);
 
+	/** Open the card-header stack picker from the live board. The stable callback
+	 * preserves CardTile memoization across unrelated edits. */
+	const openStackPicker = useCallback((event: MouseEvent, ref: ops.ItemRef): void => {
+		event.stopPropagation();
+		const current = api.getBoard();
+		if (!current) return;
+		showDropdownMenu(event, (menu) => {
+			current.stacks.forEach((stack, index) => {
+				menu.addItem((item) =>
+					item
+						.setTitle(stack.name || t('modal.archive.untitled'))
+						.setIcon('square-kanban')
+						.setDisabled(index === ref.stack)
+						.onClick(() => api.update((b) => ops.moveCardToStack(b, ref, index))),
+				);
+			});
+		});
+	}, []);
+
 	// Sections reorder among themselves; only a named one is draggable, so the
 	// grip is what Sortable takes hold of (§4.1).
 	useSortable(
@@ -283,12 +305,36 @@ export function ListView({ board, view, api, settings }: Props) {
 						pending={pending}
 						onDrop={onDrop}
 						menuExtra={menuExtra}
+						onStackPick={openStackPicker}
 						{...(section.movable && { onMove: (direction: -1 | 1) => moveBy(section, direction) })}
 						canMoveUp={at > 0}
 						canMoveDown={at !== -1 && at < movable.length - 1}
 					/>
 				);
 			})}
+			<div class="eb-list-add-section">
+				{addingSection ? (
+					<InlineEditor
+						placeholder={t('list.sectionNamePlaceholder')}
+						class="eb-list-add-section-editor"
+						onSubmit={(name) => {
+							setAddingSection(false);
+							api.update((b) => ops.addSection(b, name));
+						}}
+						onCancel={() => setAddingSection(false)}
+					/>
+				) : (
+					<button
+						type="button"
+						class="eb-list-add-section-button"
+						disabled={!board.stacks.length}
+						onClick={() => setAddingSection(true)}
+					>
+						<Icon name="plus" class="eb-button-icon" />
+						<span>{t('list.addSection')}</span>
+					</button>
+				)}
+			</div>
 		</div>
 	);
 }

@@ -226,6 +226,35 @@ describe('sections: adding a card', () => {
 	});
 });
 
+describe('sections: adding an empty named section', () => {
+	it('appends its divider to the first stack after every card', () => {
+		const next = intact(ops.addSection(board(), 'New section'));
+		expect(titlesOf(next, 0)).toEqual([
+			'Loose A',
+			'### Backlog',
+			'B1',
+			'B2',
+			'### Review',
+			'R1',
+			'### New section',
+		]);
+		expect(titlesOf(next, 1)).not.toContain('### New section');
+		expect(titlesOf(next, 2)).not.toContain('### New section');
+	});
+
+	it('trims the name and refuses an empty, existing, or stackless section', () => {
+		const trimmed = intact(ops.addSection(board(), '  New section  '));
+		expect(titlesOf(trimmed, 0).at(-1)).toBe('### New section');
+
+		const before = board();
+		expect(ops.addSection(before, '  ')).toBe(before);
+		expect(ops.addSection(before, 'Backlog')).toBe(before);
+
+		const stackless = parseBoard([FM, ''].join('\n'));
+		expect(ops.addSection(stackless, 'New section')).toBe(stackless);
+	});
+});
+
 describe('sections: moving a card', () => {
 	it('moves a card into another section of its own stack', () => {
 		const next = intact(ops.moveCardToSection(board(), { stack: 0, item: 0 }, 0, named('Review')));

@@ -4,7 +4,6 @@
 // Every edit goes through an op like any other change — there is no confirm
 // step and no dirty state to lose.
 
-import { Menu } from 'obsidian';
 import { useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import { escapeValue, formatValue, parseValue } from '../../model/properties';
@@ -19,6 +18,7 @@ import type { BoardApi } from '../api';
 import { Icon } from './Icon';
 import { safeColor } from './style';
 import { t } from '../../i18n';
+import { showDropdownMenu } from '../../util/menu';
 
 /** Types edited as one text field; the rest have a control of their own. */
 const TEXT_TYPES = new Set(['string', 'datetime', 'date-range']);
@@ -56,19 +56,19 @@ export function PropertyBadges({ config, card, target, api, settings }: Props) {
 
 	const addMenu = (evt: MouseEvent): void => {
 		const missing = config.properties.filter((d) => !valueFor(d.name));
-		const menu = new Menu();
-		if (!missing.length) {
-			menu.addItem((item) => item.setTitle(t('propertyBadges.noOtherProperties')).setDisabled(true));
-		}
-		for (const def of missing) {
-			menu.addItem((item) =>
-				item
-					.setTitle(def.name)
-					.setIcon('plus')
-					.onClick(() => setOpen(def.name)),
-			);
-		}
-		menu.showAtMouseEvent(evt);
+		showDropdownMenu(evt, (menu) => {
+			if (!missing.length) {
+				menu.addItem((item) => item.setTitle(t('propertyBadges.noOtherProperties')).setDisabled(true));
+			}
+			for (const def of missing) {
+				menu.addItem((item) =>
+					item
+						.setTitle(def.name)
+						.setIcon('plus')
+						.onClick(() => setOpen(def.name)),
+				);
+			}
+		});
 	};
 
 	const openName = open;
