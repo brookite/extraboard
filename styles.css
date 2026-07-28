@@ -108,11 +108,20 @@
 	height: 14px;
 }
 
+/* A stack name wraps to at most two lines, then ellipses (§2). One line cut a
+   name short far too eagerly at 272px; letting it grow without a bound would
+   let a pasted title push the cards off the screen. `-webkit-line-clamp` draws
+   the ellipsis itself, so `text-overflow` has no part here. */
 .eb-stack-name {
 	flex: 1 1 auto;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
 	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	/* A single unbroken word is the case a name is likeliest to hit the limit
+	   with, and it must break rather than widen the fixed-width stack. */
+	overflow-wrap: anywhere;
 	cursor: text;
 }
 
@@ -135,7 +144,15 @@
 	height: 16px;
 }
 
+/* A collapsed stack is a vertical spine: its name runs down one line and is cut
+   by height, so the two-line clamp above is undone rather than rotated. */
 .eb-stack.is-collapsed .eb-stack-name {
+	display: block;
+	-webkit-line-clamp: none;
+	line-clamp: none;
+	overflow-wrap: normal;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 	writing-mode: vertical-rl;
 	max-height: 60vh;
 }
