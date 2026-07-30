@@ -57,10 +57,9 @@ with its own file format, not a fork.
 
 ## Status
 
-**Early development** — the MVP is being implemented milestone by milestone.
-Everything listed above works; what is left before a first release is mobile
-verification. Packaging and the draft GitHub Release are automated. This section
-will be replaced with setup and usage instructions once the MVP is complete.
+**Post-MVP active development.** The full feature set above is implemented and
+manually verified on desktop and mobile. The current release is **0.2.3**;
+packaging and draft GitHub Releases are automated.
 
 ## Development
 
