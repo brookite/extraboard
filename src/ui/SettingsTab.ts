@@ -1,7 +1,14 @@
 // Plugin settings tab (Settings → Community plugins → Extraboard).
 // Spec: docs/specs/settings.md.
 
-import { App, PluginSettingTab, Setting, normalizePath } from 'obsidian';
+import {
+	App,
+	PluginSettingTab,
+	Setting,
+	normalizePath,
+	type SettingDefinition,
+	type SettingDefinitionItem,
+} from 'obsidian';
 import type ExtraboardPlugin from '../main';
 import type { ProgressStyle } from '../model/types';
 import type { Lang } from '../i18n';
@@ -59,22 +66,142 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
-	/**
-	 * Declarative settings (Obsidian 1.13+) replace `display()` entirely when
-	 * they return anything, and `defaultProperties` is a nested, typed editor
-	 * that the descriptors cannot express. Returning an empty list keeps the
-	 * custom tab below on every supported version (`minAppVersion` is 1.4.10)
-	 * while still implementing the newer API surface. See NOTICES.
-	 */
-	getSettingDefinitions(): never[] {
-		return [];
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		const setting = (
+			name: string,
+			desc: string,
+			render: (row: Setting, containerEl: HTMLElement) => void | (() => void),
+			visible?: () => boolean,
+		): SettingDefinition => ({
+			name,
+			desc,
+			render: (row) => render(row, row.settingEl.parentElement ?? row.settingEl),
+			...(visible && { visible }),
+		});
+
+		return [
+			setting(t('settings.language.name'), t('settings.language.desc'), (row) =>
+				this.renderLanguage(row),
+			),
+			{
+				type: 'group',
+				heading: t('settings.dates.heading'),
+				items: [
+					setting(t('settings.dateFormat.name'), '', (row) =>
+						this.renderFormatControl(row, 'date'),
+					),
+					setting(
+						t('settings.customPattern.name'),
+						t('settings.customPattern.desc'),
+						(row) => this.renderCustomPattern(row, 'date'),
+						() => this.plugin.settings.dateFormat === 'custom',
+					),
+					setting(t('settings.timeFormat.name'), '', (row) =>
+						this.renderFormatControl(row, 'time'),
+					),
+					setting(
+						t('settings.customPattern.name'),
+						t('settings.customPattern.desc'),
+						(row) => this.renderCustomPattern(row, 'time'),
+						() => this.plugin.settings.timeFormat === 'custom',
+					),
+					setting(t('settings.weekStart.name'), t('settings.weekStart.desc'), (row) =>
+						this.renderWeekStart(row),
+					),
+					setting(
+						t('settings.dateHighlights.heading'),
+						t('settings.dateHighlights.desc'),
+						(row, containerEl) => this.renderDateHighlights(row, containerEl),
+					),
+				],
+			},
+			setting(t('settings.cardNoteFolder.name'), t('settings.cardNoteFolder.desc'), (row) =>
+				this.renderCardNoteFolder(row),
+			),
+			setting(t('settings.progressStyle.name'), t('settings.progressStyle.desc'), (row) =>
+				this.renderProgressStyle(row),
+			),
+			setting(
+				t('settings.showRawPropertyTokens.name'),
+				t('settings.showRawPropertyTokens.desc'),
+				(row) => this.renderShowRawPropertyTokens(row),
+			),
+			setting(
+				t('settings.fillCardWithColor.name'),
+				t('settings.fillCardWithColor.desc'),
+				(row) => this.renderFillCardWithColor(row),
+			),
+			setting(
+				t('settings.allowDeleteWithoutArchive.name'),
+				t('settings.allowDeleteWithoutArchive.desc'),
+				(row) => this.renderAllowDeleteWithoutArchive(row),
+			),
+			setting(t('settings.addToTopOther.name'), t('settings.addToTopOther.desc'), (row) =>
+				this.renderAddPosition(row, 'addToTopOther'),
+			),
+			setting(
+				t('settings.addToTopCompleting.name'),
+				t('settings.addToTopCompleting.desc'),
+				(row) => this.renderAddPosition(row, 'addToTopCompleting'),
+			),
+			setting(t('settings.archiveLimit.name'), t('settings.archiveLimit.desc'), (row) =>
+				this.renderArchiveLimit(row),
+			),
+			setting(
+				t('settings.defaultProperties.heading'),
+				t('settings.defaultProperties.desc'),
+				(row, containerEl) => this.renderDefaultProperties(row, containerEl),
+			),
+			setting(
+				t('settings.reduceBoardFileWrites.name'),
+				t('settings.reduceBoardFileWrites.desc'),
+				(row) => this.renderReduceBoardFileWrites(row),
+			),
+		];
 	}
 
+	/**
+	 * Obsidian below 1.13 does not know about setting definitions and still calls
+	 * `display()`. Keep the same renderers as a compatibility path while the
+	 * manifest supports those versions.
+	 */
 	display(): void {
+		this.renderLegacy();
+	}
+
+	private renderLegacy(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		new Setting(containerEl)
+		this.renderLanguage(new Setting(containerEl));
+
+		new Setting(containerEl).setName(t('settings.dates.heading')).setHeading();
+		this.renderFormatSetting(containerEl, 'date');
+		this.renderFormatSetting(containerEl, 'time');
+		this.renderWeekStart(new Setting(containerEl));
+		this.renderDateHighlights(new Setting(containerEl), containerEl);
+		this.renderCardNoteFolder(new Setting(containerEl));
+		this.renderProgressStyle(new Setting(containerEl));
+		this.renderShowRawPropertyTokens(new Setting(containerEl));
+		this.renderFillCardWithColor(new Setting(containerEl));
+		this.renderAllowDeleteWithoutArchive(new Setting(containerEl));
+		this.renderAddPosition(new Setting(containerEl), 'addToTopOther');
+		this.renderAddPosition(new Setting(containerEl), 'addToTopCompleting');
+		this.renderArchiveLimit(new Setting(containerEl));
+		this.renderDefaultProperties(new Setting(containerEl), containerEl);
+		this.renderReduceBoardFileWrites(new Setting(containerEl));
+	}
+
+	private rerender(): void {
+		// `update()` exists only in Obsidian 1.13+. Older supported versions reach
+		// this code through the imperative `display()` fallback.
+		const update = Reflect.get(this, 'update') as (() => void) | undefined;
+		if (typeof update === 'function') update.call(this);
+		else this.renderLegacy();
+	}
+
+	private renderLanguage(setting: Setting): void {
+		setting
 			.setName(t('settings.language.name'))
 			.setDesc(t('settings.language.desc'))
 			.addDropdown((dropdown) =>
@@ -90,17 +217,13 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 						void this.plugin.saveSettings();
 						setLanguage(this.plugin.settings.language);
 						this.plugin.refreshBoards();
-						this.display();
+						this.rerender();
 					}),
 			);
+	}
 
-		new Setting(containerEl).setName(t('settings.dates.heading')).setHeading();
-		this.renderFormatSetting(containerEl, 'date');
-		this.renderFormatSetting(containerEl, 'time');
-		this.renderWeekStart(containerEl);
-		this.renderDateHighlights(containerEl);
-
-		new Setting(containerEl)
+	private renderCardNoteFolder(setting: Setting): void {
+		setting
 			.setName(t('settings.cardNoteFolder.name'))
 			.setDesc(t('settings.cardNoteFolder.desc'))
 			.addText((text) => {
@@ -118,8 +241,10 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 				// not fire `onChange` — hence the same `save` passed along.
 				new FolderSuggest(this.app, text.inputEl, save);
 			});
+	}
 
-		new Setting(containerEl)
+	private renderProgressStyle(setting: Setting): void {
+		setting
 			.setName(t('settings.progressStyle.name'))
 			.setDesc(t('settings.progressStyle.desc'))
 			.addDropdown((dropdown) =>
@@ -136,8 +261,10 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 						this.plugin.refreshBoards();
 					}),
 			);
+	}
 
-		new Setting(containerEl)
+	private renderShowRawPropertyTokens(setting: Setting): void {
+		setting
 			.setName(t('settings.showRawPropertyTokens.name'))
 			.setDesc(t('settings.showRawPropertyTokens.desc'))
 			.addToggle((toggle) =>
@@ -147,8 +274,10 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 					this.plugin.refreshBoards();
 				}),
 			);
+	}
 
-		new Setting(containerEl)
+	private renderFillCardWithColor(setting: Setting): void {
+		setting
 			.setName(t('settings.fillCardWithColor.name'))
 			.setDesc(t('settings.fillCardWithColor.desc'))
 			.addToggle((toggle) =>
@@ -158,8 +287,10 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 					this.plugin.refreshBoards();
 				}),
 			);
+	}
 
-		new Setting(containerEl)
+	private renderAllowDeleteWithoutArchive(setting: Setting): void {
+		setting
 			.setName(t('settings.allowDeleteWithoutArchive.name'))
 			.setDesc(t('settings.allowDeleteWithoutArchive.desc'))
 			.addToggle((toggle) =>
@@ -169,40 +300,32 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 					this.plugin.refreshBoards();
 				}),
 			);
+	}
 
-		// Two settings, not one: the stack that collects finished work is the one
-		// people most often want filled the other way round (§6.7).
-		new Setting(containerEl)
-			.setName(t('settings.addToTopOther.name'))
-			.setDesc(t('settings.addToTopOther.desc'))
+	private renderAddPosition(
+		setting: Setting,
+		key: 'addToTopOther' | 'addToTopCompleting',
+	): void {
+		const other = key === 'addToTopOther';
+		setting
+			.setName(t(other ? 'settings.addToTopOther.name' : 'settings.addToTopCompleting.name'))
+			.setDesc(t(other ? 'settings.addToTopOther.desc' : 'settings.addToTopCompleting.desc'))
 			.addDropdown((drop) =>
 				drop
 					.addOption('top', t('settings.addTo.top'))
 					.addOption('end', t('settings.addTo.end'))
-					.setValue(this.plugin.settings.addToTopOther ? 'top' : 'end')
+					.setValue(this.plugin.settings[key] ? 'top' : 'end')
 					.onChange((value) => {
-						this.plugin.settings.addToTopOther = value === 'top';
+						this.plugin.settings[key] = value === 'top';
 						void this.plugin.saveSettings();
 					}),
 			);
+	}
 
-		new Setting(containerEl)
-			.setName(t('settings.addToTopCompleting.name'))
-			.setDesc(t('settings.addToTopCompleting.desc'))
-			.addDropdown((drop) =>
-				drop
-					.addOption('top', t('settings.addTo.top'))
-					.addOption('end', t('settings.addTo.end'))
-					.setValue(this.plugin.settings.addToTopCompleting ? 'top' : 'end')
-					.onChange((value) => {
-						this.plugin.settings.addToTopCompleting = value === 'top';
-						void this.plugin.saveSettings();
-					}),
-			);
-
+	private renderArchiveLimit(setting: Setting): void {
 		// A number, not a slider: the useful range spans four orders of magnitude,
 		// and the value people care about is an exact one they typed.
-		new Setting(containerEl)
+		setting
 			.setName(t('settings.archiveLimit.name'))
 			.setDesc(t('settings.archiveLimit.desc'))
 			.addText((text) => {
@@ -224,16 +347,16 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 					text.setValue(String(this.plugin.settings.archiveLimit));
 				});
 			});
+	}
 
-		new Setting(containerEl).setName(t('settings.defaultProperties.heading')).setHeading();
-		containerEl.createDiv({
-			cls: 'setting-item-description',
-			text: t('settings.defaultProperties.desc'),
-		});
-
+	private renderDefaultProperties(setting: Setting, containerEl: HTMLElement): () => void {
+		setting
+			.setName(t('settings.defaultProperties.heading'))
+			.setDesc(t('settings.defaultProperties.desc'));
+		const editorEl = containerEl.createDiv();
 		const editor = new PropertyDefsEditor(
 			this.app,
-			containerEl.createDiv(),
+			editorEl,
 			this.plugin.settings.defaultProperties,
 			(defs) => {
 				this.plugin.settings.defaultProperties = defs;
@@ -241,8 +364,11 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 			},
 		);
 		editor.render();
+		return () => editorEl.remove();
+	}
 
-		new Setting(containerEl)
+	private renderReduceBoardFileWrites(setting: Setting): void {
+		setting
 			.setName(t('settings.reduceBoardFileWrites.name'))
 			.setDesc(t('settings.reduceBoardFileWrites.desc'))
 			.addToggle((toggle) =>
@@ -260,7 +386,7 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 	 * because locales like Russian write them lower-case mid-sentence, which a
 	 * dropdown item is not.
 	 */
-	private renderWeekStart(containerEl: HTMLElement): void {
+	private renderWeekStart(setting: Setting): void {
 		const lang = currentLanguage();
 		const options: Record<string, string> = { auto: t('settings.weekStart.auto') };
 		for (let day = 0; day < 7; day++) {
@@ -268,7 +394,7 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 			options[String(day)] = name.charAt(0).toUpperCase() + name.slice(1);
 		}
 
-		new Setting(containerEl)
+		setting
 			.setName(t('settings.weekStart.name'))
 			.setDesc(t('settings.weekStart.desc'))
 			.addDropdown((dropdown) =>
@@ -287,14 +413,15 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 	 * The plugin-wide highlight rules (i18n-and-dates.md §3.2). A board may
 	 * replace the whole list in its own settings, so nothing here is per-board.
 	 */
-	private renderDateHighlights(containerEl: HTMLElement): void {
-		new Setting(containerEl)
+	private renderDateHighlights(setting: Setting, containerEl: HTMLElement): () => void {
+		setting
 			.setName(t('settings.dateHighlights.heading'))
 			.setDesc(t('settings.dateHighlights.desc'));
 
+		const editorEl = containerEl.createDiv();
 		const editor = new DateHighlightsEditor(
 			this.app,
-			containerEl.createDiv(),
+			editorEl,
 			this.plugin.settings.dateHighlights,
 			(rules) => {
 				this.plugin.settings.dateHighlights = rules;
@@ -303,6 +430,7 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 			},
 		);
 		editor.render();
+		return () => editorEl.remove();
 	}
 
 	/** The example a preview shows: the date/time part only, the other left at `built-in`. */
@@ -327,16 +455,24 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 	/**
 	 * `dateFormat`/`timeFormat`: a combobox with hint text explaining the choice
 	 * and a live preview, plus the `custom` pattern field it reveals
-	 * (i18n-and-dates.md §2.5). The pattern field updates only the hint text in
-	 * place, never the whole tab, so typing a pattern does not lose focus.
+	 * (i18n-and-dates.md §2.5).
 	 */
 	private renderFormatSetting(containerEl: HTMLElement, kind: 'date' | 'time'): void {
+		this.renderFormatControl(new Setting(containerEl), kind);
+		const settingsKey = kind === 'date' ? 'dateFormat' : 'timeFormat';
+		if (this.plugin.settings[settingsKey] === 'custom') {
+			this.renderCustomPattern(new Setting(containerEl), kind);
+		}
+	}
+
+	private renderFormatControl(setting: Setting, kind: 'date' | 'time'): void {
 		const settingsKey = kind === 'date' ? 'dateFormat' : 'timeFormat';
 		const patternKey = kind === 'date' ? 'datePattern' : 'timePattern';
 		const mode = this.plugin.settings[settingsKey];
 
-		new Setting(containerEl)
+		setting
 			.setName(kind === 'date' ? t('settings.dateFormat.name') : t('settings.timeFormat.name'))
+			.setDesc(this.hintText(kind, mode, this.plugin.settings[patternKey]))
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOptions({
@@ -347,31 +483,33 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 					})
 					.setValue(mode)
 					.onChange((value) => {
-						this.plugin.settings[settingsKey] = value as DateFormatMode;
-						void this.plugin.saveSettings();
-						this.plugin.refreshBoards();
-						this.display();
-					}),
-			);
-
-		const hint = containerEl.createDiv({ cls: 'setting-item-description eb-format-hint' });
-		hint.setText(this.hintText(kind, mode, this.plugin.settings[patternKey]));
-
-		if (mode === 'custom') {
-			new Setting(containerEl)
-				.setName(t('settings.customPattern.name'))
-				.setDesc(t('settings.customPattern.desc'))
-				.addText((text) =>
-					text
-						.setPlaceholder(kind === 'date' ? 'YYYY-MM-DD' : 'HH:mm')
-						.setValue(this.plugin.settings[patternKey])
-						.onChange((value) => {
-							this.plugin.settings[patternKey] = value;
+							this.plugin.settings[settingsKey] = value as DateFormatMode;
 							void this.plugin.saveSettings();
 							this.plugin.refreshBoards();
-							hint.setText(this.hintText(kind, mode, value));
+							this.rerender();
 						}),
-				);
-		}
+			);
+	}
+
+	private renderCustomPattern(setting: Setting, kind: 'date' | 'time'): void {
+		const patternKey = kind === 'date' ? 'datePattern' : 'timePattern';
+		setting
+			.setName(t('settings.customPattern.name'))
+			.setDesc(t('settings.customPattern.desc'))
+			.addText((text) =>
+				text
+					.setPlaceholder(kind === 'date' ? 'YYYY-MM-DD' : 'HH:mm')
+					.setValue(this.plugin.settings[patternKey])
+					.onChange((value) => {
+						this.plugin.settings[patternKey] = value;
+						void this.plugin.saveSettings();
+						this.plugin.refreshBoards();
+						// Keep the live example current without rebuilding the tab and
+						// stealing focus from the pattern field.
+						const previous = setting.settingEl.previousElementSibling;
+						const hint = previous?.querySelector<HTMLElement>('.setting-item-description');
+						hint?.setText(this.hintText(kind, 'custom', value));
+					}),
+			);
 	}
 }
