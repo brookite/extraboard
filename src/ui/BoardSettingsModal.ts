@@ -40,6 +40,7 @@ export class BoardSettingsModal extends Modal {
 	private highlights?: DateHighlightRule[];
 	private highlightsEl?: HTMLElement;
 	private highlightsEditor?: DateHighlightsEditor;
+	private saved = false;
 
 	constructor(
 		app: App,
@@ -205,20 +206,26 @@ export class BoardSettingsModal extends Modal {
 		this.impactEl = contentEl.createDiv({ cls: 'eb-pe-diags eb-impact' });
 		this.renderImpact();
 
-		new Setting(contentEl)
-			.addButton((button) => button.setButtonText(t('common.cancel')).onClick(() => this.close()))
-			.addButton((button) =>
-				button
-					.setButtonText(this.options.cta ?? t('modal.boardSettings.save'))
-					.setCta()
-					.onClick(() => {
-						this.options.onSave(this.nextConfig());
-						this.close();
-					}),
-			);
+		// Editing an existing board is a live settings surface: every close path
+		// saves, so Save/Cancel would imply a transaction that does not exist.
+		// Creation remains explicit — dismissing it must not create a file.
+		if (!this.options.board) {
+			new Setting(contentEl)
+				.addButton((button) => button.setButtonText(t('common.cancel')).onClick(() => this.close()))
+				.addButton((button) =>
+					button
+						.setButtonText(this.options.cta ?? t('modal.boardSettings.save'))
+						.setCta()
+						.onClick(() => {
+							this.save();
+							this.close();
+						}),
+				);
+		}
 	}
 
 	override onClose(): void {
+		if (this.options.board) this.save();
 		this.contentEl.empty();
 	}
 
@@ -258,7 +265,8 @@ export class BoardSettingsModal extends Modal {
 			const name = line.createEl('input', { type: 'text', cls: 'eb-pe-value' });
 			name.value = row.tag;
 			name.placeholder = t('modal.boardSettings.tagColors.namePlaceholder');
-			name.addEventListener('change', () => {
+			// Keep the draft live: Escape may close and auto-save before blur.
+			name.addEventListener('input', () => {
 				row.tag = name.value.trim().replace(/^#/, '');
 			});
 			colorField(this.app, line, t('propertyDefs.background'), row.color.bg, (value) => {
@@ -288,6 +296,12 @@ export class BoardSettingsModal extends Modal {
 	}
 
 	// --- result ---------------------------------------------------------------
+
+	private save(): void {
+		if (this.saved) return;
+		this.saved = true;
+		this.options.onSave(this.nextConfig());
+	}
 
 	private nextConfig(): BoardConfig {
 		const tagColors: Record<string, BadgeColor> = {};
