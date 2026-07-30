@@ -1952,11 +1952,10 @@ body.is-mobile .eb-root {
 	box-sizing: border-box;
 }
 
-/* Unlike editor focus, this class means the viewport actually lost enough
-   height to a software keyboard (`mobileIme.ts`). The floating toolbar remains
-   protected when the keyboard is dismissed; only a real IME removes the 64 px
-   reservation that would otherwise become dead space in the shrunken viewport. */
-body.is-mobile .eb-root.is-ime-open {
+/* Obsidian replaces the floating navigation bar with its editing toolbar and
+   marks that state on the body. Its mobile layout already accounts for that
+   toolbar, so keeping our navigation reserve would add a second 64 px gap. */
+body.is-mobile.mod-toolbar-open .eb-root {
 	padding-bottom: 0;
 }
 

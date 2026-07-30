@@ -23,7 +23,6 @@ import { BoardApi, confirmDestructive, searchTag } from './api';
 import { CalendarView } from './CalendarView';
 import { KanbanView, addStack } from './KanbanView';
 import { ListView } from './ListView';
-import { watchMobileIme } from './mobileIme';
 import { NowContext, currentNow } from './now';
 import { ReloadContext } from './reload';
 import { boardSaveNeeded, PluginSaveRequests } from './saveGuard';
@@ -456,7 +455,6 @@ export class BoardView extends TextFileView {
 			// has to be the positioned one.
 			this.contentEl.addClass('eb-content');
 			this.mountEl = this.contentEl.createDiv({ cls: 'eb-root' });
-			if (Platform.isMobile) this.register(watchMobileIme(this.mountEl));
 			this.collapseRightSidebar();
 		}
 		return this.mountEl;
