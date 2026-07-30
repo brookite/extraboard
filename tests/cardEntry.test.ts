@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as ops from '../src/model/ops';
 import { parseBoard } from '../src/model/parse';
 import { serializeBoard } from '../src/model/serialize';
-import { DEFAULT_SETTINGS, cardEntryPos, type ExtraboardSettings } from '../src/settings';
+import { DEFAULT_SETTINGS, cardDropPos, cardEntryPos, type ExtraboardSettings } from '../src/settings';
 import type { Board, BoardConfig } from '../src/model/types';
 import { boardHead } from './boardFile';
 
@@ -67,6 +67,30 @@ describe('cardEntryPos', () => {
 		// never completes.
 		expect(cardEntryPos(undefined, plain(), settings())).toBe(0);
 		expect(cardEntryPos(undefined, plain(), settings({ addToTopOther: false }))).toBeNull();
+	});
+});
+
+describe('cardDropPos', () => {
+	it('preserves the chosen position in an expanded stack', () => {
+		expect(cardDropPos({ ...todo, collapsed: false }, 1, plain(), settings())).toBe(1);
+	});
+
+	it('uses the ordinary-stack entry setting for a collapsed stack', () => {
+		const target = { ...todo, collapsed: true };
+		expect(cardDropPos(target, null, plain(), settings())).toBe(0);
+		expect(cardDropPos(target, 1, plain(), settings({ addToTopOther: false }))).toBeNull();
+	});
+
+	it('uses the completing-stack entry setting separately', () => {
+		const target = { ...done, collapsed: true };
+		const s = settings({ addToTopOther: false, addToTopCompleting: true });
+		expect(cardDropPos(target, null, plain(), s)).toBe(0);
+	});
+
+	it('honors a board override for a collapsed stack', () => {
+		const target = { ...done, collapsed: true };
+		const config = plain({ addToTopCompleting: false });
+		expect(cardDropPos(target, 0, config, settings({ addToTopCompleting: true }))).toBeNull();
 	});
 });
 

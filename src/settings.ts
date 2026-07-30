@@ -19,9 +19,10 @@ export const ARCHIVE_LIMIT_MAX = 16000;
  * takes. Completing stacks and the rest are configured separately, and a board
  * override wins over the plugin setting.
  *
- * Every path that puts a card *into* a stack resolves through here, so the
- * composer, "Complete card", restore and the calendar's day modal agree. Drag &
- * drop does not: there the user picked the position themselves.
+ * Every non-positional path that puts a card *into* a stack resolves through
+ * here, so the composer, "Complete card", restore, the calendar's day modal,
+ * and a drop into a collapsed stack agree. An ordinary drag & drop does not:
+ * there the user picked the position themselves.
  */
 export function cardEntryPos(
 	stack: Pick<Stack, 'completes'> | undefined,
@@ -32,6 +33,20 @@ export function cardEntryPos(
 		? (config.addToTopCompleting ?? settings.addToTopCompleting)
 		: (config.addToTopOther ?? settings.addToTopOther);
 	return top ? 0 : null;
+}
+
+/**
+ * Resolve a card drop position. Expanded stacks preserve the exact position
+ * chosen by the drag; a collapsed stack exposes no positional choice, so its
+ * configured card-entry position wins.
+ */
+export function cardDropPos(
+	stack: Pick<Stack, 'collapsed' | 'completes'> | undefined,
+	before: InsertPos,
+	config: BoardConfig,
+	settings: ExtraboardSettings,
+): InsertPos {
+	return stack?.collapsed ? cardEntryPos(stack, config, settings) : before;
 }
 
 /**

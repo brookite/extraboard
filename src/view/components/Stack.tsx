@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { BoardConfig, Stack } from '../../model/types';
-import { archiveOpts, cardEntryPos, type ExtraboardSettings } from '../../settings';
+import { archiveOpts, cardDropPos, cardEntryPos, type ExtraboardSettings } from '../../settings';
 import { editStack } from '../../ui/StackModal';
 import type { BoardApi } from '../api';
 import { memo } from '../memo';
@@ -54,7 +54,14 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 			api.update((b) => ops.archiveCard(b, from, archiveOpts(settings)));
 			return;
 		}
-		api.update((b) => ops.moveItem(b, from, drop.toList, drop.before));
+		api.update((b) => {
+			const moving = b.stacks[from.stack]?.items[from.item];
+			const before =
+				moving?.kind === 'card'
+					? cardDropPos(b.stacks[drop.toList], drop.before, b.config, settings)
+					: drop.before;
+			return ops.moveItem(b, from, drop.toList, before);
+		});
 	});
 
 	const collapsed = stack.collapsed;
