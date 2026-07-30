@@ -263,7 +263,9 @@ function CardTileInner({
 								// its root card menu open. Close the complete chain
 								// explicitly before the move re-renders the card.
 								hideMenuTree(target, menu);
-								api.update((b) => ops.moveItem(b, ref, i, null));
+								api.update((b) =>
+									ops.moveItem(b, ref, i, cardEntryPos(b.stacks[i], b.config, settings)),
+								);
 							}),
 					);
 				});
