@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MenuToggleController, type ToggleableMenu } from '../src/util/menuToggle';
+import { hideMenuTree, MenuToggleController, type ToggleableMenu } from '../src/util/menuToggle';
 
 class FakeMenu implements ToggleableMenu {
 	hidden = false;
@@ -55,5 +55,17 @@ describe('MenuToggleController', () => {
 		controller.toggle({}, () => first);
 		expect(controller.toggle({}, () => second)).toBe(second);
 		expect(first.hidden).toBe(true);
+	});
+});
+
+describe('hideMenuTree', () => {
+	it('closes every distinct menu in a submenu chain', () => {
+		const root = new FakeMenu();
+		const child = new FakeMenu();
+
+		hideMenuTree(child, root, child);
+
+		expect(child.hidden).toBe(true);
+		expect(root.hidden).toBe(true);
 	});
 });

@@ -1897,12 +1897,19 @@ body.eb-dragging-card .eb-archive-drop {
    calendar grid above). Nothing here keys off a user-agent string.
    --------------------------------------------------------------------------- */
 
-/* The view-switch indicator (§4). A `Notice` covers the whole top button bar on
-   a phone, so the board names its new view inside itself. Positioned against
-   the view's content element, beside the Preact mount rather than inside it, so
-   a re-render cannot drop it mid-fade. */
-.eb-content {
+/* Extraboard's three views own their padding and scrolling. Obsidian's generic
+   `.view-content` adds another inset (including a safe-area bottom padding) and
+   an outer scroller around the 100%-high `.eb-root`, which becomes a visible
+   blank strip above the mobile navbar. Scope the reset to the content element
+   marked by `BoardView`; no Markdown or other plugin view is affected.
+
+   The view-switch indicator is positioned against this same element, beside
+   the Preact mount rather than inside it, so a re-render cannot drop it
+   mid-fade. */
+.workspace-leaf-content .view-content.eb-content {
 	position: relative;
+	padding: 0;
+	overflow: hidden;
 }
 
 .eb-view-indicator {
@@ -1938,9 +1945,30 @@ body.eb-dragging-card .eb-archive-drop {
    navbar's own height is not exposed as a variable, so it is a measured
    constant that a theme can still override through `--eb-bottom-inset`. */
 body.is-mobile .eb-root {
-	--eb-navbar-h: 48px;
+	/* The floating navigation/editor toolbar occupies about 56 px plus its
+	   bottom gap on the current mobile layout. Keep the whole 64 px band clear. */
+	--eb-navbar-h: 64px;
 	padding-bottom: var(--eb-bottom-inset, calc(var(--eb-navbar-h) + env(safe-area-inset-bottom, 0px)));
 	box-sizing: border-box;
+}
+
+/* Unlike editor focus, this class means the viewport actually lost enough
+   height to a software keyboard (`mobileIme.ts`). The floating toolbar remains
+   protected when the keyboard is dismissed; only a real IME removes the 64 px
+   reservation that would otherwise become dead space in the shrunken viewport. */
+body.is-mobile .eb-root.is-ime-open {
+	padding-bottom: 0;
+}
+
+/* A desktop-style horizontal scrollbar becomes a second floating bar above the
+   mobile toolbar. Touch already supplies the scroll affordance, so hide only
+   the board row's visual scrollbar; its horizontal scrolling remains enabled. */
+body.is-mobile .eb-board {
+	scrollbar-width: none;
+}
+
+body.is-mobile .eb-board::-webkit-scrollbar {
+	display: none;
 }
 
 /* Obsidian gives a *page* of Markdown breathing room under the phone header:

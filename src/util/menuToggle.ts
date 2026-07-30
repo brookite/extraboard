@@ -7,6 +7,11 @@ export interface ToggleableMenu {
 	onHide(callback: () => void): void;
 }
 
+/** Hide every level of a menu chain, ignoring duplicate references. */
+export function hideMenuTree(...menus: ToggleableMenu[]): void {
+	for (const menu of new Set(menus)) menu.hide();
+}
+
 interface OpenMenu<M extends ToggleableMenu> {
 	trigger: object;
 	menu: M;

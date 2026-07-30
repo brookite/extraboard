@@ -1,4 +1,4 @@
-import { Menu } from 'obsidian';
+import { Menu, Platform } from 'obsidian';
 import { useEffect, useState } from 'preact/hooks';
 import { parseCardLink, unlinkedTitle } from '../../model/link';
 import * as ops from '../../model/ops';
@@ -6,6 +6,7 @@ import type { BoardConfig, Card } from '../../model/types';
 import { archiveOpts, cardEntryPos, type ExtraboardSettings } from '../../settings';
 import { ChecklistModal } from '../../ui/ChecklistModal';
 import { showDropdownMenu, styleMenuItem, submenuOf } from '../../util/menu';
+import { hideMenuTree } from '../../util/menuToggle';
 import type { BoardApi } from '../api';
 import { CardEditor } from '../CardEditor';
 import { hoverLinkText, openLinkText, resolveCardLink } from '../links';
@@ -257,7 +258,13 @@ function CardTileInner({
 							.setTitle(stack.name || t('modal.archive.untitled'))
 							.setIcon('square-kanban')
 							.setDisabled(i === stackIndex)
-							.onClick(() => api.update((b) => ops.moveItem(b, ref, i, null))),
+							.onClick(() => {
+								// Mobile Obsidian closes the submenu but can leave
+								// its root card menu open. Close the complete chain
+								// explicitly before the move re-renders the card.
+								hideMenuTree(target, menu);
+								api.update((b) => ops.moveItem(b, ref, i, null));
+							}),
 					);
 				});
 			};
@@ -324,7 +331,10 @@ function CardTileInner({
 			}}
 			onContextMenu={(e) => {
 				e.preventDefault();
-				openMenu(e);
+				// A touch long-press is the card's drag pickup gesture. Chromium
+				// also synthesizes `contextmenu` for that press, but on mobile the
+				// menu is deliberately reachable only through the visible ⋯ button.
+				if (!Platform.isMobile && !isDragging()) openMenu(e);
 			}}
 		>
 			<div class="eb-card-head">

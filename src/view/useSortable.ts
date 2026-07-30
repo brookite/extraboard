@@ -108,6 +108,12 @@ export function useSortable(
 			delayOnTouchOnly: true,
 			touchStartThreshold: 5,
 			fallbackOnBody: true,
+			// Use Sortable's positioned clone on every platform. Native HTML5
+			// dragging replaces the card under the pointer with an OS/Chromium
+			// drag image, whose appearance and behaviour differ between desktop
+			// devices. The fallback keeps the visible card consistent while the
+			// original remains the list placeholder until the model re-renders.
+			forceFallback: true,
 			ghostClass: 'eb-drag-ghost',
 			dragClass: 'eb-drag-item',
 			filter: 'input, textarea, button',
@@ -129,7 +135,7 @@ export function useSortable(
 			// `mousedown` is bound alongside `touchstart`, so a desktop app running
 			// under `emulateMobile(true)` without device emulation keeps its mouse
 			// drag.
-			...(Platform.isMobile ? { supportPointer: false, forceFallback: true } : {}),
+			...(Platform.isMobile ? { supportPointer: false } : {}),
 			// Auto-scroll is the plugin's own and proportional (`autoScroll.ts`);
 			// the built-in constant-speed scroller must not compete with it.
 			scroll: false,
