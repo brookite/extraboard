@@ -29,8 +29,9 @@ with its own file format, not a fork.
   that picks which stack the new card goes to. A board can define several views
   and cycle through them from its header, and a new board can open as a list
   instead of a board.
-- **Drag and drop** cards within and across stacks, whole stacks, and cards onto
-  a calendar day to move their date. Touch drag works on mobile.
+- **Drag and drop** cards within and across stacks — including collapsed
+  stacks — whole stacks, and cards onto a calendar day to move their date.
+  Touch drag works on mobile.
 - **Typed card properties** written inline as `@{name|value}`: text, number,
   percent, checkbox, color, single-select and multi-select lists with per-value
   badge colors, date, date range, list of dates, and recurrence.

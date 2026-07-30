@@ -257,9 +257,13 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 				</div>
 			)}
 
-			<div class="eb-stack-body" ref={bodyRef} data-list={index} hidden={collapsed}>
-				{stack.items.map((item, i) =>
-					hidden.has(i) ? null : item.kind === 'card' ? (
+			{/* Keep the list mounted while collapsed: Sortable can only accept a
+			    card into a destination that existed when the drag began. CSS turns
+			    this empty list into a full-spine drop layer during a card drag. */}
+			<div class="eb-stack-body" ref={bodyRef} data-list={index}>
+				{!collapsed &&
+					stack.items.map((item, i) =>
+						hidden.has(i) ? null : item.kind === 'card' ? (
 						<CardTile
 							key={i}
 							card={item.card}
@@ -282,7 +286,7 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 							hiddenCount={countHiddenAfter(hidden, i)}
 						/>
 					),
-				)}
+					)}
 			</div>
 		</div>
 	);

@@ -121,9 +121,10 @@ describe('ops: moving items', () => {
 		expect(text(next)).toContain('## To do\n\n- Second card\n\n## Doing\n\n### Group\n\n- First card #work\n- Grouped card');
 	});
 
-	it('moves a card to the end of another stack', () => {
+	it('moves a card to the end of a collapsed stack without expanding it', () => {
 		const next = ops.moveItem(board(), { stack: 0, item: 1 }, 2, null);
 		expect(text(next)).toContain('## Done %%collapsed%%\n\n- Shipped\n- Second card\n');
+		expect(next.stacks[2]?.collapsed).toBe(true);
 	});
 
 	it('reorders within a stack using pre-move indexes', () => {

@@ -136,8 +136,12 @@ body:not(.is-mobile) .eb-board {
 
 /* Collapsed stacks shrink to a vertical spine. */
 .eb-stack.is-collapsed {
+	position: relative;
 	width: auto;
 	min-width: 0;
+	transition:
+		transform 140ms ease-out,
+		box-shadow 140ms ease-out;
 }
 
 .eb-stack.is-collapsed .eb-stack-header {
@@ -231,9 +235,55 @@ body:not(.is-mobile) .eb-board {
 	overflow-y: auto;
 }
 
-/* `display: flex` would otherwise beat the browser default for [hidden]. */
-.eb-stack-body[hidden] {
-	display: none;
+/* A collapsed stack keeps an empty Sortable list mounted as a drop layer.
+   It covers the whole spine only while a card is in flight, so the stack's
+   regular click targets remain untouched at every other time. */
+.eb-stack.is-collapsed .eb-stack-body {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	min-height: 0;
+	padding: 0;
+	overflow: hidden;
+	pointer-events: none;
+	border-radius: inherit;
+	transition: transform 140ms ease-out;
+}
+
+body.eb-dragging-card .eb-stack.is-collapsed .eb-stack-body {
+	pointer-events: auto;
+}
+
+/* Sortable inserts the original card into the destination while it hovers.
+   Lift the whole visible stack, then counter-translate its full-spine drop
+   layer with the same timing so the hit area stays still at the edges. */
+body.eb-dragging-card .eb-stack.is-collapsed:has(.eb-stack-body > .eb-card) {
+	transform: translateY(-4px);
+	box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.18));
+}
+
+body.eb-dragging-card
+	.eb-stack.is-collapsed:has(.eb-stack-body > .eb-card)
+	.eb-stack-body {
+	transform: translateY(4px);
+}
+
+.eb-stack.is-collapsed .eb-stack-body > .eb-item {
+	opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.eb-stack.is-collapsed,
+	.eb-stack.is-collapsed .eb-stack-body {
+		transition: none;
+	}
+
+	body.eb-dragging-card .eb-stack.is-collapsed:has(.eb-stack-body > .eb-card),
+	body.eb-dragging-card
+		.eb-stack.is-collapsed:has(.eb-stack-body > .eb-card)
+		.eb-stack-body {
+		transform: none;
+	}
 }
 
 /* Cards */
