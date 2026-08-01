@@ -14,6 +14,7 @@ import {
 	FilterNode,
 	NodePath,
 	emptyGroup,
+	nextCondition,
 } from '../../model/filter';
 import { editorFor, needsSecondValue, defaultOp, OPS_BY_KIND, supportsOp } from '../../model/filterOps';
 import { FieldRef, fieldId, fieldKind } from '../../model/fieldValue';
@@ -324,17 +325,7 @@ export function GroupNode({
 			</div>
 
 			<div class="eb-filter-add">
-				<button
-					type="button"
-					onClick={() =>
-						rest.onAdd(path, {
-							kind: 'condition',
-							field: { kind: 'builtin', id: 'title' },
-							op: 'contains',
-							value: '',
-						})
-					}
-				>
+				<button type="button" onClick={() => rest.onAdd(path, nextCondition(group))}>
 					<Icon name="plus" class="eb-button-icon" />
 					<span>{t('filter.addCondition')}</span>
 				</button>

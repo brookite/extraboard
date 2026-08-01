@@ -60,6 +60,26 @@ export function emptyGroup(op: FilterGroup['op'] = 'and'): FilterGroup {
 	return { kind: 'group', op, children: [] };
 }
 
+const blankCondition: FilterCondition = {
+	kind: 'condition',
+	field: { kind: 'builtin', id: 'title' },
+	op: 'contains',
+	value: '',
+};
+
+/**
+ * The condition "add condition" should insert into `group`: a copy of its
+ * last child with the value cleared, so picking a field and operator again is
+ * one less thing to do. Falls back to a blank condition when the group is
+ * empty or its last child is a group — duplicating a group's shape would be
+ * surprising, not a shortcut.
+ */
+export function nextCondition(group: FilterGroup): FilterCondition {
+	const last = group.children[group.children.length - 1];
+	if (!last || last.kind === 'group') return { ...blankCondition };
+	return { ...last, value: '', value2: undefined };
+}
+
 /** True when the filter has nothing to say and can be left out of the file. */
 export function isEmptyFilter(node: FilterNode | undefined): boolean {
 	return !node || (node.kind === 'group' && node.children.length === 0);

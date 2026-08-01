@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+	FilterCondition,
+	FilterGroup,
 	FilterNode,
 	countConditions,
 	emptyGroup,
@@ -11,6 +13,7 @@ import {
 	isEmptyFilter,
 	matchCard,
 	moveNode,
+	nextCondition,
 	nodeAt,
 	removeAt,
 	replaceNode,
@@ -340,6 +343,42 @@ describe('the tree (§4.2)', () => {
 		const moved = moveNode(flat, [0], [], 2);
 		const values = moved.kind === 'group' ? moved.children.map((c) => (c.kind === 'condition' ? c.value : '')) : [];
 		expect(values).toEqual(['b', 'a', 'c']);
+	});
+});
+
+describe('what "add condition" inserts (§4.2)', () => {
+	it('duplicates the last condition, without its value', () => {
+		const group: FilterGroup = {
+			kind: 'group',
+			op: 'and',
+			children: [cond(property('owner'), 'equals', 'Ann') as FilterCondition],
+		};
+		expect(nextCondition(group)).toEqual(cond(property('owner'), 'equals', ''));
+	});
+
+	it('drops the second value of a duplicated "between"', () => {
+		const group: FilterGroup = {
+			kind: 'group',
+			op: 'and',
+			children: [cond(property('points'), 'between', '1', '9') as FilterCondition],
+		};
+		expect(nextCondition(group)).toEqual(cond(property('points'), 'between', ''));
+	});
+
+	it('falls back to a blank title condition when the group is empty', () => {
+		expect(nextCondition(emptyGroup())).toEqual(cond(builtin('title'), 'contains', ''));
+	});
+
+	it('falls back to a blank condition when the last child is a group', () => {
+		const group: FilterGroup = {
+			kind: 'group',
+			op: 'and',
+			children: [
+				cond(property('owner'), 'equals', 'Ann') as FilterCondition,
+				{ kind: 'group', op: 'or', children: [] },
+			],
+		};
+		expect(nextCondition(group)).toEqual(cond(builtin('title'), 'contains', ''));
 	});
 });
 
