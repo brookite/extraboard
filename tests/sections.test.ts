@@ -13,7 +13,7 @@ import {
 	stateKeyOf,
 	type Section,
 } from '../src/model/sections';
-import { sectionMoveTargets, tagsOf } from '../src/model/sectionView';
+import { isStackBoundary, sectionMoveTargets, tagsOf } from '../src/model/sectionView';
 import { filterCards } from '../src/model/filter';
 import { sortCards } from '../src/model/sort';
 import type { Board, Card } from '../src/model/types';
@@ -304,5 +304,28 @@ describe('sections: filter', () => {
 		const b = board();
 		expect(tagsOf(b, named(b, 'Backlog').cards)).toEqual(['bug']);
 		expect(tagsOf(b, sectionsOf(b)[0]!.cards)).toEqual([]);
+	});
+});
+
+describe('sections: stack boundary (list-view.md §4.3)', () => {
+	const rows = [
+		{ stack: 0, item: 0 },
+		{ stack: 0, item: 1 },
+		{ stack: 1, item: 0 },
+		{ stack: 1, item: 1 },
+	];
+
+	it('never marks the first row', () => {
+		expect(isStackBoundary(rows, 0, true)).toBe(false);
+	});
+
+	it('marks where the stack changes, in document order', () => {
+		expect(isStackBoundary(rows, 1, true)).toBe(false);
+		expect(isStackBoundary(rows, 2, true)).toBe(true);
+		expect(isStackBoundary(rows, 3, true)).toBe(false);
+	});
+
+	it('marks nothing once rows are sorted, even across a stack change', () => {
+		expect(isStackBoundary(rows, 2, false)).toBe(false);
 	});
 });

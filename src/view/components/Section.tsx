@@ -9,6 +9,7 @@ import { Menu } from 'obsidian';
 import { useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { Section } from '../../model/sections';
+import { isStackBoundary } from '../../model/sectionView';
 import type { Board, BoardConfig, SectionState, ViewDisplay } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
 import type { BoardApi } from '../api';
@@ -270,12 +271,19 @@ export function SectionGroup(props: SectionProps) {
 			</div>
 
 			<div class="eb-section-body" ref={bodyRef} data-list={index} hidden={collapsed}>
-				{rows.map((ref, i) => {
+				{rows.flatMap((ref, i) => {
 					const stack = board.stacks[ref.stack];
 					const entry = stack?.items[ref.item];
-					if (!stack || entry?.kind !== 'card') return null;
-					return (
-						<div class="eb-list-row" key={`${String(ref.stack)}-${String(ref.item)}`} data-index={i}>
+					if (!stack || entry?.kind !== 'card') return [];
+					const row = (
+						<div
+							class="eb-list-row"
+							key={`${String(ref.stack)}-${String(ref.item)}`}
+							data-index={i}
+							data-stack={ref.stack}
+						>
+							{/* `data-stack` is read outside Preact, by `useSortable`'s
+							    drag handlers (list-view.md §4.3) — not by this render. */}
 							<CardTile
 								card={entry.card}
 								stackIndex={ref.stack}
@@ -301,6 +309,18 @@ export function SectionGroup(props: SectionProps) {
 							/>
 						</div>
 					);
+					if (!isStackBoundary(rows, i, ordered)) return [row];
+					// Not a drop target and not part of the model: a stack change is
+					// where a drag stops actually moving the card, and this marks it.
+					return [
+						<div
+							class="eb-list-stack-boundary"
+							key={`boundary-${String(ref.stack)}-${String(ref.item)}`}
+							title={t('list.stackBoundary')}
+							aria-hidden="true"
+						/>,
+						row,
+					];
 				})}
 			</div>
 

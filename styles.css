@@ -2712,6 +2712,32 @@ body.is-mobile .eb-add-stack-button {
 	max-width: 30%;
 }
 
+/* Marks where the rows above and below belong to different stacks (§4.3):
+   not a real divider, and not a drop target — a drag stops actually moving
+   the card into the other stack right here. The line itself stays a hairline;
+   the box around it is tall enough to actually catch the hover that shows its
+   tooltip. */
+.eb-list-stack-boundary {
+	display: flex;
+	align-items: center;
+	height: 9px;
+	cursor: default;
+}
+
+.eb-list-stack-boundary::before {
+	content: '';
+	flex: 1;
+	border-top: 1px dashed var(--background-modifier-border);
+}
+
+/* While a row is being dragged, every other-stack row across the whole list
+   is shown as what it is: a drop never changes a card's stack, wherever it
+   lands (§4.3), so these are not valid targets for that move. */
+.eb-list-row-other-stack {
+	opacity: 0.4;
+	filter: grayscale(1);
+}
+
 /* Desktop owns a different stack control inside `.eb-card-head`; this sibling
    remains exclusively the mobile footer. */
 body:not(.is-mobile) .eb-list-row > .eb-list-stack {

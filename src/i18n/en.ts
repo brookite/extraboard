@@ -108,6 +108,7 @@ export const en = {
 		moveToSection: 'Move to section',
 		controlsFixed: 'This view fixes its sort and filter',
 		emptyBoard: 'This board has no stacks yet. Add one to start filling the list.',
+		stackBoundary: "Cards don't move past here into another stack",
 		sort: {
 			label: 'Sort',
 			document: 'Document order',

@@ -31,3 +31,14 @@ export function sectionMoveTargets(board: Board, _ref: ItemRef): Section[] {
 			section.key.kind === 'named',
 	);
 }
+
+/**
+ * True when a stack boundary belongs between `rows[index - 1]` and
+ * `rows[index]` — only meaningful in document order (list-view.md §4.3),
+ * where a drag between rows of different stacks cannot actually carry a card
+ * across it: it snaps back to the nearest row of its own stack.
+ */
+export function isStackBoundary(rows: ItemRef[], index: number, ordered: boolean): boolean {
+	if (!ordered || index <= 0) return false;
+	return rows[index - 1]?.stack !== rows[index]?.stack;
+}

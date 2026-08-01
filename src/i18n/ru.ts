@@ -109,6 +109,7 @@ export const ru: DeepPartial<typeof en> = {
 		moveToSection: 'Переместить в секцию',
 		controlsFixed: 'В этом виде сортировка и фильтр зафиксированы',
 		emptyBoard: 'На доске ещё нет стопок. Добавьте одну, чтобы наполнить список.',
+		stackBoundary: 'Карточки не переходят через эту черту в другую стопку',
 		sort: {
 			label: 'Сортировка',
 			document: 'Порядок в файле',

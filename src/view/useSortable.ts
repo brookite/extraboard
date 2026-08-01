@@ -46,6 +46,27 @@ function markDrag(item: HTMLElement, on: boolean): void {
 	else body.removeClass(DRAGGING_CARD);
 }
 
+/**
+ * Class put on every `.eb-list-row` of a stack other than the one being
+ * dragged, while the drag lasts (list-view.md §4.3): a drop never changes a
+ * card's stack, wherever in the list it lands, so every other-stack row is
+ * shown as what it is — not a place this drag can put the card.
+ */
+const OTHER_STACK = 'eb-list-row-other-stack';
+
+function markStackDrag(item: HTMLElement, on: boolean): void {
+	const stack = item.dataset.stack;
+	const root = item.closest('.eb-list');
+	if (!root) return;
+	if (on && stack !== undefined) {
+		root.querySelectorAll<HTMLElement>('.eb-list-row[data-stack]').forEach((row) => {
+			if (row.dataset.stack !== stack) row.classList.add(OTHER_STACK);
+		});
+	} else {
+		root.querySelectorAll<HTMLElement>(`.${OTHER_STACK}`).forEach((row) => row.classList.remove(OTHER_STACK));
+	}
+}
+
 function readIndex(el: Element | null, attr: 'index' | 'list'): number | null {
 	if (!(el instanceof HTMLElement)) return null;
 	const raw = el.dataset[attr];
@@ -143,6 +164,7 @@ export function useSortable(
 			onStart: (evt) => {
 				dragging = true;
 				markDrag(evt.item, true);
+				markStackDrag(evt.item, true);
 				startAutoScroll(evt.item);
 			},
 			onEnd: (evt) => {
@@ -152,6 +174,7 @@ export function useSortable(
 					dragging = false;
 				}, 0);
 				markDrag(evt.item, false);
+				markStackDrag(evt.item, false);
 				const info = readDrop(evt);
 				revert(evt);
 				if (info) latest.current(info);
