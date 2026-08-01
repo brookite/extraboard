@@ -25,10 +25,16 @@ with its own file format, not a fork.
   untouched.
 - **Three views over the same file:** a Kanban board, a month/week calendar, and
   a **list** that groups every card by its named dividers into collapsible
-  sections — each one sortable by date and filterable by tag, with a composer
-  that picks which stack the new card goes to. A board can define several views
-  and cycle through them from its header, and a new board can open as a list
-  instead of a board.
+  sections, with a composer that picks which stack the new card goes to. A board
+  can define several views and cycle through them from its header, and a new
+  board can open as a list instead of a board.
+- **A calendar can read several date properties at once** — a card with a start
+  and a due date shows on both days, and once where they fall on the same one.
+- **Filters and sorting for a list:** a condition builder with AND / OR / NOT
+  groups over any property plus the card's own text, tags, checkbox and linked
+  note, and as many sort keys as you like, each with its own direction.
+- **Per-view card settings:** choose which property badges, tags, checkbox,
+  progress and color a view draws — remembered per view, across restarts.
 - **Drag and drop** cards within and across stacks — including collapsed
   stacks — whole stacks, and cards onto a calendar day to move their date.
   Touch drag works on mobile.
@@ -58,7 +64,7 @@ with its own file format, not a fork.
 ## Status
 
 **Post-MVP active development.** The full feature set above is implemented and
-manually verified on desktop and mobile. The current release is **0.2.3**;
+manually verified on desktop and mobile. The current version is **0.3.0**;
 packaging and draft GitHub Releases are automated.
 
 ## Development
