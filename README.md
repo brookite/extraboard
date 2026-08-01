@@ -41,6 +41,8 @@ with its own file format, not a fork.
 - **Typed card properties** written inline as `@{name|value}`: text, number,
   percent, checkbox, color, single-select and multi-select lists with per-value
   badge colors, date, date range, list of dates, and recurrence.
+- **Calendar-backed date editing:** select a day or an inclusive range directly
+  in a card; date-list values keep dates and ranges as separate removable items.
 - **Recurring dates** in a readable phrase — `every 2 weeks on Fri`,
   `every month on the last Friday` — expanded onto the calendar.
 - **Date highlighting:** ordered rules color a date badge as its date approaches
@@ -64,7 +66,7 @@ with its own file format, not a fork.
 ## Status
 
 **Post-MVP active development.** The full feature set above is implemented and
-manually verified on desktop and mobile. The current version is **0.3.0**;
+manually verified on desktop and mobile. The current version is **0.3.1**;
 packaging and draft GitHub Releases are automated.
 
 ## Development

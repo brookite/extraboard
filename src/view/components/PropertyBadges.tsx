@@ -19,11 +19,12 @@ import { Icon } from './Icon';
 import { safeColor } from './style';
 import { t } from '../../i18n';
 import { showDropdownMenu } from '../../util/menu';
+import { DateValueEditor } from './DateValueEditor';
 
 /** Types edited as one text field; the rest have a control of their own. */
-const TEXT_TYPES = new Set(['string', 'datetime', 'date-range']);
+const TEXT_TYPES = new Set(['string']);
 /** Types whose text is the raw token value, so `;` separates list elements. */
-const LIST_TEXT_TYPES = new Set(['date-list', 'raw']);
+const LIST_TEXT_TYPES = new Set(['raw']);
 
 interface Props {
 	config: BoardConfig;
@@ -88,6 +89,7 @@ export function PropertyBadges({ config, card, target, api, settings }: Props) {
 					/>
 				))}
 				<button
+					key="add-property"
 					type="button"
 					class="eb-badge eb-badge-add"
 					aria-label={t('propertyBadges.addProperty')}
@@ -98,10 +100,12 @@ export function PropertyBadges({ config, card, target, api, settings }: Props) {
 			</div>
 			{openName !== null && (
 				<ValueEditor
+					key={openName}
 					name={openName}
 					def={openDef}
 					pv={openValue}
 					api={api}
+					settings={settings}
 					onCommit={(pv) => commit(pv, openName)}
 					onRemove={() => remove(openName)}
 					onClose={() => setOpen(null)}
@@ -165,6 +169,7 @@ interface EditorProps {
 	def: PropertyDef | undefined;
 	pv: PropertyValue | undefined;
 	api: BoardApi;
+	settings: ExtraboardSettings;
 	onCommit: (pv: PropertyValue | null) => void;
 	onRemove: () => void;
 	onClose: () => void;
@@ -175,7 +180,7 @@ interface EditorProps {
  * the board) is edited as raw text, so foreign tokens stay visible and
  * removable instead of silently invisible.
  */
-function ValueEditor({ name, def, pv, api, onCommit, onRemove, onClose }: EditorProps) {
+function ValueEditor({ name, def, pv, api, settings, onCommit, onRemove, onClose }: EditorProps) {
 	const type = def?.type ?? 'raw';
 	const current = pv ? formatValue(pv) : '';
 	const typeLabel = type === 'raw' ? t('propertyDefs.type.raw') : typeLabels()[type];
@@ -229,6 +234,16 @@ function ValueEditor({ name, def, pv, api, onCommit, onRemove, onClose }: Editor
 				</button>
 			) : type === 'string-list' ? (
 				<StringListEditor name={name} def={def} pv={pv} onCommit={onCommit} />
+			) : type === 'datetime' || type === 'date-range' || type === 'date-list' ? (
+				<DateValueEditor
+					name={name}
+					type={type}
+					def={def}
+					pv={pv}
+					api={api}
+					settings={settings}
+					onCommit={onCommit}
+				/>
 			) : type === 'recurrence' ? (
 				// A rule is not something to type by hand (recurrence.md §4).
 				<button

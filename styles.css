@@ -1099,6 +1099,102 @@ body.eb-dragging-card
 	gap: 6px;
 }
 
+/* Calendar-backed datetime, range and compound-list editor (0.3.1). */
+.eb-date-editor,
+.eb-date-values {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.eb-date-values {
+	max-height: 128px;
+	overflow-y: auto;
+}
+
+.eb-date-value,
+.eb-date-nav,
+.eb-date-time,
+.eb-date-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.eb-date-value {
+	justify-content: space-between;
+	min-width: 0;
+	padding: 3px 6px;
+	background: var(--background-primary);
+	border-radius: var(--radius-s, 6px);
+}
+
+.eb-date-value > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.eb-date-nav {
+	justify-content: space-between;
+	font-weight: var(--font-semibold, 600);
+}
+
+.eb-date-weekdays,
+.eb-date-grid {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(28px, 1fr));
+	gap: 2px;
+}
+
+.eb-date-weekdays {
+	color: var(--text-muted);
+	font-size: var(--font-smaller, 0.8em);
+	text-align: center;
+}
+
+.eb-date-day {
+	min-width: 28px;
+	height: 30px;
+	padding: 0;
+	background: transparent;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	color: var(--text-normal);
+}
+
+.eb-date-day.is-outside {
+	color: var(--text-faint);
+}
+
+.eb-date-day.is-selected {
+	background: var(--background-modifier-hover);
+}
+
+.eb-date-day.is-endpoint {
+	background: var(--interactive-accent);
+	border-radius: var(--radius-s, 6px);
+	color: var(--text-on-accent);
+}
+
+.eb-date-time {
+	justify-content: space-between;
+}
+
+.eb-date-actions {
+	justify-content: flex-end;
+}
+
+.eb-date-actions.is-list {
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.eb-date-actions.is-list > button {
+	width: 100%;
+}
+
 /* Checklist modal (card-content-and-checklists.md §4.3) */
 .eb-checklist-count {
 	color: var(--text-muted);
