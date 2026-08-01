@@ -3,7 +3,6 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-	FilterCondition,
 	FilterGroup,
 	FilterNode,
 	countConditions,
@@ -351,7 +350,7 @@ describe('what "add condition" inserts (§4.2)', () => {
 		const group: FilterGroup = {
 			kind: 'group',
 			op: 'and',
-			children: [cond(property('owner'), 'equals', 'Ann') as FilterCondition],
+			children: [cond(property('owner'), 'equals', 'Ann')],
 		};
 		expect(nextCondition(group)).toEqual(cond(property('owner'), 'equals', ''));
 	});
@@ -360,7 +359,7 @@ describe('what "add condition" inserts (§4.2)', () => {
 		const group: FilterGroup = {
 			kind: 'group',
 			op: 'and',
-			children: [cond(property('points'), 'between', '1', '9') as FilterCondition],
+			children: [cond(property('points'), 'between', '1', '9')],
 		};
 		expect(nextCondition(group)).toEqual(cond(property('points'), 'between', ''));
 	});
@@ -373,10 +372,7 @@ describe('what "add condition" inserts (§4.2)', () => {
 		const group: FilterGroup = {
 			kind: 'group',
 			op: 'and',
-			children: [
-				cond(property('owner'), 'equals', 'Ann') as FilterCondition,
-				{ kind: 'group', op: 'or', children: [] },
-			],
+			children: [cond(property('owner'), 'equals', 'Ann'), { kind: 'group', op: 'or', children: [] }],
 		};
 		expect(nextCondition(group)).toEqual(cond(builtin('title'), 'contains', ''));
 	});
