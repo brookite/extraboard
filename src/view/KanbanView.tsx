@@ -3,7 +3,7 @@
 import { Platform } from 'obsidian';
 import { useRef } from 'preact/hooks';
 import * as ops from '../model/ops';
-import type { Board } from '../model/types';
+import type { Board, ViewDef } from '../model/types';
 import type { ExtraboardSettings } from '../settings';
 import { editStack } from '../ui/StackModal';
 import type { BoardApi } from './api';
@@ -71,11 +71,13 @@ function AddStack({ api }: { api: BoardApi }) {
 
 interface BoardProps {
 	board: Board;
+	/** The active view, for the card settings it carries (views.md §5). */
+	view: ViewDef;
 	api: BoardApi;
 	settings: ExtraboardSettings;
 }
 
-export function KanbanView({ board, api, settings }: BoardProps) {
+export function KanbanView({ board, view, api, settings }: BoardProps) {
 	const boardRef = useRef<HTMLDivElement>(null);
 
 	useSortable(
@@ -110,6 +112,7 @@ export function KanbanView({ board, api, settings }: BoardProps) {
 					config={board.config}
 					api={api}
 					settings={settings}
+					display={view.display}
 				/>
 			))}
 			<AddStack api={api} />

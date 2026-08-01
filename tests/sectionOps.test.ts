@@ -262,6 +262,13 @@ describe('sections: moving a card', () => {
 		expect(sectionOf(next, { stack: 0, item: 5 })).toEqual(named('Review'));
 	});
 
+	it('puts a menu-style section move at the top of its target group when requested', () => {
+		const next = intact(
+			ops.moveCardToSection(board(), { stack: 0, item: 0 }, 0, named('Review'), null, true),
+		);
+		expect(titlesOf(next, 0)).toEqual(['### Backlog', 'B1', 'B2', '### Review', 'Loose A', 'R1']);
+	});
+
 	it('moves a card out of a section into the sectionless group', () => {
 		const next = intact(ops.moveCardToSection(board(), { stack: 0, item: 2 }, 0, NONE));
 		expect(titlesOf(next, 0)).toEqual(['Loose A', 'B1', '### Backlog', 'B2', '### Review', 'R1']);
@@ -482,20 +489,10 @@ describe('sections: view state', () => {
 			].join('\n'),
 		);
 
-	it('writes a section’s sort, filter and collapse into the view', () => {
-		const next = intact(
-			ops.setSectionState(listBoard(), 'v1', 'Backlog', {
-				sort: { property: 'due', dir: 'desc' },
-				tags: ['bug'],
-				collapsed: true,
-			}),
-		);
+	it('writes a section’s collapse into the view', () => {
+		const next = intact(ops.setSectionState(listBoard(), 'v1', 'Backlog', { collapsed: true }));
 		const view = next.config.views[0]!;
-		expect(view.type === 'list' && view.sections?.Backlog).toEqual({
-			sort: { property: 'due', dir: 'desc' },
-			tags: ['bug'],
-			collapsed: true,
-		});
+		expect(view.type === 'list' && view.sections?.Backlog).toEqual({ collapsed: true });
 		expect(serializeBoard(next)).toContain('"Backlog"');
 	});
 
@@ -507,11 +504,14 @@ describe('sections: view state', () => {
 		expect(serializeBoard(cleared)).toBe(serializeBoard(listBoard()));
 	});
 
-	it('merges a patch into the state already there', () => {
+	it('keeps one section’s collapse while another changes', () => {
 		const first = ops.setSectionState(listBoard(), 'v1', '', { collapsed: true });
-		const second = intact(ops.setSectionState(first, 'v1', '', { tags: ['bug'] }));
+		const second = intact(ops.setSectionState(first, 'v1', 'Backlog', { collapsed: true }));
 		const view = second.config.views[0]!;
-		expect(view.type === 'list' && view.sections?.['']).toEqual({ collapsed: true, tags: ['bug'] });
+		expect(view.type === 'list' && view.sections).toEqual({
+			'': { collapsed: true },
+			Backlog: { collapsed: true },
+		});
 	});
 
 	it('is a no-op for an unchanged state, a Kanban view and an unknown id', () => {
@@ -522,28 +522,44 @@ describe('sections: view state', () => {
 		expect(ops.setSectionState(parseBoard(BOARD), 'v1', '', { collapsed: true })).toEqual(parseBoard(BOARD));
 	});
 
-	it('updates the view-wide controls, sort and tags', () => {
-		const next = intact(
-			ops.updateView(listBoard(), 'v1', {
-				controls: 'fixed',
-				sort: { property: 'due', dir: 'asc' },
-				tags: ['#bug', ' ', 'ops'],
-			}),
-		);
+	it('updates the view-wide controls', () => {
+		const next = intact(ops.updateView(listBoard(), 'v1', { controls: 'fixed' }));
 		const view = next.config.views[0]!;
 		expect(view.type === 'list' && view.controls).toBe('fixed');
-		expect(view.type === 'list' && view.sort).toEqual({ property: 'due', dir: 'asc' });
-		expect(view.type === 'list' && view.tags).toEqual(['bug', 'ops']);
 	});
 
-	it('clears the view-wide sort with null and the filter with an empty list', () => {
-		const set = ops.updateView(listBoard(), 'v1', {
-			sort: { property: 'due', dir: 'asc' },
-			tags: ['bug'],
-		});
-		const cleared = intact(ops.updateView(set, 'v1', { sort: null, tags: [] }));
-		const view = cleared.config.views[0]!;
-		expect(view.type === 'list' && 'sort' in view).toBe(false);
-		expect(view.type === 'list' && 'tags' in view).toBe(false);
+	it('sets and clears the view-wide filter and sort keys', () => {
+		const filter = {
+			kind: 'group' as const,
+			op: 'and' as const,
+			children: [
+				{
+					kind: 'condition' as const,
+					field: { kind: 'builtin' as const, id: 'tags' as const },
+					op: 'contains' as const,
+					value: 'bug',
+				},
+			],
+		};
+		const sorts = [{ field: { kind: 'property' as const, name: 'due' }, dir: 'desc' as const }];
+		const set = intact(ops.setViewSorts(ops.setViewFilter(listBoard(), 'v1', filter), 'v1', sorts));
+		const view = set.config.views[0]!;
+		expect(view.type === 'list' && view.filter).toEqual(filter);
+		expect(view.type === 'list' && view.sorts).toEqual(sorts);
+		expect(serializeBoard(set)).toContain('"field":"@tags"');
+		expect(serializeBoard(set)).toContain('"sorts":[{"field":"due","dir":"desc"}]');
+
+		// Setting the same thing twice changes nothing, and clearing drops the keys.
+		expect(ops.setViewFilter(set, 'v1', filter)).toBe(set);
+		const cleared = intact(ops.setViewSorts(ops.setViewFilter(set, 'v1', null), 'v1', []));
+		const bare = cleared.config.views[0]!;
+		expect(bare.type === 'list' && 'filter' in bare).toBe(false);
+		expect(bare.type === 'list' && 'sorts' in bare).toBe(false);
+		expect(serializeBoard(cleared)).toBe(serializeBoard(listBoard()));
+	});
+
+	it('an empty group is not a filter, so it drops the key too', () => {
+		const before = listBoard();
+		expect(ops.setViewFilter(before, 'v1', { kind: 'group', op: 'and', children: [] })).toBe(before);
 	});
 });

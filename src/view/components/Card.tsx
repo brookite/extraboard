@@ -2,7 +2,7 @@ import { Menu, Platform } from 'obsidian';
 import { useEffect, useState } from 'preact/hooks';
 import { parseCardLink, unlinkedTitle } from '../../model/link';
 import * as ops from '../../model/ops';
-import type { BoardConfig, Card } from '../../model/types';
+import type { BoardConfig, Card, ViewDisplay } from '../../model/types';
 import { archiveOpts, cardEntryPos, type ExtraboardSettings } from '../../settings';
 import { ChecklistModal } from '../../ui/ChecklistModal';
 import { showDropdownMenu, styleMenuItem, submenuOf } from '../../util/menu';
@@ -46,11 +46,17 @@ interface Props {
 	 * the list view's "Move to section" (list-view.md §4.4). Must be stable
 	 * across renders, or it defeats this card's memo.
 	 */
-	menuExtra?: (menu: Menu, ref: ops.ItemRef) => void;
+	menuExtra?: (menu: Menu, ref: ops.ItemRef, event: MouseEvent) => void;
 	/** List-view stack picker shown inside this card on desktop. */
 	stackLabel?: string;
 	/** Opens the stack picker for this card. Stable for memoization. */
 	onStackPick?: (event: MouseEvent, ref: ops.ItemRef) => void;
+	/**
+	 * What the mounting view draws on a card (views.md §5). Absent means all of
+	 * it. The object comes straight off the `ViewDef`, whose identity survives
+	 * every edit that did not touch the view, so the memo still holds.
+	 */
+	display?: ViewDisplay;
 }
 
 /** The board's single `color` property paints the card instead of a badge. */
@@ -72,6 +78,7 @@ function CardTileInner({
 	menuExtra,
 	stackLabel,
 	onStackPick,
+	display,
 }: Props) {
 	const [editing, setEditing] = useState(false);
 
@@ -120,8 +127,9 @@ function CardTileInner({
 	const rawColor = cardColor(card);
 	// A card in a colored divider's group inherits that color, in the same place
 	// the card's own would paint; its own always wins
-	// (stack-completion-and-divider-colors.md §4.1).
-	const color = safeColor(rawColor) ?? safeColor(groupColor);
+	// (stack-completion-and-divider-colors.md §4.1). A view that hides colors
+	// paints none of them — the property itself stays, and the menu still edits it.
+	const color = display?.hideColor ? null : (safeColor(rawColor) ?? safeColor(groupColor));
 	// The content note is derived from the title, never stored (§4.4): it is the
 	// first link in it. Only a title that is *nothing but* that link renders as
 	// one anchor; a title that merely contains it is rendered as Markdown, links
@@ -284,7 +292,7 @@ function CardTileInner({
 				}
 			});
 			}
-			menuExtra?.(menu, ref);
+			menuExtra?.(menu, ref, event);
 			menu.addSeparator();
 			menu.addItem((item) =>
 			item
@@ -309,10 +317,18 @@ function CardTileInner({
 		});
 	};
 
-	// The color property is chrome, not a badge (kanban-view.md §3).
-	const badges = card.properties.filter((pv) => pv.type !== 'color');
+	// The color property is chrome, not a badge (kanban-view.md §3). On top of
+	// that the view drops whatever it was told to hide — by name, so a value the
+	// board gained later is shown rather than quietly missing (views.md §5).
+	const hidden = display?.hiddenProperties;
+	const badges = card.properties.filter(
+		(pv) => pv.type !== 'color' && !hidden?.includes(pv.name),
+	);
 	const done = ops.isCardDone(card);
-	const hasCheckbox = card.task !== undefined || config.showCardCheckbox === true;
+	const hasCheckbox =
+		!display?.hideCheckbox && (card.task !== undefined || config.showCardCheckbox === true);
+	const tags = display?.hideTags ? [] : card.tags;
+	const showProgress = !display?.hideProgress && progress.total > 0;
 	const classes = [
 		'eb-item',
 		'eb-card',
@@ -408,23 +424,26 @@ function CardTileInner({
 							progress={progressStyleFor(config, settings)}
 							settings={settings}
 							card={card}
+							api={api}
 						/>
 					))}
 				</div>
 			) : null}
-			{card.tags.length > 0 || progress.total > 0 ? (
+			{tags.length > 0 || showProgress ? (
 				<div class="eb-card-foot">
 					<div class="eb-card-tags">
-						{card.tags.map((t) => (
+						{tags.map((t) => (
 							<Tag key={t} tag={t} config={config} api={api} />
 						))}
 					</div>
-					<ChecklistProgress
-						done={progress.done}
-						total={progress.total}
-						style={progressStyleFor(config, settings)}
-						onOpen={openChecklist}
-					/>
+					{showProgress ? (
+						<ChecklistProgress
+							done={progress.done}
+							total={progress.total}
+							style={progressStyleFor(config, settings)}
+							onOpen={openChecklist}
+						/>
+					) : null}
 				</div>
 			) : null}
 		</div>

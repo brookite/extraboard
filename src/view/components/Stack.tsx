@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
-import type { BoardConfig, Stack } from '../../model/types';
+import type { BoardConfig, Stack, ViewDisplay } from '../../model/types';
 import { archiveOpts, cardDropPos, cardEntryPos, type ExtraboardSettings } from '../../settings';
 import { editStack } from '../../ui/StackModal';
 import type { BoardApi } from '../api';
@@ -24,6 +24,9 @@ interface Props {
 	config: BoardConfig;
 	api: BoardApi;
 	settings: ExtraboardSettings;
+	/** What the active view draws on a card; straight off the `ViewDef`, so the
+	 * identity is stable and the card memo holds (views.md §5). */
+	display?: ViewDisplay;
 }
 
 /** How many consecutive items right after `index` are hidden by that divider. */
@@ -33,7 +36,7 @@ function countHiddenAfter(hidden: Set<number>, index: number): number {
 	return count;
 }
 
-function StackColumnInner({ stack, index, config, api, settings }: Props) {
+function StackColumnInner({ stack, index, config, api, settings, display }: Props) {
 	const [renaming, setRenaming] = useState(false);
 	// Set right after a fresh card is inserted at the top, so that card's tile
 	// opens itself for editing once, then clears this back.
@@ -282,6 +285,7 @@ function StackColumnInner({ stack, index, config, api, settings }: Props) {
 							settings={settings}
 							forceEdit={i === (entryPos === 0 ? 0 : stack.items.length - 1) && pendingNewCard}
 							onForceEditConsumed={clearPendingNewCard}
+							display={display}
 						/>
 					) : (
 						<DividerRow

@@ -10,11 +10,14 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { RefObject } from 'preact';
 import {
 	Occurrence,
+	OccurrenceSource,
 	Placement,
 	clearOccurrence,
+	datePropertyType,
 	moveOccurrence,
 	placeCards,
 	setCardDay,
+	sourceValue,
 } from '../model/calendar';
 import {
 	CalDate,
@@ -30,8 +33,10 @@ import {
 } from '../model/dates';
 import * as ops from '../model/ops';
 import { unlinkedTitle } from '../model/link';
-import type { Board, Card, PropertyType, ViewDef } from '../model/types';
+import type { Board, Card, ViewDef } from '../model/types';
+import { usableDateProperties } from '../model/views';
 import type { ExtraboardSettings } from '../settings';
+import { pickDateProperty } from '../ui/DatePropertyModal';
 import { openDayModal } from '../ui/DayModal';
 import type { BoardApi } from './api';
 import { Icon } from './components/Icon';
@@ -85,9 +90,6 @@ interface Props {
 // below, since those are the same kind of value a property badge shows.
 
 const asDate = (d: CalDate): Date => new Date(d.y, d.m - 1, d.d);
-
-/** The property types a calendar can be computed from (§7). */
-const DATE_PROPERTY_TYPES: readonly PropertyType[] = ['datetime', 'date-range', 'date-list', 'recurrence'];
 
 function periodLabel(anchor: CalDate, mode: 'month' | 'week', start: CalDate): string {
 	const lang = currentLanguage();
@@ -197,6 +199,19 @@ function chipColor(board: Board, ref: ops.ItemRef, card: Card): string | undefin
 	return color ?? undefined;
 }
 
+/**
+ * What a chip says on hover. With one date property that is the card's text and
+ * nothing else — the day is already the cell it sits in. With several, the
+ * tooltip is the only place that says *which* of them put it there, so it lists
+ * them with their values (§3.1).
+ */
+function chipTooltip(card: Card, sources?: OccurrenceSource[]): string {
+	const text = chipText(card);
+	if (!sources?.length) return text;
+	const lines = sources.map((source) => `${source.property}: ${sourceValue(card, source) ?? ''}`);
+	return [text, ...lines].join('\n');
+}
+
 interface ChipProps {
 	board: Board;
 	card: Card;
@@ -208,10 +223,12 @@ interface ChipProps {
 	opts?: DateTimeOpts;
 	/** From a repetition rule: one card showing up on many days (recurrence.md §3). */
 	repeating?: boolean;
+	/** Named in the tooltip; passed only when the view reads several properties. */
+	sources?: OccurrenceSource[];
 	onOpen: () => void;
 }
 
-function Chip({ board, card, occRef, index, time, opts, repeating, onOpen }: ChipProps) {
+function Chip({ board, card, occRef, index, time, opts, repeating, sources, onOpen }: ChipProps) {
 	const color = chipColor(board, occRef, card);
 	const done = ops.isCardDone(card);
 	return (
@@ -219,7 +236,7 @@ function Chip({ board, card, occRef, index, time, opts, repeating, onOpen }: Chi
 			class={`eb-cal-chip${done ? ' is-done' : ''}${color ? ' is-colored' : ''}`}
 			data-index={index}
 			style={color ? `--eb-card-color: ${color}` : undefined}
-			title={chipText(card)}
+			title={chipTooltip(card, sources)}
 			onClick={(e) => {
 				e.stopPropagation();
 				if (!isDragging()) onOpen();
@@ -296,10 +313,13 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	const narrow = useCompactGrid(gridRef);
 	const compact = narrow && view.mode === 'month';
 
-	const def = board.config.properties.find((p) => p.name === view.dateProperty);
-	const propertyType: PropertyType = def?.type ?? 'datetime';
+	// The properties this grid is actually computed from: the view's list minus
+	// whatever the board stopped declaring as a date (§7).
+	const properties = usableDateProperties(board.config, view);
 	const dateTimeOpts = dateTimeOptsFor(settings);
-	const usable = def !== undefined && DATE_PROPERTY_TYPES.includes(def.type);
+	const usable = properties.length > 0;
+	/** Several properties means a placement can be ambiguous; one never is. */
+	const multi = properties.length > 1;
 
 	// The drawn window, computed before the broken-view return below so the hooks
 	// that depend on it keep their order.
@@ -318,19 +338,19 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	const { occurrences, undated }: Placement = useMemo(
 		() =>
 			usable
-				? placeCards(board, view.dateProperty, { from: start, to: days[days.length - 1]! })
+				? placeCards(board, properties, { from: start, to: days[days.length - 1]! })
 				: { occurrences: [], undated: [] },
-		[board, view.dateProperty, usable, dayKey(start), days.length],
+		[board, view.dateProperties, usable, dayKey(start), days.length],
 	);
 
-	// A view whose property is gone renders its reason, not an empty grid (§7).
+	// A view whose properties are all gone renders its reason, not an empty grid (§7).
 	if (!usable) {
 		const [before, after] = t('calendar.brokenMessage').split('{property}');
 		return (
 			<div class="eb-cal-broken">
 				<p>
 					{before}
-					<strong>{view.dateProperty}</strong>
+					<strong>{view.dateProperties.join(', ')}</strong>
 					{after}
 				</p>
 				<button
@@ -369,6 +389,31 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	};
 
 	/**
+	 * Which values an edit is about (§6.2). One is decided here; several is a
+	 * question only the user can answer, so the drop stops and asks — and a
+	 * dismissed question moves nothing.
+	 */
+	const chooseSources = (
+		ref: ops.ItemRef,
+		sources: OccurrenceSource[],
+		title: string,
+		message: string,
+	): Promise<OccurrenceSource[] | null> => {
+		if (sources.length < 2) return Promise.resolve(sources.length ? sources : null);
+		const card = cardOf(board, ref);
+		return pickDateProperty(api.app, {
+			title,
+			message,
+			allowAll: true,
+			choices: sources.map((source) => ({
+				source,
+				label: source.property,
+				value: sourceValue(card, source),
+			})),
+		});
+	};
+
+	/**
 	 * One drop handler for the whole grid (§6). `fromList` says where the drag
 	 * started — a day cell, the row of a bar, or the tray — and that is enough to
 	 * recover the day the delta is measured from.
@@ -382,14 +427,48 @@ export function CalendarView({ board, view, api, settings }: Props) {
 			const ref = undated[drop.fromIndex];
 			const target = days[drop.toList];
 			if (!ref || !target) return;
-			api.update((b) => setCardDay(b, ref, view.dateProperty, propertyType, target));
+			// An undated card has no value to point at, so the choice is over the
+			// view's own properties.
+			const sources = properties.map((property) => ({ property, index: 0 }));
+			void chooseSources(ref, sources, t('dateProperty.setTitle'), t('dateProperty.setMessage')).then(
+				(picked) => {
+					if (!picked) return;
+					api.update((b) =>
+						picked.reduce(
+							(acc, source) =>
+								setCardDay(
+									acc,
+									ref,
+									source.property,
+									datePropertyType(acc.config, source.property),
+									target,
+								),
+							b,
+						),
+					);
+				},
+			);
 			return;
 		}
 
 		const occurrence = occurrences[drop.fromIndex];
 		if (!occurrence) return;
 		if (toTray) {
-			api.update((b) => clearOccurrence(b, occurrence, view.dateProperty, propertyType));
+			void chooseSources(
+				occurrence.ref,
+				occurrence.sources,
+				t('dateProperty.clearTitle'),
+				t('dateProperty.moveMessage'),
+			).then((picked) => {
+				if (!picked) return;
+				api.update((b) =>
+					picked.reduce(
+						(acc, source) =>
+							clearOccurrence(acc, occurrence, source, datePropertyType(acc.config, source.property)),
+						b,
+					),
+				);
+			});
 			return;
 		}
 		const target = days[drop.toList];
@@ -397,10 +476,29 @@ export function CalendarView({ board, view, api, settings }: Props) {
 		if (!target || !rowDay) return;
 		// For a chip this is its own day; for a bar segment, the later of the
 		// occurrence's start and the row's first day — i.e. the segment's left edge.
-		const source = compareDates(occurrence.start, rowDay) > 0 ? occurrence.start : rowDay;
-		api.update((b) =>
-			moveOccurrence(b, occurrence, view.dateProperty, propertyType, source, target),
-		);
+		const from = compareDates(occurrence.start, rowDay) > 0 ? occurrence.start : rowDay;
+		void chooseSources(
+			occurrence.ref,
+			occurrence.sources,
+			t('dateProperty.moveTitle'),
+			t('dateProperty.moveMessage'),
+		).then((picked) => {
+			if (!picked) return;
+			api.update((b) =>
+				picked.reduce(
+					(acc, source) =>
+						moveOccurrence(
+							acc,
+							occurrence,
+							source,
+							datePropertyType(acc.config, source.property),
+							from,
+							target,
+						),
+					b,
+				),
+			);
+		});
 	};
 
 	const step = (delta: number): void => {
@@ -475,6 +573,7 @@ export function CalendarView({ board, view, api, settings }: Props) {
 							lanes={lanes}
 							capacity={Math.max(1, capacity - lanes)}
 							compact={compact}
+							multi={multi}
 							rowStartIndex={row * 7}
 							dateTimeOpts={dateTimeOpts}
 							onOpenDay={openDay}
@@ -512,6 +611,8 @@ interface RowProps {
 	capacity: number;
 	/** Day number plus colored marks instead of chips and bars (mobile.md §6). */
 	compact: boolean;
+	/** The view reads several date properties, so tooltips name them (§3.1). */
+	multi: boolean;
 	rowStartIndex: number;
 	dateTimeOpts: DateTimeOpts;
 	onOpenDay: (day: CalDate) => void;
@@ -531,6 +632,7 @@ function WeekRow({
 	lanes,
 	capacity,
 	compact,
+	multi,
 	rowStartIndex,
 	dateTimeOpts,
 	onOpenDay,
@@ -561,7 +663,7 @@ function WeekRow({
 								.join(' ')}
 							data-index={segment.index}
 							style={`grid-column: ${String(segment.column + 1)} / span ${String(segment.span)}; grid-row: ${String(segment.lane + 1)};${color ? ` --eb-card-color: ${color};` : ''}`}
-							title={chipText(card)}
+							title={chipTooltip(card, multi ? segment.occurrence.sources : undefined)}
 							onClick={(e) => {
 								e.stopPropagation();
 								if (!isDragging()) onOpenDay(days[Math.max(0, segment.column)]!);
@@ -595,6 +697,7 @@ function WeekRow({
 							lanes={lanes}
 							capacity={capacity}
 							indexOf={indexOf}
+							multi={multi}
 							dateTimeOpts={dateTimeOpts}
 						/>
 					);
@@ -621,6 +724,8 @@ interface CellProps extends BaseCellProps {
 	lanes: number;
 	capacity: number;
 	indexOf: Map<Occurrence, number>;
+	/** Name the properties in chip tooltips (§3.1). */
+	multi: boolean;
 	dateTimeOpts: DateTimeOpts;
 }
 
@@ -679,6 +784,7 @@ function DayCell({
 	capacity,
 	occurrences,
 	indexOf,
+	multi,
 	dateTimeOpts,
 	onOpen,
 	onDrop,
@@ -713,6 +819,7 @@ function DayCell({
 							time={occurrence.start.minutes}
 							opts={dateTimeOpts}
 							repeating={occurrence.repeating}
+							sources={multi ? occurrence.sources : undefined}
 							onOpen={onOpen}
 						/>
 					);

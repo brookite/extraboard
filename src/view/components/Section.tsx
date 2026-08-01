@@ -8,9 +8,8 @@
 import { Menu } from 'obsidian';
 import { useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
-import { tagsOf } from '../../model/sectionView';
 import type { Section } from '../../model/sections';
-import type { Board, BoardConfig, PropertyDef, SectionState } from '../../model/types';
+import type { Board, BoardConfig, SectionState, ViewDisplay } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
 import type { BoardApi } from '../api';
 import { useSortable, type DropInfo } from '../useSortable';
@@ -29,10 +28,6 @@ export interface SectionProps {
 	/** Cards to draw, already sorted and filtered (§3). */
 	rows: ops.ItemRef[];
 	state: SectionState;
-	/** Date-family properties the sort menu offers (§3.1). */
-	dateProps: PropertyDef[];
-	/** `fixed` views own the sort and filter, so the chips are read-only (§3.4). */
-	locked: boolean;
 	/** Document order — the only order rows may be dragged in (§4.3). */
 	ordered: boolean;
 	api: BoardApi;
@@ -54,13 +49,15 @@ export interface SectionProps {
 	onDrop: (info: DropInfo) => void;
 	/** "Move to section" for the card menu — the pointer-free way to do what a
 	 * drag does (§4.3). Stable, or every row's memo misses. */
-	menuExtra: (menu: Menu, ref: ops.ItemRef) => void;
+	menuExtra: (menu: Menu, ref: ops.ItemRef, event: MouseEvent) => void;
 	/** Open the stack picker inside a card header. Stable for card memoization. */
 	onStackPick: (event: MouseEvent, ref: ops.ItemRef) => void;
 	/** Section reordering, absent when this section cannot move (§1.3, §1.4). */
 	onMove?: (direction: -1 | 1) => void;
 	canMoveUp: boolean;
 	canMoveDown: boolean;
+	/** What this view draws on a card (views.md §5). */
+	display?: ViewDisplay;
 }
 
 /** The stack badge every row wears, and the composer's stack picker. */
@@ -116,8 +113,6 @@ export function SectionGroup(props: SectionProps) {
 		config,
 		rows,
 		state,
-		dateProps,
-		locked,
 		ordered,
 		api,
 		settings,
@@ -132,6 +127,7 @@ export function SectionGroup(props: SectionProps) {
 		onMove,
 		canMoveUp,
 		canMoveDown,
+		display,
 	} = props;
 
 	const [renaming, setRenaming] = useState(false);
@@ -167,67 +163,6 @@ export function SectionGroup(props: SectionProps) {
 				? section.name
 				: t('list.unnamedSection', { stack: board.stacks[key.ref.stack]?.name || t('modal.archive.untitled') });
 
-	const sortLabel = state.sort
-		? `${state.sort.property} ${state.sort.dir === 'asc' ? '↑' : '↓'}`
-		: t('list.sort.document');
-
-	const chooseSort = (event: MouseEvent): void => {
-		showDropdownMenu(event, (menu) => {
-			menu.addItem((item) =>
-				item
-					.setTitle(t('list.sort.document'))
-					.setIcon('list')
-					.setChecked(!state.sort)
-					.onClick(() => onState({ sort: undefined })),
-			);
-			for (const def of dateProps) {
-				for (const dir of ['asc', 'desc'] as const) {
-					menu.addItem((item) =>
-						item
-							.setTitle(t(dir === 'asc' ? 'list.sort.asc' : 'list.sort.desc', { name: def.name }))
-							.setIcon(dir === 'asc' ? 'arrow-up-narrow-wide' : 'arrow-down-wide-narrow')
-							.setChecked(state.sort?.property === def.name && state.sort.dir === dir)
-							.onClick(() => onState({ sort: { property: def.name, dir } })),
-					);
-				}
-			}
-			if (!dateProps.length) {
-				menu.addItem((item) => item.setTitle(t('list.sort.noDateProperty')).setDisabled(true));
-			}
-		});
-	};
-
-	const chooseTags = (event: MouseEvent): void => {
-		showDropdownMenu(event, (menu) => {
-			const active = state.tags ?? [];
-			const available = tagsOf(board, section.cards);
-			if (!available.length) {
-				menu.addItem((item) => item.setTitle(t('list.filter.noTags')).setDisabled(true));
-			}
-			for (const tag of available) {
-				menu.addItem((item) =>
-					item
-						.setTitle(`#${tag}`)
-						.setChecked(active.includes(tag))
-						.onClick(() =>
-							onState({
-								tags: active.includes(tag) ? active.filter((x) => x !== tag) : [...active, tag],
-							}),
-						),
-				);
-			}
-			if (active.length) {
-				menu.addSeparator();
-				menu.addItem((item) =>
-					item
-						.setTitle(t('list.filter.clear'))
-						.setIcon('filter-x')
-						.onClick(() => onState({ tags: [] })),
-				);
-			}
-		});
-	};
-
 	const rename = (name: string): void => {
 		setRenaming(false);
 		const next = name.trim();
@@ -250,28 +185,6 @@ export function SectionGroup(props: SectionProps) {
 				.setIcon(collapsed ? 'chevron-down' : 'chevron-right')
 				.onClick(() => setCollapsed(!collapsed)),
 			);
-			if (!locked) {
-			menu.addItem((item) =>
-				item
-					.setTitle(t('list.sort.label'))
-					.setIcon('arrow-up-down')
-					.onClick(() => chooseSort(event)),
-			);
-			menu.addItem((item) =>
-				item
-					.setTitle(t('list.filter.label'))
-					.setIcon('filter')
-					.onClick(() => chooseTags(event)),
-			);
-			if (state.tags?.length) {
-				menu.addItem((item) =>
-					item
-						.setTitle(t('list.filter.clear'))
-						.setIcon('filter-x')
-						.onClick(() => onState({ tags: [] })),
-				);
-			}
-			}
 			if (onMove) {
 			menu.addSeparator();
 			menu.addItem((item) =>
@@ -311,7 +224,6 @@ export function SectionGroup(props: SectionProps) {
 		});
 	};
 
-	const filtered = (state.tags?.length ?? 0) > 0;
 	const classes = ['eb-section', collapsed ? 'is-collapsed' : '', section.movable ? 'is-movable' : '']
 		.filter(Boolean)
 		.join(' ');
@@ -353,28 +265,6 @@ export function SectionGroup(props: SectionProps) {
 						{label}
 					</span>
 				)}
-				<button
-					type="button"
-					class={`eb-badge eb-section-sort${state.sort ? ' is-active' : ''}`}
-					disabled={locked}
-					title={locked ? t('list.controlsFixed') : t('list.sort.label')}
-					onClick={chooseSort}
-				>
-					<Icon name="arrow-up-down" class="eb-button-icon" />
-					<span class="eb-section-sort-label">{sortLabel}</span>
-				</button>
-				<button
-					type="button"
-					class={`eb-badge eb-section-filter${filtered ? ' is-active' : ''}`}
-					disabled={locked}
-					title={locked ? t('list.controlsFixed') : t('list.filter.label')}
-					onClick={chooseTags}
-				>
-					<Icon name="filter" class="eb-button-icon" />
-					{filtered ? (
-						<span class="eb-section-filter-label">{state.tags!.map((tag) => `#${tag}`).join(' ')}</span>
-					) : null}
-				</button>
 				<span class="eb-section-count">{rows.length}</span>
 				<IconButton icon="more-vertical" label={t('stack.options')} onClick={openMenu} />
 			</div>
@@ -398,6 +288,7 @@ export function SectionGroup(props: SectionProps) {
 								stackLabel={stack.name || t('modal.archive.untitled')}
 								onStackPick={onStackPick}
 								forceEdit={pending?.stack === ref.stack && pending.item === ref.item}
+								display={display}
 							/>
 							{/* Keep the stack control outside CardTile's read/edit
 							    switch: on phones CSS joins both into one visual card,

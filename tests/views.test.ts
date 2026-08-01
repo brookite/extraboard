@@ -34,9 +34,11 @@ describe('views: parsing', () => {
 			],
 			...DATE_PROPS,
 		});
+		// The written key is `dateProperties`; the single `dateProperty` every
+		// version before 0.3.0 wrote is still read, as the one-element list it is.
 		expect(board.config.views).toEqual([
 			{ id: 'v1', name: 'Board', type: 'kanban' },
-			{ id: 'v2', name: 'Due dates', type: 'calendar', dateProperty: 'due', mode: 'week' },
+			{ id: 'v2', name: 'Due dates', type: 'calendar', dateProperties: ['due'], mode: 'week' },
 		]);
 		expect(activeViewOf(board.config).name).toBe('Due dates');
 	});
@@ -80,7 +82,7 @@ describe('views: parsing', () => {
 			id: 'v1',
 			name: 'Calendar',
 			type: 'calendar',
-			dateProperty: 'due',
+			dateProperties: ['due'],
 			mode: 'month',
 		});
 	});
@@ -100,13 +102,79 @@ describe('views: parsing', () => {
 });
 
 describe('views: serialization', () => {
+	it('writes a calendar as a property list, plus the single key older versions read', () => {
+		const board = parse({
+			views: [
+				{ id: 'v1', name: 'Dates', type: 'calendar', dateProperties: ['due', 'sprint'], mode: 'month' },
+			],
+			...DATE_PROPS,
+		});
+		const text = serializeBoard(board);
+		expect(text).toContain('"dateProperties":["due","sprint"]');
+		expect(text).toContain('"dateProperty":"due"');
+		// And reading it back gives the list, not the compatibility key.
+		expect(parseBoard(text).config.views[0]).toEqual({
+			id: 'v1',
+			name: 'Dates',
+			type: 'calendar',
+			dateProperties: ['due', 'sprint'],
+			mode: 'month',
+		});
+	});
+
+	it('round-trips the card settings and prunes them back to nothing', () => {
+		const board = parse({
+			views: [{ id: 'v1', name: 'Board', type: 'kanban' }],
+			...DATE_PROPS,
+		});
+		const hidden = ops.setViewDisplay(board, 'v1', {
+			hiddenProperties: ['due'],
+			hideTags: true,
+		});
+		const text = serializeBoard(hidden);
+		expect(text).toContain('"display":{"hiddenProperties":["due"],"hideTags":true}');
+		expect(parseBoard(text).config.views[0]?.display).toEqual({
+			hiddenProperties: ['due'],
+			hideTags: true,
+		});
+
+		// Everything back on writes no key at all, and is a no-op the second time.
+		const cleared = ops.setViewDisplay(hidden, 'v1', { hiddenProperties: [], hideTags: false });
+		expect(cleared.config.views[0]?.display).toBeUndefined();
+		expect(serializeBoard(cleared)).not.toContain('display');
+		expect(ops.setViewDisplay(cleared, 'v1', { hideTags: false })).toBe(cleared);
+	});
+
+	it('ignores a malformed display block instead of dropping the view', () => {
+		const board = parse({
+			views: [
+				{ id: 'v1', name: 'Board', type: 'kanban', display: 'nonsense' },
+				{ id: 'v2', name: 'List', type: 'list', display: { hiddenProperties: [''], hideTags: 'yes' } },
+			],
+		});
+		expect(board.config.views).toHaveLength(2);
+		expect(board.config.views[0]?.display).toBeUndefined();
+		expect(board.config.views[1]?.display).toBeUndefined();
+	});
+
+	it('de-duplicates a hand-written property list and drops blank entries', () => {
+		const board = parse({
+			views: [
+				{ id: 'v1', name: 'Dates', type: 'calendar', dateProperties: ['due', ' due ', '', 7, 'sprint'] },
+			],
+			...DATE_PROPS,
+		});
+		const view = board.config.views[0];
+		expect(view?.type === 'calendar' && view.dateProperties).toEqual(['due', 'sprint']);
+	});
+
 	it('recognizes any top-level marker value and saves the active view name into it', () => {
 		const source = boardText(
 			{
 				activeView: 'v2',
 				views: [
 					{ id: 'v1', name: 'Board', type: 'kanban' },
-					{ id: 'v2', name: 'Due dates', type: 'calendar', dateProperty: 'due', mode: 'month' },
+					{ id: 'v2', name: 'Due dates', type: 'calendar', dateProperties: ['due'], mode: 'month' },
 				],
 				...DATE_PROPS,
 			},
@@ -129,7 +197,7 @@ describe('views: serialization', () => {
 
 	it('omits activeView while the first view is active, and writes it otherwise', () => {
 		const board = parse({ ...DATE_PROPS });
-		const one = ops.addView(board, { name: 'Due dates', type: 'calendar', dateProperty: 'due', mode: 'month' }, false);
+		const one = ops.addView(board, { name: 'Due dates', type: 'calendar', dateProperties: ['due'], mode: 'month' }, false);
 		expect(serializeBoard(one)).not.toContain('activeView');
 		const switched = ops.setActiveView(one, one.config.views[1]!.id);
 		expect(serializeBoard(switched)).toContain('"activeView":"v2"');
@@ -158,7 +226,7 @@ describe('views: ops (§2.4)', () => {
 		parse({
 			views: [
 				{ id: 'v1', name: 'Board', type: 'kanban' },
-				{ id: 'v2', name: 'Due dates', type: 'calendar', dateProperty: 'due', mode: 'month' },
+				{ id: 'v2', name: 'Due dates', type: 'calendar', dateProperties: ['due'], mode: 'month' },
 			],
 			...DATE_PROPS,
 		});
@@ -180,19 +248,23 @@ describe('views: ops (§2.4)', () => {
 	});
 
 	it('addView assigns the lowest free id and can activate the new view', () => {
-		const board = ops.addView(twoViews(), { name: 'Sprint', type: 'calendar', dateProperty: 'sprint', mode: 'week' });
+		const board = ops.addView(twoViews(), { name: 'Sprint', type: 'calendar', dateProperties: ['sprint'], mode: 'week' });
 		expect(board.config.views[2]?.id).toBe('v3');
 		expect(board.config.activeView).toBe('v3');
 		expect(nextViewId(board.config.views)).toBe('v4');
 	});
 
-	it('updateView patches name, mode and date property', () => {
-		const board = ops.updateView(twoViews(), 'v2', { name: 'Deadlines', mode: 'week', dateProperty: 'sprint' });
+	it('updateView patches name, mode and date properties', () => {
+		const board = ops.updateView(twoViews(), 'v2', {
+			name: 'Deadlines',
+			mode: 'week',
+			dateProperties: ['sprint', 'due'],
+		});
 		expect(board.config.views[1]).toEqual({
 			id: 'v2',
 			name: 'Deadlines',
 			type: 'calendar',
-			dateProperty: 'sprint',
+			dateProperties: ['sprint', 'due'],
 			mode: 'week',
 		});
 	});
@@ -267,17 +339,22 @@ describe('views: validation (§2.2)', () => {
 // Spec: docs/specs/list-view.md §5.
 
 describe('views: list views', () => {
+	const FILTER = {
+		op: 'and',
+		children: [
+			{ field: '@tags', op: 'contains', value: 'bug' },
+			{ op: 'not', children: [{ field: 'due', op: 'isSet' }] },
+		],
+	};
+
 	const LIST = {
 		id: 'v1',
 		name: 'All tasks',
 		type: 'list',
 		controls: 'fixed',
-		sort: { property: 'due', dir: 'desc' },
-		tags: ['bug'],
-		sections: {
-			'': { collapsed: true },
-			Backlog: { sort: { property: 'due', dir: 'asc' }, tags: ['ops'] },
-		},
+		filter: FILTER,
+		sorts: [{ field: 'due', dir: 'desc' }, { field: '@title', dir: 'asc' }],
+		sections: { '': { collapsed: true } },
 	};
 
 	it('reads every list key back', () => {
@@ -287,12 +364,23 @@ describe('views: list views', () => {
 			name: 'All tasks',
 			type: 'list',
 			controls: 'fixed',
-			sort: { property: 'due', dir: 'desc' },
-			tags: ['bug'],
-			sections: {
-				'': { collapsed: true },
-				Backlog: { sort: { property: 'due', dir: 'asc' }, tags: ['ops'] },
+			filter: {
+				kind: 'group',
+				op: 'and',
+				children: [
+					{ kind: 'condition', field: { kind: 'builtin', id: 'tags' }, op: 'contains', value: 'bug' },
+					{
+						kind: 'group',
+						op: 'not',
+						children: [{ kind: 'condition', field: { kind: 'property', name: 'due' }, op: 'isSet' }],
+					},
+				],
 			},
+			sorts: [
+				{ field: { kind: 'property', name: 'due' }, dir: 'desc' },
+				{ field: { kind: 'builtin', id: 'title' }, dir: 'asc' },
+			],
+			sections: { '': { collapsed: true } },
 		});
 	});
 
@@ -317,16 +405,83 @@ describe('views: list views', () => {
 					id: 'v1',
 					name: 'L',
 					type: 'list',
+					// A legacy sort with no property is not a sort at all.
 					sort: { dir: 'asc' },
-					tags: ['#bug', '  ', 7, 'bug'],
 					sections: { Backlog: 'nope', Other: {} },
 				},
 			],
 		}).config.views[0]!;
 		expect(view.type).toBe('list');
-		expect(view.type === 'list' && 'sort' in view).toBe(false);
-		expect(view.type === 'list' && view.tags).toEqual(['bug']);
+		expect(view.type === 'list' && 'sorts' in view).toBe(false);
 		expect(view.type === 'list' && view.sections).toBeUndefined();
+	});
+
+	it('migrates a pre-0.3.0 list view’s sort and tag filter (filters §7)', () => {
+		const view = parse({
+			views: [
+				{
+					id: 'v1',
+					name: 'L',
+					type: 'list',
+					controls: 'fixed',
+					sort: { property: 'due', dir: 'desc' },
+					tags: ['#bug', '  ', 7, 'ops'],
+					// Per-section sorts and filters have nowhere to go; collapse stays.
+					sections: { Backlog: { collapsed: true, sort: { property: 'due', dir: 'asc' } } },
+				},
+			],
+			...DATE_PROPS,
+		}).config.views[0]!;
+		expect(view.type === 'list' && view.sorts).toEqual([
+			{ field: { kind: 'property', name: 'due' }, dir: 'desc' },
+		]);
+		expect(view.type === 'list' && view.filter).toEqual({
+			kind: 'group',
+			op: 'or',
+			children: [
+				{ kind: 'condition', field: { kind: 'builtin', id: 'tags' }, op: 'contains', value: 'bug' },
+				{ kind: 'condition', field: { kind: 'builtin', id: 'tags' }, op: 'contains', value: 'ops' },
+			],
+		});
+		expect(view.type === 'list' && view.sections).toEqual({ Backlog: { collapsed: true } });
+	});
+
+	it('drops a filter condition it cannot read, and keeps the rest', () => {
+		const view = parse({
+			views: [
+				{
+					id: 'v1',
+					name: 'L',
+					type: 'list',
+					filter: {
+						op: 'or',
+						children: [
+							{ field: '@tags', op: 'contains', value: 'bug' },
+							{ field: '@nope', op: 'contains', value: 'x' },
+							{ field: 'due', op: 'nonsense' },
+							'not-a-mapping',
+						],
+					},
+					sorts: [
+						{ field: 'due', dir: 'desc' },
+						{ field: 'due', dir: 'asc' },
+						{ field: '@bogus', dir: 'asc' },
+					],
+				},
+			],
+			...DATE_PROPS,
+		}).config.views[0]!;
+		expect(view.type === 'list' && view.filter).toEqual({
+			kind: 'group',
+			op: 'or',
+			children: [
+				{ kind: 'condition', field: { kind: 'builtin', id: 'tags' }, op: 'contains', value: 'bug' },
+			],
+		});
+		// A field may only be sorted by once, and an unknown builtin is not a field.
+		expect(view.type === 'list' && view.sorts).toEqual([
+			{ field: { kind: 'property', name: 'due' }, dir: 'desc' },
+		]);
 	});
 
 	it('names a list view by default and allows several per board', () => {

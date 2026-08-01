@@ -11,8 +11,12 @@ import {
 	StringListOption,
 	BadgeColor,
 	ViewDef,
+	ViewDisplay,
 } from './types';
 import { normalizeViews, parseViews } from './views';
+import { fieldId } from './fieldValue';
+import { isEmptyFilter, type FilterNode } from './filter';
+import type { SortRule } from './sort';
 import type { DateHighlightRule, HighlightUnit } from './dateHighlights';
 
 /** Info string of the fenced block holding the configuration. */
@@ -144,11 +148,24 @@ export function toConfig(raw: unknown): BoardConfig {
 
 /** Section state, empty-pruned; `undefined` when the section holds none. */
 function sectionStateToPlain(state: SectionState): Record<string, unknown> | undefined {
-	const out: Record<string, unknown> = {};
-	if (state.sort) out.sort = { property: state.sort.property, dir: state.sort.dir };
-	if (state.tags?.length) out.tags = state.tags;
-	if (state.collapsed) out.collapsed = true;
-	return Object.keys(out).length ? out : undefined;
+	return state.collapsed ? { collapsed: true } : undefined;
+}
+
+/** A filter node as JSON: fields by id, empty operands left out (§5). */
+function filterToPlain(node: FilterNode): Record<string, unknown> {
+	if (node.kind === 'group') {
+		return { op: node.op, children: node.children.map(filterToPlain) };
+	}
+	return {
+		field: fieldId(node.field),
+		op: node.op,
+		...(node.value !== undefined && node.value !== '' && { value: node.value }),
+		...(node.value2 !== undefined && node.value2 !== '' && { value2: node.value2 }),
+	};
+}
+
+function sortsToPlain(sorts: readonly SortRule[]): Record<string, unknown>[] {
+	return sorts.map((rule) => ({ field: fieldId(rule.field), dir: rule.dir }));
 }
 
 /**
@@ -156,16 +173,47 @@ function sectionStateToPlain(state: SectionState): Record<string, unknown> | und
  * default, and its display state only when it holds any: an untouched list is
  * three keys (list-view.md §5).
  */
-function viewToPlain(v: ViewDef): Record<string, unknown> {
-	if (v.type === 'calendar') {
-		return { id: v.id, name: v.name, type: v.type, dateProperty: v.dateProperty, mode: v.mode };
-	}
-	if (v.type !== 'list') return { id: v.id, name: v.name, type: v.type };
+/** A view's card settings, empty-pruned; `undefined` when it holds none. */
+function displayToPlain(display: ViewDisplay | undefined): Record<string, unknown> | undefined {
+	if (!display) return undefined;
+	const out: Record<string, unknown> = {};
+	if (display.hiddenProperties?.length) out.hiddenProperties = display.hiddenProperties;
+	if (display.hideTags) out.hideTags = true;
+	if (display.hideCheckbox) out.hideCheckbox = true;
+	if (display.hideProgress) out.hideProgress = true;
+	if (display.hideColor) out.hideColor = true;
+	return Object.keys(out).length ? out : undefined;
+}
 
-	const out: Record<string, unknown> = { id: v.id, name: v.name, type: v.type };
+function viewToPlain(v: ViewDef): Record<string, unknown> {
+	const display = displayToPlain(v.display);
+	if (v.type === 'calendar') {
+		return {
+			id: v.id,
+			name: v.name,
+			type: v.type,
+			...(display && { display }),
+			dateProperties: v.dateProperties,
+			// The pre-0.3.0 key, written alongside: a plugin that only knows it
+			// drops a calendar without one, so leaving it out would delete the view
+			// from a board opened by an older Obsidian (views.md §4.3).
+			dateProperty: v.dateProperties[0] ?? '',
+			mode: v.mode,
+		};
+	}
+	if (v.type !== 'list') {
+		return { id: v.id, name: v.name, type: v.type, ...(display && { display }) };
+	}
+
+	const out: Record<string, unknown> = {
+		id: v.id,
+		name: v.name,
+		type: v.type,
+		...(display && { display }),
+	};
 	if (v.controls !== 'dynamic') out.controls = v.controls;
-	if (v.sort) out.sort = { property: v.sort.property, dir: v.sort.dir };
-	if (v.tags?.length) out.tags = v.tags;
+	if (!isEmptyFilter(v.filter) && v.filter) out.filter = filterToPlain(v.filter);
+	if (v.sorts?.length) out.sorts = sortsToPlain(v.sorts);
 	const sections: Record<string, unknown> = {};
 	for (const [name, state] of Object.entries(v.sections ?? {})) {
 		const plain = sectionStateToPlain(state);

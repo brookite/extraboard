@@ -10,6 +10,7 @@ import { App, Modal, setIcon } from 'obsidian';
 import Sortable from 'sortablejs';
 import * as cl from '../model/checklist';
 import type { ChecklistItem, ChecklistPath } from '../model/checklist';
+import { createEmbeddedEditor, type EmbeddedEditorHandle } from '../view/embeddedEditor';
 import { t } from '../i18n';
 import { showDropdownMenu } from '../util/menu';
 
@@ -38,6 +39,12 @@ export class ChecklistModal extends Modal {
 	private focusPath: ChecklistPath | null = null;
 	/** True while rows are being torn down, so a stale blur commits nothing. */
 	private rebuilding = false;
+	/**
+	 * The one row being edited (§4.3). One at a time, because each editor is a
+	 * whole CodeMirror instance and a checklist can be long — a row is a piece of
+	 * text until it is pointed at.
+	 */
+	private editing: { path: ChecklistPath; handle: EmbeddedEditorHandle } | null = null;
 
 	constructor(
 		app: App,
@@ -68,6 +75,9 @@ export class ChecklistModal extends Modal {
 	}
 
 	override onClose(): void {
+		// Commit first: the last thing typed is as much an edit as any other, and
+		// dismissing the modal was never a way to undo one.
+		this.closeEditor(true);
 		this.sortable?.destroy();
 		this.sortable = null;
 		this.contentEl.empty();
@@ -88,6 +98,8 @@ export class ChecklistModal extends Modal {
 
 	private render(): void {
 		this.rebuilding = true;
+		// The editor lives inside a row, and every row is about to be replaced.
+		this.closeEditor(false);
 		this.listEl.empty();
 		this.rebuilding = false;
 		const items = this.options.items();
@@ -129,25 +141,163 @@ export class ChecklistModal extends Modal {
 			this.change((items) => cl.toggle(items, path));
 		});
 
-		const input = rowEl.createEl('input', { type: 'text', cls: 'eb-checklist-text' });
-		input.value = item.text;
-		input.dataset.path = path.join('.');
-		input.addEventListener('change', () => {
-			this.commitText(path, input.value);
-		});
-		input.addEventListener('blur', () => {
-			this.commitText(path, input.value);
-		});
-		input.addEventListener('keydown', (evt) => {
-			this.onKeyDown(evt, path, input);
-		});
+		// Text, not a field: the row becomes an editor when it is pointed at, and
+		// only then (§4.3). Focusable, so Tab still walks the list.
+		const text = rowEl.createDiv({ cls: 'eb-checklist-text' });
+		text.dataset.path = path.join('.');
+		text.tabIndex = 0;
+		this.fillText(text, item.text);
+		const edit = (): void => this.editRow(path);
+		text.addEventListener('click', edit);
+		text.addEventListener('focus', edit);
 
 		const menu = rowEl.createEl('button', { cls: 'eb-icon-button', attr: { type: 'button' } });
 		setIcon(menu, 'more-vertical');
 		menu.setAttr('aria-label', t('modal.checklist.itemOptions'));
 		menu.addEventListener('click', (evt) => {
-			this.openRowMenu(evt, path, input);
+			this.openRowMenu(evt, path);
 		});
+	}
+
+	/** A row's read-mode content: its text, or the placeholder for an empty one. */
+	private fillText(el: HTMLElement, text: string): void {
+		el.empty();
+		el.removeClass('is-editing');
+		if (text) el.setText(text);
+		else el.createSpan({ cls: 'eb-placeholder', text: t('modal.checklist.itemPlaceholder') });
+	}
+
+	private textEl(path: ChecklistPath): HTMLElement | null {
+		const el = this.listEl.querySelector(`.eb-checklist-text[data-path="${path.join('.')}"]`);
+		return el instanceof HTMLElement ? el : null;
+	}
+
+	/**
+	 * Turn one row into the board's own Markdown field, so `[[` and `#` complete
+	 * here exactly as they do in a card (§4.3) — one line only: Enter belongs to
+	 * the list, not to the text.
+	 */
+	private editRow(path: ChecklistPath): void {
+		if (this.editing && cl.samePath(this.editing.path, path)) return;
+		this.closeEditor(true);
+		const el = this.textEl(path);
+		const item = cl.itemAt(this.options.items(), path);
+		if (!el || !item) return;
+
+		el.empty();
+		el.addClass('is-editing');
+		const handle = createEmbeddedEditor(this.app, el, {
+			value: item.text,
+			singleLine: true,
+			onKey: (evt) => this.onEditorKey(evt, path),
+			// Focus left the row: keep what was typed, and go back to text.
+			onSubmit: (text) => {
+				this.editing = null;
+				this.commitText(path, text);
+				const target = this.textEl(path);
+				if (target) this.fillText(target, text);
+			},
+			onCancel: () => {
+				this.editing = null;
+				const current = cl.itemAt(this.options.items(), path);
+				const target = this.textEl(path);
+				if (target) this.fillText(target, current?.text ?? '');
+			},
+		});
+		// No embedded editor on this Obsidian version: the plain field of M6 is
+		// still a field, and a checklist item must always be editable.
+		if (!handle) {
+			this.editInput(el, path, item.text);
+			return;
+		}
+		this.editing = { path, handle };
+		handle.focus();
+	}
+
+	/** The textarea-free fallback: one plain input, wired to the same keys. */
+	private editInput(el: HTMLElement, path: ChecklistPath, value: string): void {
+		const input = el.createEl('input', { type: 'text', cls: 'eb-checklist-input' });
+		input.value = value;
+		input.addEventListener('change', () => this.commitText(path, input.value));
+		input.addEventListener('blur', () => {
+			this.commitText(path, input.value);
+			const target = this.textEl(path);
+			if (target && !this.rebuilding) this.fillText(target, input.value);
+		});
+		input.addEventListener('keydown', (evt) => {
+			if (evt.isComposing) return;
+			if (this.onEditorKey(evt, path, () => input.value)) {
+				evt.preventDefault();
+				return;
+			}
+			if (evt.key === 'Escape') input.blur();
+		});
+		input.focus();
+		input.setSelectionRange(value.length, value.length);
+	}
+
+	/**
+	 * The keys a row owns, whichever field is mounted: Enter adds a sibling,
+	 * Tab/Shift+Tab indent and outdent, Alt+↑/↓ move the row with its subtree.
+	 * **Backspace is not one of them** — an empty row is a row the user is still
+	 * writing, so deleting it is a menu item, never a keystroke (§4.3).
+	 */
+	private onEditorKey(evt: KeyboardEvent, path: ChecklistPath, read?: () => string): boolean {
+		const value = (): string => read?.() ?? this.editing?.handle.getValue() ?? '';
+
+		if (evt.key === 'Enter') {
+			const text = value();
+			this.closeEditor(false);
+			this.commitText(path, text);
+			this.change((items) => {
+				const r = cl.insertAfter(items, path);
+				this.focusPath = r.path;
+				return r.items;
+			});
+			return true;
+		}
+
+		if (evt.key === 'Tab') {
+			const text = value();
+			this.closeEditor(false);
+			this.commitText(path, text);
+			this.change((items) => {
+				const r = evt.shiftKey ? cl.outdent(items, path) : cl.indent(items, path);
+				this.focusPath = r.path;
+				return r.items;
+			});
+			return true;
+		}
+
+		if (evt.altKey && (evt.key === 'ArrowUp' || evt.key === 'ArrowDown')) {
+			const text = value();
+			this.closeEditor(false);
+			this.commitText(path, text);
+			this.change((items) => {
+				const r = cl.move(items, path, evt.key === 'ArrowUp' ? -1 : 1);
+				this.focusPath = r.path;
+				return r.items;
+			});
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Tear the editor down. `commit` writes what it holds first; the structural
+	 * keys pass `false` because they have already read and written the text
+	 * themselves, and a second write would race the re-render.
+	 */
+	private closeEditor(commit: boolean): void {
+		const editing = this.editing;
+		if (!editing) return;
+		this.editing = null;
+		const text = editing.handle.getValue();
+		editing.handle.destroy();
+		if (commit) this.commitText(editing.path, text);
+		const el = this.rebuilding ? null : this.textEl(editing.path);
+		if (el) this.fillText(el, commit ? text : (cl.itemAt(this.options.items(), editing.path)?.text ?? ''));
 	}
 
 	private commitText(path: ChecklistPath, text: string): void {
@@ -163,64 +313,6 @@ export class ChecklistModal extends Modal {
 	private refreshCount(): void {
 		const { done, total } = cl.progress(this.options.items());
 		this.countEl.setText(total ? `  ${String(done)}/${String(total)}` : '');
-	}
-
-	/**
-	 * Enter adds a sibling, Tab/Shift+Tab indent and outdent, Alt+↑/↓ move the
-	 * row with its subtree, and Backspace on an empty row deletes it. Escape is
-	 * left to the modal, which closes.
-	 */
-	private onKeyDown(evt: KeyboardEvent, path: ChecklistPath, input: HTMLInputElement): void {
-		if (evt.isComposing) return;
-
-		if (evt.key === 'Enter') {
-			evt.preventDefault();
-			this.commitText(path, input.value);
-			this.change((items) => {
-				const r = cl.insertAfter(items, path);
-				this.focusPath = r.path;
-				return r.items;
-			});
-			return;
-		}
-
-		if (evt.key === 'Tab') {
-			evt.preventDefault();
-			this.commitText(path, input.value);
-			this.change((items) => {
-				const r = evt.shiftKey ? cl.outdent(items, path) : cl.indent(items, path);
-				this.focusPath = r.path;
-				return r.items;
-			});
-			return;
-		}
-
-		if (evt.altKey && (evt.key === 'ArrowUp' || evt.key === 'ArrowDown')) {
-			evt.preventDefault();
-			this.commitText(path, input.value);
-			this.change((items) => {
-				const r = cl.move(items, path, evt.key === 'ArrowUp' ? -1 : 1);
-				this.focusPath = r.path;
-				return r.items;
-			});
-			return;
-		}
-
-		if (evt.key === 'Backspace' && input.value === '') {
-			evt.preventDefault();
-			const previous = this.previousPath(path);
-			this.change((items) => {
-				this.focusPath = previous;
-				return cl.removeAt(items, path);
-			});
-		}
-	}
-
-	/** The row above `path` in display order, or `null` at the top. */
-	private previousPath(path: ChecklistPath): ChecklistPath | null {
-		const rows = cl.flatten(this.options.items());
-		const at = rows.findIndex((r) => cl.samePath(r.path, path));
-		return at > 0 ? rows[at - 1]!.path : null;
 	}
 
 	// --- drag & drop ------------------------------------------------------
@@ -262,8 +354,9 @@ export class ChecklistModal extends Modal {
 		from.insertBefore(item, oldIndex === undefined ? null : (from.children[oldIndex] ?? null));
 	}
 
-	private openRowMenu(evt: MouseEvent, path: ChecklistPath, input: HTMLInputElement): void {
-		this.commitText(path, input.value);
+	private openRowMenu(evt: MouseEvent, path: ChecklistPath): void {
+		// Whatever the row holds is written before the menu acts on it.
+		this.closeEditor(true);
 		showDropdownMenu(evt, (menu) => {
 			const structural = (
 			title: string,
@@ -304,13 +397,15 @@ export class ChecklistModal extends Modal {
 		});
 	}
 
+	/**
+	 * Put the caret back where the last edit left it — by opening the row's
+	 * editor, so a chain of Enters, Tabs or Alt+arrows never drops the user out
+	 * of the text.
+	 */
 	private applyFocus(): void {
 		const path = this.focusPath;
 		this.focusPath = null;
-		if (!path) return;
-		const el = this.listEl.querySelector(`.eb-checklist-text[data-path="${path.join('.')}"]`);
-		if (!(el instanceof HTMLInputElement)) return;
-		el.focus();
-		el.setSelectionRange(el.value.length, el.value.length);
+		if (!path || !this.textEl(path)) return;
+		this.editRow(path);
 	}
 }

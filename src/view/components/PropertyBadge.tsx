@@ -11,7 +11,9 @@ import { dateTimeOptsFor, formatCalDate, formatCalSpan, absoluteTooltip, type Da
 import { describeRecurrence } from '../../i18n/recurrenceText';
 import { t } from '../../i18n';
 import { readableOn } from '../../util/color';
+import type { BoardApi } from '../api';
 import { Icon } from './Icon';
+import { MarkdownText, hasMarkdown } from './MarkdownText';
 import { PercentValue } from './Progress';
 import { safeColor, styleFor } from './style';
 import { useNow } from '../now';
@@ -25,6 +27,19 @@ interface Props {
 	/** The card this value belongs to — a `recurrence` badge needs its siblings
 	 * to resolve an anchor-less rule's start (recurrence.md §1.2). */
 	card: Card;
+	/** Needed by the text renderer below: a link in a value is a real link. */
+	api: BoardApi;
+}
+
+/**
+ * A free-text value in read mode (properties.md §2.1): one line of inline
+ * Markdown, so a `[[link]]` typed into a `string` property opens, previews and
+ * resolves like any other — the same treatment a card title gets, and skipped
+ * outright for the prose that most values are.
+ */
+function TextValue({ text, api }: { text: string; api: BoardApi }) {
+	if (!hasMarkdown(text)) return <>{text}</>;
+	return <MarkdownText markdown={text} api={api} />;
 }
 
 /** What every date-family badge needs: the format settings, the rules in force,
@@ -144,7 +159,7 @@ function SpanBadge({ raw, dates }: { raw: string; dates: DateOpts }) {
 	);
 }
 
-export function PropertyBadge({ pv, config, progress, settings, card }: Props) {
+export function PropertyBadge({ pv, config, progress, settings, card, api }: Props) {
 	// Subscribing to the clock here is what keeps relative labels and highlights
 	// live under the card's `memo`: a context change re-renders exactly the badges
 	// that read it, and nothing else on the board (m10-perf.md §2.3).
@@ -176,7 +191,11 @@ export function PropertyBadge({ pv, config, progress, settings, card }: Props) {
 			);
 		}
 		case 'string':
-			return <span class="eb-badge">{pv.value}</span>;
+			return (
+				<span class="eb-badge">
+					<TextValue text={pv.value} api={api} />
+				</span>
+			);
 		case 'integer':
 			return (
 				<span class="eb-badge eb-badge-num">
@@ -217,6 +236,10 @@ export function PropertyBadge({ pv, config, progress, settings, card }: Props) {
 			);
 		}
 		case 'raw':
-			return <span class="eb-badge eb-badge-muted">{pv.value.join(', ')}</span>;
+			return (
+				<span class="eb-badge eb-badge-muted">
+					<TextValue text={pv.value.join(', ')} api={api} />
+				</span>
+			);
 	}
 }

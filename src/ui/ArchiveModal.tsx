@@ -97,6 +97,7 @@ function ArchiveRow({ entry, board, api, settings, onRestore, onDelete, onOpenLi
 						progress={progressStyleFor(board.config, settings)}
 						settings={settings}
 						card={card}
+						api={api}
 					/>
 				))}
 			</div>

@@ -107,6 +107,44 @@ export function parseCardLink(title: string): CardLink | null {
 }
 
 /**
+ * Every internal link in a piece of text, as written — the whole scan, where
+ * `parseCardLink` stops at the first one. Embeds and external URLs are skipped
+ * the same way. Used by the `linked to` filter, which asks about a card's text
+ * properties as well as its title (filters-and-sorting.md §3).
+ */
+export function linksIn(text: string): string[] {
+	LINK_RE.lastIndex = 0;
+	const out: string[] = [];
+	for (let m = LINK_RE.exec(text); m; m = LINK_RE.exec(text)) {
+		if (m[1] === '!' || m[3] === '!') continue;
+		const parts = m[2] === undefined ? fromMarkdown(m[4] ?? '', m[5] ?? '') : fromWiki(m[2]);
+		if (parts) out.push(parts.linktext);
+	}
+	return out;
+}
+
+/**
+ * A link target reduced to what two of them can be compared by: no `.md`, no
+ * `#heading` or `^block`, case-folded. The model has no metadata cache, so this
+ * is deliberately textual — a full path matches a full path, and a bare name
+ * matches the last segment of one (filters-and-sorting.md §3.4).
+ */
+export function normalizeLink(target: string): string {
+	const { path } = splitSubpath(target.trim());
+	const clean = path.endsWith('.md') ? path.slice(0, -3) : path;
+	return clean.toLowerCase();
+}
+
+/** True iff two link targets name the same note, by path or by basename. */
+export function sameLinkTarget(a: string, b: string): boolean {
+	const left = normalizeLink(a);
+	const right = normalizeLink(b);
+	if (!left || !right) return false;
+	if (left === right) return true;
+	return basename(left) === basename(right);
+}
+
+/**
  * The title a linked card falls back to when its note is unlinked (§2): the
  * content link replaced by its display text, the rest of the title kept.
  */

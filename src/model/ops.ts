@@ -30,12 +30,14 @@ import type {
 	ListControls,
 	PropertyDef,
 	PropertyValue,
-	SectionSort,
 	SectionState,
 	Stack,
 	StackItem,
 	ViewDef,
+	ViewDisplay,
 } from './types';
+import { isEmptyFilter, type FilterNode } from './filter';
+import type { SortRule } from './sort';
 import { nextViewId } from './views';
 
 /**
@@ -681,9 +683,8 @@ function shifted(ref: ItemRef, stackIndex: number, at: number): ItemRef {
 }
 
 /**
- * The item index a card lands on when it enters `key` in this stack: the end of
- * that section's group, or — for the sectionless group — the top or the end of
- * the head group, as `atTop` says (§4.2).
+ * The item index a card lands on when it enters `key` in this stack: the top or
+ * end of that section's group, as `atTop` says.
  *
  * Returns `null` when the section is not in this stack, which only happens for
  * an anonymous section: the caller creates named ones first.
@@ -704,7 +705,8 @@ function sectionEntryIndex(
 				? key.ref.item
 				: -1;
 	if (at === -1) return null;
-	return groupRange(stack, at).end;
+	const range = groupRange(stack, at);
+	return atTop ? range.start : range.end;
 }
 
 /**
@@ -758,9 +760,11 @@ export function addCardToSectionAt(
  * section change — where `toStack` is the card's own stack, so it keeps it —
  * and the row's stack badge, which keeps the section instead.
  *
- * `before` is a card of the destination group the moved card lands in front of;
- * `null` means the end of the group. It is resolved by identity like every
- * other move, so it may be read off the pre-move board.
+ * `before` is a card of the destination group the moved card lands in front of
+ * and always wins when supplied by drag-and-drop. Without one, `atTop` selects
+ * the start or end of the group for non-positional menu moves. A target ref is
+ * resolved by identity like every other move, so it may be read off the
+ * pre-move board.
  */
 export function moveCardToSection(
 	board: Board,
@@ -768,6 +772,7 @@ export function moveCardToSection(
 	toStack: number,
 	key: SectionKey,
 	before: ItemRef | null = null,
+	atTop = false,
 ): Board {
 	const entry = board.stacks[from.stack]?.items[from.item];
 	if (entry?.kind !== 'card' || !board.stacks[toStack]) return board;
@@ -789,7 +794,7 @@ export function moveCardToSection(
 	const at =
 		target && target.stack === toStack && next.stacks[toStack]?.items[target.item]?.kind === 'card'
 			? target.item
-			: sectionEntryIndex(next, toStack, key, false);
+			: sectionEntryIndex(next, toStack, key, atTop);
 	if (at === null) return board;
 	const moved = moveItem(next, ref, toStack, at);
 	return moved === next && next === board ? board : moved;
@@ -1115,12 +1120,10 @@ export function updateView(
 	id: string,
 	patch: {
 		name?: string;
-		dateProperty?: string;
+		/** Replaces the calendar's whole list; an empty one is ignored. */
+		dateProperties?: string[];
 		mode?: CalendarMode;
 		controls?: ListControls;
-		/** `null` clears the view-wide sort back to document order. */
-		sort?: SectionSort | null;
-		tags?: string[];
 	},
 ): Board {
 	const at = board.config.views.findIndex((v) => v.id === id);
@@ -1130,14 +1133,16 @@ export function updateView(
 	const name = patch.name?.trim();
 	let next: ViewDef = name && name !== view.name ? { ...view, name } : view;
 	if (next.type === 'calendar') {
-		const dateProperty = patch.dateProperty?.trim();
-		if (dateProperty && dateProperty !== next.dateProperty) next = { ...next, dateProperty };
+		const properties = cleanNames(patch.dateProperties);
+		// A calendar with no property is not a view, so an empty list is a no-op
+		// rather than a way to break one (views.md §4.3).
+		if (properties && !sameNames(properties, next.dateProperties)) {
+			next = { ...next, dateProperties: properties };
+		}
 		if (patch.mode && patch.mode !== next.mode) next = { ...next, mode: patch.mode };
 	}
-	if (next.type === 'list') {
-		if (patch.controls && patch.controls !== next.controls) next = { ...next, controls: patch.controls };
-		if (patch.sort !== undefined) next = withSort(next, patch.sort);
-		if (patch.tags !== undefined) next = withTags(next, patch.tags);
+	if (next.type === 'list' && patch.controls && patch.controls !== next.controls) {
+		next = { ...next, controls: patch.controls };
 	}
 	if (next === view) return board;
 
@@ -1146,29 +1151,107 @@ export function updateView(
 	return withViews(board, views);
 }
 
-type ListView = Extract<ViewDef, { type: 'list' }>;
+/**
+ * Patch what a view draws on its cards (views.md §5). Defaults are pruned, so
+ * turning everything back on leaves the view exactly as it was written before
+ * anyone touched the quick settings.
+ */
+export function setViewDisplay(board: Board, id: string, patch: Partial<ViewDisplay>): Board {
+	const at = board.config.views.findIndex((v) => v.id === id);
+	const view = board.config.views[at];
+	if (!view) return board;
 
-/** `view` with `sort` set, or without one when it is `null` — never both keys. */
-function withSort(view: ListView, sort: SectionSort | null): ListView {
-	if (sort === null) {
-		if (view.sort === undefined) return view;
-		const { sort: _dropped, ...rest } = view;
-		return rest;
+	const merged: ViewDisplay = { ...view.display, ...patch };
+	if (!merged.hiddenProperties?.length) delete merged.hiddenProperties;
+	if (!merged.hideTags) delete merged.hideTags;
+	if (!merged.hideCheckbox) delete merged.hideCheckbox;
+	if (!merged.hideProgress) delete merged.hideProgress;
+	if (!merged.hideColor) delete merged.hideColor;
+
+	const display = Object.keys(merged).length ? merged : undefined;
+	if (sameDisplay(view.display, display)) return board;
+
+	let next: ViewDef;
+	if (display) next = { ...view, display };
+	else {
+		const { display: _dropped, ...rest } = view;
+		next = rest;
 	}
-	if (view.sort?.property === sort.property && view.sort.dir === sort.dir) return view;
-	return { ...view, sort };
+	const views = board.config.views.slice();
+	views[at] = next;
+	return withViews(board, views);
 }
 
-/** `view` with the tag filter set; an empty list drops the key altogether. */
-function withTags(view: ListView, tags: string[]): ListView {
-	const next = tags.map((tag) => tag.trim().replace(/^#/, '')).filter(Boolean);
-	const current = view.tags ?? [];
-	if (next.length === current.length && next.every((tag, i) => tag === current[i])) return view;
-	if (!next.length) {
-		const { tags: _dropped, ...rest } = view;
-		return rest;
+function sameDisplay(a: ViewDisplay | undefined, b: ViewDisplay | undefined): boolean {
+	if (!a || !b) return a === b;
+	return (
+		a.hideTags === b.hideTags &&
+		a.hideCheckbox === b.hideCheckbox &&
+		a.hideProgress === b.hideProgress &&
+		a.hideColor === b.hideColor &&
+		sameNames(a.hiddenProperties ?? [], b.hiddenProperties ?? [])
+	);
+}
+
+/** Trimmed, de-duplicated names, or `undefined` when there is nothing to set. */
+function cleanNames(names: string[] | undefined): string[] | undefined {
+	if (!names) return undefined;
+	const out: string[] = [];
+	for (const raw of names) {
+		const name = raw.trim();
+		if (name && !out.includes(name)) out.push(name);
 	}
-	return { ...view, tags: next };
+	return out.length ? out : undefined;
+}
+
+function sameNames(a: readonly string[], b: readonly string[]): boolean {
+	return a.length === b.length && a.every((name, i) => name === b[i]);
+}
+
+type ListView = Extract<ViewDef, { type: 'list' }>;
+
+/**
+ * Set a list view's filter (filters-and-sorting.md §1). A tree with no
+ * conditions left in it drops the key altogether, so clearing a filter leaves
+ * the view exactly as it was written before one existed.
+ */
+export function setViewFilter(board: Board, id: string, filter: FilterNode | null): Board {
+	const at = board.config.views.findIndex((v) => v.id === id);
+	const view = board.config.views[at];
+	if (view?.type !== 'list') return board;
+
+	const next = filter && !isEmptyFilter(filter) ? filter : null;
+	if (JSON.stringify(view.filter ?? null) === JSON.stringify(next)) return board;
+
+	let updated: ListView;
+	if (next) updated = { ...view, filter: next };
+	else {
+		const { filter: _dropped, ...rest } = view;
+		updated = rest;
+	}
+	const views = board.config.views.slice();
+	views[at] = updated;
+	return withViews(board, views);
+}
+
+/** Set a list view's sort keys, most significant first; an empty list clears them. */
+export function setViewSorts(board: Board, id: string, sorts: readonly SortRule[]): Board {
+	const at = board.config.views.findIndex((v) => v.id === id);
+	const view = board.config.views[at];
+	if (view?.type !== 'list') return board;
+
+	const next = sorts.length ? sorts.map((rule) => ({ ...rule })) : null;
+	if (JSON.stringify(view.sorts ?? null) === JSON.stringify(next)) return board;
+
+	let updated: ListView;
+	if (next) updated = { ...view, sorts: next };
+	else {
+		const { sorts: _dropped, ...rest } = view;
+		updated = rest;
+	}
+	const views = board.config.views.slice();
+	views[at] = updated;
+	return withViews(board, views);
 }
 
 /**
@@ -1193,8 +1276,6 @@ export function setSectionState(
 	const current = view.sections?.[key] ?? {};
 	const merged: SectionState = { ...current, ...patch };
 	// Prune what is at its default, so an untouched section writes nothing.
-	if (!merged.sort) delete merged.sort;
-	if (!merged.tags?.length) delete merged.tags;
 	if (!merged.collapsed) delete merged.collapsed;
 
 	const sections = { ...view.sections };
@@ -1216,17 +1297,8 @@ export function setSectionState(
 function sameSections(a: Record<string, SectionState>, b: Record<string, SectionState>): boolean {
 	const keys = Object.keys(a);
 	if (keys.length !== Object.keys(b).length) return false;
-	return keys.every((key) => {
-		const x = a[key];
-		const y = b[key];
-		if (!x || !y) return false;
-		return (
-			x.collapsed === y.collapsed &&
-			x.sort?.property === y.sort?.property &&
-			x.sort?.dir === y.sort?.dir &&
-			(x.tags ?? []).join(' ') === (y.tags ?? []).join(' ')
-		);
-	});
+	// Collapse is all a section state holds now (filters-and-sorting.md §1).
+	return keys.every((key) => a[key]?.collapsed === b[key]?.collapsed);
 }
 
 /**

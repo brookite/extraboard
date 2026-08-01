@@ -128,11 +128,34 @@ export interface EmbeddedEditorOptions {
 	 * element entirely counts as "done". Defaults to the mount container.
 	 */
 	scope?: HTMLElement;
+	/**
+	 * A one-line field (card-content-and-checklists.md §4.3): line breaks are
+	 * collapsed out of the value, so a multi-line paste cannot turn one checklist
+	 * item into several, and Shift+Enter is not an escape hatch either.
+	 */
+	singleLine?: boolean;
+	/**
+	 * Keys the caller owns, seen **before** anything else — CodeMirror included,
+	 * which is why the listener moves to the capture phase for a single-line
+	 * field. Return `true` when the event was handled; the editor then swallows
+	 * it and does nothing of its own.
+	 */
+	onKey?(evt: KeyboardEvent): boolean;
 	/** Enter (without Shift, with no completion open) commits and closes. */
 	onSubmit(text: string): void;
 	/** Blur inside `scope`: save the text, keep the field open. */
 	onCommit?(text: string): void;
 	onCancel(): void;
+}
+
+/**
+ * What a one-line field keeps of a multi-line paste: the lines joined by single
+ * spaces. A checklist item is one Markdown list line, so a value with a newline
+ * in it would not survive serialization as one item
+ * (card-content-and-checklists.md §4.3).
+ */
+export function collapseLines(text: string): string {
+	return text.replace(/\s*\r?\n\s*/g, ' ').trim();
 }
 
 export interface EmbeddedEditorHandle {
@@ -186,17 +209,28 @@ export function createEmbeddedEditor(
 
 	setValue(options.value, true);
 
+	/** The text as the caller means it — one line when it asked for one. */
+	const readValue = (): string => (options.singleLine ? collapseLines(getValue()) : getValue());
+
 	let closed = false;
 	const finish = (commit: boolean): void => {
 		if (closed) return;
 		closed = true;
-		if (commit) options.onSubmit(getValue());
+		if (commit) options.onSubmit(readValue());
 		else options.onCancel();
 	};
 
 	const onKeyDown = (evt: KeyboardEvent): void => {
 		if (evt.isComposing || suggestionOpen()) return;
-		if (evt.key === 'Enter' && !evt.shiftKey) {
+		// The caller's keys come first, and a handled one never reaches the
+		// editor's own keymap — that is how Tab and Enter can mean something else
+		// inside a checklist row.
+		if (options.onKey?.(evt)) {
+			evt.preventDefault();
+			evt.stopPropagation();
+			return;
+		}
+		if (evt.key === 'Enter' && (options.singleLine || !evt.shiftKey)) {
 			evt.preventDefault();
 			finish(true);
 		} else if (evt.key === 'Escape') {
@@ -214,22 +248,25 @@ export function createEmbeddedEditor(
 			if (container.contains(document.activeElement)) return;
 			// Still inside the editor (a property badge): save, but stay open.
 			if (scope.contains(document.activeElement)) {
-				options.onCommit?.(getValue());
+				options.onCommit?.(readValue());
 				return;
 			}
 			finish(true);
 		}, 0);
 	};
 
-	content.addEventListener('keydown', onKeyDown);
+	// Capture, so a single-line field's keys are decided before CodeMirror's own
+	// handlers get to insert a newline or a tab.
+	const capture = options.singleLine === true;
+	content.addEventListener('keydown', onKeyDown, capture);
 	content.addEventListener('blur', onBlur);
 
 	return {
-		getValue,
+		getValue: readValue,
 		focus: () => instance.editor?.focus?.(),
 		destroy: () => {
 			closed = true;
-			content.removeEventListener('keydown', onKeyDown);
+			content.removeEventListener('keydown', onKeyDown, capture);
 			content.removeEventListener('blur', onBlur);
 			releaseOwner(app, owner);
 			destroy(instance);

@@ -6,6 +6,8 @@ import type { ChecklistItem } from './checklist';
 // Type-only, so the `dateHighlights.ts` <-> `types.ts` pair stays a compile-time
 // cycle that erases away, exactly like `ChecklistItem` above.
 import type { DateHighlightRule } from './dateHighlights';
+import type { FilterNode } from './filter';
+import type { SortRule } from './sort';
 
 export type ViewKind = 'kanban' | 'calendar' | 'list';
 
@@ -19,49 +21,69 @@ export type CalendarMode = 'month' | 'week';
  */
 export type ListControls = 'dynamic' | 'fixed' | 'session';
 
-/** A list section's sort: a date-family property, ascending or descending. */
-export interface SectionSort {
-	property: string;
-	dir: 'asc' | 'desc';
-}
-
 /**
  * Display state of one list section (list-view.md §5), keyed in `sections` by
- * the section name — the empty string being the sectionless group.
+ * the section name — the empty string being the sectionless group. Sorting and
+ * filtering moved to the view as a whole in 0.3.0
+ * (filters-and-sorting.md §1), so collapsing is all a section still owns.
  */
 export interface SectionState {
-	sort?: SectionSort;
-	/** Tag names without `#`; a card matching any of them is shown. */
-	tags?: string[];
 	collapsed?: boolean;
 }
 
 /**
- * One of a board's views. `id` is generated and stable; `name` is the user's
- * label. Spec: docs/specs/views.md §1–§2 and docs/specs/list-view.md §5.
+ * What a view draws on a card in read mode (views.md §5). Stated as what is
+ * **hidden**, so a property declared after the view was configured shows up
+ * instead of silently missing, and an untouched view writes nothing at all.
+ */
+export interface ViewDisplay {
+	/** Property names whose badges this view leaves out. */
+	hiddenProperties?: string[];
+	hideTags?: boolean;
+	hideCheckbox?: boolean;
+	/** The checklist `N/M` indicator. */
+	hideProgress?: boolean;
+	/** The card's color stripe or fill; the property itself is untouched. */
+	hideColor?: boolean;
+}
+
+/** What every view carries, whatever it draws. */
+interface ViewCommon {
+	/** Generated and stable. */
+	id: string;
+	/** The user's label. */
+	name: string;
+	/** Read-mode card settings; absent means "everything the board has". */
+	display?: ViewDisplay;
+}
+
+/**
+ * One of a board's views. Spec: docs/specs/views.md §1–§2 and
+ * docs/specs/list-view.md §5.
  */
 export type ViewDef =
-	| { id: string; name: string; type: 'kanban' }
-	| {
-			id: string;
-			name: string;
+	| (ViewCommon & { type: 'kanban' })
+	| (ViewCommon & {
 			type: 'calendar';
-			/** Board property the grid is computed from; required. */
-			dateProperty: string;
+			/**
+			 * Board properties the grid is computed from, in the order they are
+			 * read; never empty. A card is placed once per property that gives it a
+			 * date, and the placements that land on the same cell are merged
+			 * (calendar-view.md §1.3).
+			 */
+			dateProperties: string[];
 			mode: CalendarMode;
-	  }
-	| {
-			id: string;
-			name: string;
+	  })
+	| (ViewCommon & {
 			type: 'list';
 			controls: ListControls;
-			/** The view-wide sort; the only one that applies under `fixed`. */
-			sort?: SectionSort;
-			/** The view-wide tag filter; the only one that applies under `fixed`. */
-			tags?: string[];
+			/** The view's filter: one tree for the whole list (filters-and-sorting.md §1). */
+			filter?: FilterNode;
+			/** Its sort keys, most significant first. */
+			sorts?: SortRule[];
 			/** Per-section state, by section name (`''` = the sectionless group). */
 			sections?: Record<string, SectionState>;
-	  };
+	  });
 
 /** Shape of the checklist `N/M` indicator and of `percent` badges. */
 export type ProgressStyle = 'ring' | 'fraction' | 'percent';

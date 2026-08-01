@@ -30,7 +30,7 @@ import type { Board } from '../src/model/types';
 import { boardHead } from './boardFile';
 
 const FM = boardHead({
-	views: [{ id: 'v1', name: 'Due', type: 'calendar', dateProperty: 'due', mode: 'month' }],
+	views: [{ id: 'v1', name: 'Due', type: 'calendar', dateProperties: ['due'], mode: 'month' }],
 	properties: [
 		{ name: 'due', type: 'datetime' },
 		{ name: 'sprint', type: 'date-range' },
@@ -132,7 +132,7 @@ describe('dates: arithmetic (§1.2)', () => {
 
 describe('calendar: placement (§1.3)', () => {
 	it('places a datetime once and keeps its time', () => {
-		const { occurrences, undated } = placeCards(board('- Ship @{due|2026-07-28 09:00}'), 'due');
+		const { occurrences, undated } = placeCards(board('- Ship @{due|2026-07-28 09:00}'), ['due']);
 		expect(occurrences).toHaveLength(1);
 		expect(occurrences[0]?.hasTime).toBe(true);
 		expect(occurrences[0]?.length).toBe(1);
@@ -140,16 +140,16 @@ describe('calendar: placement (§1.3)', () => {
 	});
 
 	it('spans a range inclusively', () => {
-		const { occurrences } = placeCards(board('- Sprint @{sprint|2026-07-24 → 2026-08-07}'), 'sprint');
+		const { occurrences } = placeCards(board('- Sprint @{sprint|2026-07-24 → 2026-08-07}'), ['sprint']);
 		expect(occurrences[0]?.length).toBe(15);
 	});
 
 	it('places every element of a date list, each with its own index', () => {
 		const { occurrences } = placeCards(
 			board('- Standup @{dates|2026-07-25; 2026-07-28; 2026-08-01 → 2026-08-02}'),
-			'dates',
+			['dates'],
 		);
-		expect(occurrences.map((o) => o.index)).toEqual([0, 1, 2]);
+		expect(occurrences.map((o) => o.sources[0]?.index)).toEqual([0, 1, 2]);
 		expect(occurrences[2]?.length).toBe(2);
 	});
 
@@ -159,7 +159,7 @@ describe('calendar: placement (§1.3)', () => {
 			'- Broken @{due|sometime next week}',
 			'- Recurring @{repeat|every week}',
 		);
-		const { occurrences, undated } = placeCards(b, 'due');
+		const { occurrences, undated } = placeCards(b, ['due']);
 		expect(occurrences).toHaveLength(0);
 		expect(undated).toHaveLength(3);
 	});
@@ -168,7 +168,7 @@ describe('calendar: placement (§1.3)', () => {
 		const b = parseBoard(
 			[FM, '', '## Done %%collapsed%%', '', '### Later %%collapsed%%', '', '- Late @{due|2026-07-28}', ''].join('\n'),
 		);
-		expect(placeCards(b, 'due').occurrences).toHaveLength(1);
+		expect(placeCards(b, ['due']).occurrences).toHaveLength(1);
 	});
 
 	it('sorts by start, then by length', () => {
@@ -177,14 +177,14 @@ describe('calendar: placement (§1.3)', () => {
 			'- Long @{due|2026-07-28 → 2026-07-31}',
 			'- Short @{due|2026-07-28}',
 		);
-		const { occurrences } = placeCards(b, 'due');
+		const { occurrences } = placeCards(b, ['due']);
 		expect(occurrences.map((o) => o.length)).toEqual([4, 1, 1]);
 	});
 });
 
 describe('calendar: date edits (§5.3, §6)', () => {
 	const day = { y: 2026, m: 8, d: 3 };
-	const only = (b: Board, property: string): Occurrence => placeCards(b, property).occurrences[0]!;
+	const only = (b: Board, property: string): Occurrence => placeCards(b, [property]).occurrences[0]!;
 
 	it('setCardDay writes the shape the property type asks for', () => {
 		const b = board('- Ship');
@@ -205,7 +205,14 @@ describe('calendar: date edits (§5.3, §6)', () => {
 
 	it('moving a datetime keeps its time', () => {
 		const b = board('- Ship @{due|2026-07-28 09:00}');
-		const moved = moveOccurrence(b, only(b, 'due'), 'due', 'datetime', { y: 2026, m: 7, d: 28 }, day);
+		const moved = moveOccurrence(
+			b,
+			only(b, 'due'),
+			{ property: 'due', index: 0 },
+			'datetime',
+			{ y: 2026, m: 7, d: 28 },
+			day,
+		);
 		expect(body(moved)).toContain('@{due|2026-08-03 09:00}');
 	});
 
@@ -215,7 +222,7 @@ describe('calendar: date edits (§5.3, §6)', () => {
 		const moved = moveOccurrence(
 			b,
 			only(b, 'sprint'),
-			'sprint',
+			{ property: 'sprint', index: 0 },
 			'date-range',
 			{ y: 2026, m: 7, d: 26 },
 			day,
@@ -225,27 +232,40 @@ describe('calendar: date edits (§5.3, §6)', () => {
 
 	it('moving one element of a date list leaves the others alone', () => {
 		const b = board('- Standup @{dates|2026-07-25; 2026-07-28}');
-		const second = placeCards(b, 'dates').occurrences[1]!;
-		const moved = moveOccurrence(b, second, 'dates', 'date-list', { y: 2026, m: 7, d: 28 }, day);
+		const second = placeCards(b, ['dates']).occurrences[1]!;
+		const moved = moveOccurrence(
+			b,
+			second,
+			{ property: 'dates', index: 1 },
+			'date-list',
+			{ y: 2026, m: 7, d: 28 },
+			day,
+		);
 		expect(body(moved)).toContain('@{dates|2026-07-25; 2026-08-03}');
 	});
 
 	it('a move onto the same day changes nothing', () => {
 		const b = board('- Ship @{due|2026-07-28}');
 		const from = { y: 2026, m: 7, d: 28 };
-		expect(moveOccurrence(b, only(b, 'due'), 'due', 'datetime', from, from)).toBe(b);
+		expect(moveOccurrence(b, only(b, 'due'), { property: 'due', index: 0 }, 'datetime', from, from)).toBe(b);
 	});
 
 	it('clearing removes the property, or just the dragged element of a list', () => {
 		const single = board('- Ship @{due|2026-07-28}');
-		expect(body(clearOccurrence(single, only(single, 'due'), 'due', 'datetime'))).not.toContain('@{due');
+		expect(
+			body(clearOccurrence(single, only(single, 'due'), { property: 'due', index: 0 }, 'datetime')),
+		).not.toContain('@{due');
 
 		const list = board('- Standup @{dates|2026-07-25; 2026-07-28}');
-		const first = placeCards(list, 'dates').occurrences[0]!;
-		expect(body(clearOccurrence(list, first, 'dates', 'date-list'))).toContain('@{dates|2026-07-28}');
+		const first = placeCards(list, ['dates']).occurrences[0]!;
+		expect(body(clearOccurrence(list, first, { property: 'dates', index: 0 }, 'date-list'))).toContain(
+			'@{dates|2026-07-28}',
+		);
 
 		const one = board('- Standup @{dates|2026-07-25}');
-		const solo = placeCards(one, 'dates').occurrences[0]!;
-		expect(body(clearOccurrence(one, solo, 'dates', 'date-list'))).not.toContain('@{dates');
+		const solo = placeCards(one, ['dates']).occurrences[0]!;
+		expect(body(clearOccurrence(one, solo, { property: 'dates', index: 0 }, 'date-list'))).not.toContain(
+			'@{dates',
+		);
 	});
 });

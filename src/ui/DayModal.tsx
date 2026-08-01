@@ -8,10 +8,11 @@
 import { App, Modal } from 'obsidian';
 import { render } from 'preact';
 import { useRef, useState } from 'preact/hooks';
-import { occurrencesOn, placeCards, setCardDay } from '../model/calendar';
+import { datePropertyType, occurrencesOn, placeCards, setCardDay } from '../model/calendar';
 import { CalDate, compareDates } from '../model/dates';
 import * as ops from '../model/ops';
-import type { Board, PropertyType, ViewDef } from '../model/types';
+import type { Board, PropertyValue, ViewDef, ViewDisplay } from '../model/types';
+import { usableDateProperties } from '../model/views';
 import { cardEntryPos, type ExtraboardSettings } from '../settings';
 import type { BoardApi } from '../view/api';
 import { CardTile } from '../view/components/Card';
@@ -91,9 +92,11 @@ interface RowProps {
 	refItem: ops.ItemRef;
 	api: BoardApi;
 	settings: ExtraboardSettings;
+	/** The calendar's own card settings, so a row reads like its chip (views.md §5). */
+	display?: ViewDisplay;
 }
 
-function DayRow({ board, refItem, api, settings }: RowProps) {
+function DayRow({ board, refItem, api, settings, display }: RowProps) {
 	const stack = board.stacks[refItem.stack];
 	const divider = dividerOf(board, refItem);
 	const entry = stack?.items[refItem.item];
@@ -158,6 +161,7 @@ function DayRow({ board, refItem, api, settings }: RowProps) {
 				groupColor={ops.groupColor(stack, refItem.item)}
 				api={api}
 				settings={settings}
+				display={display}
 			/>
 			<div class="eb-day-meta">
 				<button type="button" class="eb-badge eb-day-stack" onClick={chooseStack}>
@@ -188,16 +192,21 @@ function DayRow({ board, refItem, api, settings }: RowProps) {
 interface ComposerProps {
 	board: Board;
 	api: BoardApi;
-	view: CalendarDef;
 	day: CalDate;
-	propertyType: PropertyType;
+	/**
+	 * The property a new card is dated through: the **first** the view reads
+	 * (§5.3). A composer is not the place to ask which of several — the card can
+	 * be given the rest from its own editor.
+	 */
+	property: string;
+	propertyType: PropertyValue['type'];
 	stackIndex: number;
 	settings: ExtraboardSettings;
 	onStack: (index: number) => void;
 }
 
 /** Creates a card already dated to this day, in a stack chosen here (§5.3). */
-function Composer({ board, api, view, day, propertyType, stackIndex, settings, onStack }: ComposerProps) {
+function Composer({ board, api, day, property, propertyType, stackIndex, settings, onStack }: ComposerProps) {
 	const [text, setText] = useState('');
 	const inputRef = useRef<HTMLInputElement>(null);
 	const stack = board.stacks[stackIndex] ?? board.stacks[0];
@@ -214,7 +223,7 @@ function Composer({ board, api, view, day, propertyType, stackIndex, settings, o
 			const withCard = ops.addCard(b, target, title, at);
 			const items = withCard.stacks[target]?.items.length ?? 0;
 			const ref = { stack: target, item: at === 0 ? 0 : items - 1 };
-			return setCardDay(withCard, ref, view.dateProperty, propertyType, day);
+			return setCardDay(withCard, ref, property, propertyType, day);
 		});
 		inputRef.current?.focus();
 	};
@@ -291,9 +300,10 @@ class DayModal extends Modal {
 
 		// A day modal only ever asks about one day, so that is the window a
 		// recurrence is expanded over (recurrence.md §3).
+		const properties = usableDateProperties(board.config, view);
 		const { occurrences, undated } = placeCards(
 			board,
-			view.dateProperty,
+			properties,
 			day ? { from: day, to: day } : undefined,
 		);
 		const refs = day
@@ -303,9 +313,10 @@ class DayModal extends Modal {
 					.map((o) => o.ref)
 			: undated;
 
-		const def = board.config.properties.find((p) => p.name === view.dateProperty);
-		const propertyType: PropertyType = def?.type ?? 'datetime';
-		// De-duplicate: a date-list card can occur twice on the same day.
+		const property = properties[0] ?? view.dateProperties[0] ?? '';
+		const propertyType = datePropertyType(board.config, property);
+		// De-duplicate: a date-list card can occur twice on the same day, and so
+		// can one dated through two of the view's properties.
 		const seen = new Set<string>();
 		const unique = refs.filter((ref) => {
 			const key = `${String(ref.stack)}:${String(ref.item)}`;
@@ -329,6 +340,7 @@ class DayModal extends Modal {
 								refItem={ref}
 								api={api}
 								settings={settings}
+								display={view.display}
 							/>
 						))}
 					</div>
@@ -337,8 +349,8 @@ class DayModal extends Modal {
 					<Composer
 						board={board}
 						api={api}
-						view={view}
 						day={day}
+						property={property}
 						propertyType={propertyType}
 						stackIndex={Math.min(this.composerStack, board.stacks.length - 1)}
 						settings={settings}

@@ -2,6 +2,7 @@
    dark themes both work. All classes are prefixed `eb-`. */
 
 .eb-root {
+	position: relative;
 	height: 100%;
 	overflow: hidden;
 }
@@ -10,6 +11,318 @@
 	padding: 2em;
 	color: var(--text-muted);
 	text-align: center;
+}
+
+/* --- the filter builder (filters-and-sorting.md §4) ----------------------- */
+
+.eb-filter-modal {
+	--eb-filter-indent: 16px;
+}
+
+.eb-filter-modal .modal-content {
+	max-height: 70vh;
+	overflow-y: auto;
+}
+
+.eb-filter-tabs {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2, 8px);
+	margin-bottom: var(--size-4-3, 12px);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.eb-filter-tabs > button {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.eb-filter-tabs > button.is-active {
+	color: var(--text-normal);
+	border-bottom-color: var(--interactive-accent);
+}
+
+.eb-filter-count {
+	padding: 0 5px;
+	background: var(--background-modifier-border);
+	border-radius: 8px;
+	font-size: var(--font-ui-smaller, 0.8em);
+}
+
+/* The top-level operator belongs to the whole tree, so it sits in the corner
+   above it rather than in a row (§4.1). */
+.eb-filter-root-op {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-4-2, 8px);
+	margin-inline-start: auto;
+	padding-bottom: 4px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller, 0.8em);
+}
+
+.eb-filter-group {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1, 4px);
+}
+
+.eb-filter-group:not(.is-root) {
+	padding: var(--size-4-2, 8px);
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 4px);
+}
+
+.eb-filter-group-head {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2, 8px);
+}
+
+.eb-filter-children {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1, 4px);
+	min-height: 24px;
+	padding-inline-start: var(--eb-filter-indent);
+}
+
+.eb-filter-condition,
+.eb-sort-rule {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-1, 4px);
+	flex-wrap: wrap;
+}
+
+.eb-filter-condition select,
+.eb-filter-condition input,
+.eb-sort-rule select {
+	min-width: 0;
+	font-size: var(--font-ui-smaller, 0.9em);
+}
+
+.eb-filter-field {
+	flex: 1 1 120px;
+}
+
+.eb-filter-op {
+	flex: 0 1 auto;
+}
+
+.eb-filter-value {
+	flex: 1 1 120px;
+}
+
+.eb-filter-and {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller, 0.8em);
+}
+
+/* The one grab zone of a row, so its fields keep their own gestures. */
+.eb-filter-grip {
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+	color: var(--text-faint);
+	cursor: grab;
+}
+
+.eb-filter-grip .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.eb-filter-grip:active {
+	cursor: grabbing;
+}
+
+.eb-filter-empty {
+	padding: var(--size-4-1, 4px) 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller, 0.8em);
+}
+
+.eb-filter-add {
+	display: flex;
+	gap: var(--size-4-2, 8px);
+	padding-top: var(--size-4-1, 4px);
+}
+
+.eb-filter-add button {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--font-ui-smaller, 0.8em);
+	box-shadow: none;
+}
+
+.eb-sort-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1, 4px);
+}
+
+.eb-sort-dir {
+	display: inline-flex;
+	gap: 2px;
+}
+
+.eb-sort-dir button {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 6px;
+	font-size: var(--font-ui-smaller, 0.8em);
+	box-shadow: none;
+}
+
+.eb-sort-dir button.is-active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+/* A phone has no room for a row of dropdowns side by side. */
+.is-phone .eb-filter-condition select,
+.is-phone .eb-filter-condition input,
+.is-phone .eb-sort-rule select {
+	flex: 1 1 100%;
+}
+
+/* --- the date-property picker (calendar-view.md §6.2) --------------------- */
+
+.eb-date-property-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1, 4px);
+	margin-top: var(--size-4-3, 12px);
+}
+
+.eb-date-property-choice {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--size-4-2, 8px);
+	width: 100%;
+	text-align: left;
+	cursor: pointer;
+}
+
+.eb-date-property-value {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller, 0.8em);
+	white-space: nowrap;
+}
+
+.eb-date-property-choice.mod-cta .eb-date-property-value {
+	color: inherit;
+}
+
+/* --- quick view settings (views.md §5) ------------------------------------ */
+
+/* A panel, not a menu: every row is a toggle, and a menu would close on the
+   first one. It is positioned inside the board root from the header button's
+   measured rectangle, so an offset workspace pane cannot shift it downward. */
+.eb-view-options {
+	position: absolute;
+	z-index: var(--layer-menu, 60);
+	width: 240px;
+	max-width: calc(100% - 16px);
+	max-height: 70vh;
+	padding: var(--size-4-2, 8px);
+	overflow-y: auto;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	box-shadow: var(--shadow-s);
+}
+
+.eb-view-options-head {
+	padding: var(--size-4-2, 8px) var(--size-4-2, 8px) var(--size-4-1, 4px);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller, 0.8em);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.eb-view-options-head:first-child {
+	padding-top: var(--size-4-1, 4px);
+}
+
+.eb-view-options-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2, 8px);
+	padding: var(--size-4-1, 4px) var(--size-4-2, 8px);
+	border-radius: var(--radius-s, 4px);
+	cursor: pointer;
+}
+
+.eb-view-options-row:hover {
+	background: var(--background-modifier-hover);
+}
+
+.eb-view-options-row.is-disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.eb-view-options-row span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.eb-view-options-choice {
+	display: flex;
+	gap: var(--size-4-1, 4px);
+	padding: var(--size-4-1, 4px) var(--size-4-2, 8px);
+}
+
+.eb-view-options-choice button {
+	flex: 1 1 0;
+	padding: 2px 6px;
+	font-size: var(--font-ui-smaller, 0.8em);
+	box-shadow: none;
+}
+
+.eb-view-options-choice button.is-active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.eb-view-options-radio-group {
+	display: flex;
+	flex-direction: column;
+}
+
+.eb-view-options-radio span {
+	white-space: normal;
+}
+
+/* On a phone the header button it would hang from is in the ⋯ menu, so the
+   panel rises from the bottom instead — the shape a touch UI expects
+   (mobile.md §4). */
+body.is-mobile .eb-view-options {
+	position: fixed;
+	top: auto !important;
+	right: 0 !important;
+	bottom: 0;
+	left: 0;
+	width: auto;
+	max-width: none;
+	max-height: 60vh;
+	border-radius: var(--radius-l, 12px) var(--radius-l, 12px) 0 0;
+	padding-bottom: calc(var(--size-4-4, 16px) + env(safe-area-inset-bottom, 0px));
 }
 
 /* Horizontal, scrollable row of stacks. */
@@ -491,13 +804,34 @@ body.eb-dragging-card
 
 .eb-badge-icon {
 	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	flex: 0 0 auto;
+	line-height: 0;
 	color: var(--text-faint);
 }
 
 .eb-badge-icon svg {
+	display: block;
 	width: 12px;
 	height: 12px;
+}
+
+/* Every icon that shares a button with a label. The host is a plain inline
+   span, so without this it carries the line box's leading and the glyph sits
+   above the centreline of whatever flex row it is in. Keep the flex on the
+   host — not on the SVG itself, which stops Obsidian's icon painting on
+   mobile. */
+.eb-button-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	line-height: 0;
+}
+
+.eb-button-icon .svg-icon {
+	display: block;
 }
 
 /* The recurrence chip is the widest badge there is (a whole sentence), so it is
@@ -819,21 +1153,55 @@ body.eb-dragging-card
 	height: 14px;
 }
 
+/* Text until it is pointed at, then the board's own Markdown field in the same
+   box — so a row does not jump when it starts being edited
+   (card-content-and-checklists.md §4.3). */
 .eb-checklist-text {
 	flex: 1 1 auto;
 	min-width: 0;
+	padding: var(--size-4-1, 4px) var(--size-4-2, 8px);
 	background: none;
 	border: 1px solid transparent;
+	border-radius: var(--radius-s, 4px);
 	box-shadow: none;
+	overflow-wrap: anywhere;
+	cursor: text;
 }
 
 .eb-checklist-text:hover {
 	border-color: var(--background-modifier-border);
 }
 
-.eb-checklist-text:focus {
+.eb-checklist-text:focus,
+.eb-checklist-text.is-editing {
 	background: var(--background-primary);
 	border-color: var(--background-modifier-border-focus, var(--interactive-accent));
+}
+
+/* The embedded editor brings its own padding and scroller. */
+.eb-checklist-text.is-editing {
+	padding: 0;
+}
+
+.eb-checklist-text .cm-editor {
+	background: none;
+}
+
+.eb-checklist-text .cm-scroller {
+	padding: 0;
+}
+
+.eb-checklist-text .cm-line {
+	padding: var(--size-4-1, 4px) var(--size-4-2, 8px);
+}
+
+/* The pre-1.x fallback field, mounted in the same box. */
+.eb-checklist-input {
+	width: 100%;
+	padding: var(--size-4-1, 4px) var(--size-4-2, 8px);
+	background: none;
+	border: none;
+	box-shadow: none;
 }
 
 .eb-checklist-footer {
@@ -883,6 +1251,13 @@ body.eb-dragging-card
 .eb-card:hover .eb-hover-only,
 .eb-divider-row:hover .eb-hover-only,
 .eb-hover-only:focus-visible {
+	opacity: 1;
+}
+
+/* A list row is read one after another rather than pointed at, and its card
+   already carries a stack badge of its own, so nothing there hides until the
+   pointer arrives (list-view.md §2). */
+.eb-list-row .eb-hover-only {
 	opacity: 1;
 }
 
@@ -2125,6 +2500,7 @@ body.is-mobile .eb-stack-grip {
 body.is-mobile .eb-card-menu {
 	width: 20px;
 	height: 20px;
+	margin-top: 0;
 }
 
 /* The calendar's own chrome. These take their hit area as real height — they
@@ -2186,6 +2562,20 @@ body.is-mobile .eb-add-stack-button {
 	text-align: center;
 }
 
+/* One filter and one sort for the whole list, above every section — where the
+   per-section chips used to be (filters-and-sorting.md §1). */
+.eb-list-toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2, 8px);
+	margin-bottom: var(--size-4-2, 8px);
+}
+
+.eb-list-toolbar .eb-list-filter,
+.eb-list-toolbar .eb-list-sort {
+	max-width: 50%;
+}
+
 .eb-section {
 	margin-bottom: var(--size-4-3, 12px);
 	background: var(--background-secondary);
@@ -2236,8 +2626,9 @@ body.is-mobile .eb-add-stack-button {
 	min-width: 0;
 }
 
-.eb-section-sort,
-.eb-section-filter,
+/* The list header's two chips and the row's stack badge share one shape. */
+.eb-list-filter,
+.eb-list-sort,
 .eb-list-stack {
 	display: inline-flex;
 	align-items: center;
@@ -2256,35 +2647,21 @@ body.is-mobile .eb-add-stack-button {
 	cursor: pointer;
 }
 
-.eb-section-sort svg,
-.eb-section-filter svg,
+.eb-list-filter svg,
+.eb-list-sort svg,
 .eb-list-stack svg {
 	width: 12px;
 	height: 12px;
 	flex: 0 0 auto;
 }
 
-/* Keep the host — not the SVG itself — on the button's centreline. Making the
-   SVG a flex container prevents Obsidian's icon from painting on mobile. */
-.eb-list button .eb-button-icon {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex: 0 0 auto;
-	line-height: 0;
-}
-
-.eb-list button .eb-button-icon .svg-icon {
-	display: block;
-}
-
-.eb-section-sort.is-active,
-.eb-section-filter.is-active {
+.eb-list-filter.is-active,
+.eb-list-sort.is-active {
 	color: var(--text-accent);
 }
 
-.eb-section-sort:disabled,
-.eb-section-filter:disabled {
+.eb-list-filter:disabled,
+.eb-list-sort:disabled {
 	opacity: 0.6;
 	cursor: default;
 }
@@ -2359,6 +2736,32 @@ body:not(.is-mobile) .eb-list-row > .eb-list-stack {
 .eb-card-stack > span:last-child {
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+/* The two desktop read-mode actions share a 20 px padding box: 3 px above and
+   below a 14 px content line. The labelled stack action keeps wider inline
+   padding, while the square menu action needs exactly 3 px around its SVG. */
+body:not(.is-mobile) .eb-card-head .eb-card-stack,
+body:not(.is-mobile) .eb-card-head .eb-card-menu {
+	box-sizing: border-box;
+	height: 20px;
+	min-height: 20px;
+	margin-top: -1px;
+	padding-block: 3px;
+}
+
+body:not(.is-mobile) .eb-card-head .eb-card-stack {
+	padding-inline: 5px;
+	border-radius: var(--radius-s, 4px);
+}
+
+body:not(.is-mobile) .eb-card-head .eb-card-stack .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+body:not(.is-mobile) .eb-card-head .eb-card-menu {
+	padding-inline: 3px;
 }
 
 body:not(.is-mobile) .eb-list-row:hover .eb-card-stack,
@@ -2438,24 +2841,6 @@ body.is-mobile .eb-card-stack {
 	padding-inline: 6px;
 }
 
-/* Full localized sort/filter values consume the section title on narrow
-   screens and inherit the mobile theme's oversized button metrics. Their
-   tooltips and menus retain the details; the header keeps centred glyphs. */
-.is-phone .eb-section-sort,
-.is-phone .eb-section-filter {
-	justify-content: center;
-	width: 32px;
-	height: 32px;
-	min-width: 32px;
-	min-height: 32px;
-	max-width: none;
-	padding: 0;
-}
-
-.is-phone .eb-section-sort-label,
-.is-phone .eb-section-filter-label {
-	display: none;
-}
 
 .is-phone .eb-list-row {
 	flex-direction: column;

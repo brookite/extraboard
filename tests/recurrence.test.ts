@@ -259,7 +259,7 @@ const july = { from: d('2026-07-01'), to: d('2026-07-31') };
 describe('recurrence: on the calendar (§3)', () => {
 	it('expands a rule inside the window only', () => {
 		const b = board('- Standup @{repeat|every week on Mon from 2026-07-06}');
-		const { occurrences } = placeCards(b, 'repeat', july);
+		const { occurrences } = placeCards(b, ['repeat'], july);
 		expect(occurrences.map((o) => formatDate(o.start))).toEqual([
 			'2026-07-06',
 			'2026-07-13',
@@ -271,14 +271,14 @@ describe('recurrence: on the calendar (§3)', () => {
 
 	it('a rule with no hit in the window is still dated, not tray material', () => {
 		const b = board('- Yearly @{repeat|every year on Dec 25 from 2026-12-25}');
-		const { occurrences, undated } = placeCards(b, 'repeat', july);
+		const { occurrences, undated } = placeCards(b, ['repeat'], july);
 		expect(occurrences).toHaveLength(0);
 		expect(undated).toHaveLength(0);
 	});
 
 	it('anchors a rule with no `from` to the card\'s other date (§1.2)', () => {
 		const b = board('- Review @{repeat|every week} @{due|2026-07-08}');
-		const { occurrences, undated } = placeCards(b, 'repeat', july);
+		const { occurrences, undated } = placeCards(b, ['repeat'], july);
 		expect(occurrences.map((o) => formatDate(o.start))).toEqual([
 			'2026-07-08',
 			'2026-07-15',
@@ -290,14 +290,14 @@ describe('recurrence: on the calendar (§3)', () => {
 
 	it('leaves an unanchored rule undated rather than starting it today', () => {
 		const b = board('- Floating @{repeat|every week}');
-		const placement = placeCards(b, 'repeat', july);
+		const placement = placeCards(b, ['repeat'], july);
 		expect(placement.occurrences).toHaveLength(0);
 		expect(placement.undated).toHaveLength(1);
 	});
 
 	it('places a rule inside a date list beside plain dates (§2.2)', () => {
 		const b = board('- Mixed @{dates|2026-07-03; every week on Fri from 2026-07-10}');
-		const { occurrences } = placeCards(b, 'dates', july);
+		const { occurrences } = placeCards(b, ['dates'], july);
 		expect(occurrences.map((o) => formatDate(o.start))).toEqual([
 			'2026-07-03',
 			'2026-07-10',
@@ -306,13 +306,20 @@ describe('recurrence: on the calendar (§3)', () => {
 			'2026-07-31',
 		]);
 		expect(occurrences[0]?.repeating).toBeUndefined();
-		expect(occurrences[1]?.index).toBe(1);
+		expect(occurrences[1]?.sources[0]?.index).toBe(1);
 	});
 
 	it('dragging an occurrence shifts the whole series', () => {
 		const b = board('- Standup @{repeat|every week on Mon from 2026-07-06}');
-		const occurrence = placeCards(b, 'repeat', july).occurrences[1]!;
-		const moved = moveOccurrence(b, occurrence, 'repeat', 'recurrence', d('2026-07-13'), d('2026-07-15'));
+		const occurrence = placeCards(b, ['repeat'], july).occurrences[1]!;
+		const moved = moveOccurrence(
+			b,
+			occurrence,
+			{ property: 'repeat', index: 0 },
+			'recurrence',
+			d('2026-07-13'),
+			d('2026-07-15'),
+		);
 		expect(body(moved)).toContain('@{repeat|every week on Wed from 2026-07-08}');
 	});
 
@@ -320,7 +327,7 @@ describe('recurrence: on the calendar (§3)', () => {
 		const b = board('- Once');
 		const out = setCardDay(b, { stack: 0, item: 0 }, 'repeat', 'recurrence', d('2026-08-03'));
 		expect(body(out)).toContain('@{repeat|every day from 2026-08-03 for 1 time}');
-		const { occurrences } = placeCards(out, 'repeat', { from: d('2026-08-01'), to: d('2026-08-31') });
+		const { occurrences } = placeCards(out, ['repeat'], { from: d('2026-08-01'), to: d('2026-08-31') });
 		expect(occurrences.map((o) => formatDate(o.start))).toEqual(['2026-08-03']);
 	});
 

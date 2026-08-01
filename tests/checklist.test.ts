@@ -7,6 +7,7 @@ import type { ChecklistItem } from '../src/model/checklist';
 import { parseBody } from '../src/model/parse';
 import { serializeBody } from '../src/model/serialize';
 import * as ops from '../src/model/ops';
+import { collapseLines } from '../src/view/embeddedEditor';
 import type { Board, BoardConfig, Card } from '../src/model/types';
 
 const config: BoardConfig = {
@@ -221,5 +222,26 @@ describe('checklist: board ops', () => {
 		expect(shape(copy.checklist)).toEqual([' :a', 'x:b']);
 		// A deep copy: editing the duplicate must not touch the original.
 		expect(copy.checklist[0]).not.toBe(cardAt(dup, 0, 0).checklist[0]);
+	});
+});
+
+describe('the one-line field (§4.3)', () => {
+	it('keeps a multi-line paste to one item', () => {
+		expect(collapseLines('one\ntwo')).toBe('one two');
+		expect(collapseLines('one\r\ntwo')).toBe('one two');
+		expect(collapseLines('one \n\n  two')).toBe('one two');
+		expect(collapseLines('  spaced  ')).toBe('spaced');
+	});
+
+	it('leaves a value that is already one line alone', () => {
+		expect(collapseLines('Call [[Ann]] about #billing')).toBe('Call [[Ann]] about #billing');
+		expect(collapseLines('')).toBe('');
+	});
+
+	// A checklist item is one Markdown list line; a value with a newline in it
+	// would come back as two items, or as text the parser drops.
+	it('produces a value that survives a round trip as one item', () => {
+		const { checklist } = cl.splitChecklist([`\t- [ ] ${collapseLines('one\ntwo')}`]);
+		expect(cl.serializeChecklist(checklist)).toEqual(['\t- [ ] one two']);
 	});
 });

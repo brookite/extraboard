@@ -7,17 +7,22 @@
 
 import { Menu } from 'obsidian';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { countConditions, filterCards, isEmptyFilter, type FilterNode } from '../model/filter';
 import * as ops from '../model/ops';
 import { sameKey, sectionOf, sectionsOf, stateKeyOf, type Section } from '../model/sections';
-import { filterCards, sortCards } from '../model/sectionView';
+import { sectionMoveTargets } from '../model/sectionView';
+import { sortCards, type SortRule } from '../model/sort';
 import type { Board, SectionState, ViewDef } from '../model/types';
-import { dateProperties } from '../model/views';
-import type { ExtraboardSettings } from '../settings';
+import { cardEntryPos, type ExtraboardSettings } from '../settings';
+import { openFilterSortModal } from '../ui/FilterSortModal';
 import type { BoardApi } from './api';
 import { SectionGroup } from './components/Section';
+import { fieldLabel } from './components/FilterTree';
 import { Icon } from './components/Icon';
 import { InlineEditor } from './components/InlineEditor';
+import { useNow } from './now';
 import { showDropdownMenu, submenuOf } from '../util/menu';
+import { hideMenuTree } from '../util/menuToggle';
 import { useSortable, type DropInfo } from './useSortable';
 import { t } from '../i18n';
 
@@ -31,12 +36,16 @@ interface Props {
 }
 
 /**
- * A section's state under a `session` view, and for every anonymous section
- * whatever the mode: neither has anywhere in the file to live (§1.4, §3.4).
- * Keyed by the section's list position, which is stable for as long as the
- * board's shape is — the state is meant to be lost on a reload anyway.
+ * What a `session` view keeps in the component instead of the file (§3.4): the
+ * view's own filter and sort, and every section's collapse. Keyed by section,
+ * which is stable for as long as the board's shape is — the state is meant to
+ * be lost on a reload anyway.
  */
-type SessionState = Record<string, SectionState>;
+interface SessionState {
+	filter?: FilterNode;
+	sorts?: SortRule[];
+	collapsed: Record<string, boolean>;
+}
 
 /** The key a section's session state is held under. */
 function sessionKey(section: Section): string {
@@ -47,7 +56,7 @@ function sessionKey(section: Section): string {
 }
 
 export function ListView({ board, view, api, settings }: Props) {
-	const [session, setSession] = useState<SessionState>({});
+	const [session, setSession] = useState<SessionState>({ collapsed: {} });
 	const [addingSection, setAddingSection] = useState(false);
 	const rootRef = useRef<HTMLDivElement>(null);
 	// The composer's stack, per section, remembered for as long as the view is
@@ -66,57 +75,66 @@ export function ListView({ board, view, api, settings }: Props) {
 	}, [board, pending]);
 
 	const sections = sectionsOf(board);
-	const dateProps = dateProperties(board.config);
 	const locked = view.controls === 'fixed';
 	const persist = view.controls !== 'session';
+	// A `session` view's filter and sort live here and are never written; every
+	// other mode reads them off the view definition (§3.4).
+	const filter = persist ? view.filter : session.filter;
+	const sorts = persist ? view.sorts : session.sorts;
+	// Filters ask about dates, and a repetition rule's answer moves at midnight,
+	// so the clock is part of the query (filters-and-sorting.md §2.3).
+	const ctx = { config: board.config, today: useNow().date };
 
 	/**
-	 * What a section is sorted, filtered and collapsed by (§3.4). A `fixed` view
-	 * imposes its own sort and filter on every section but still lets each one
-	 * collapse; an anonymous section's collapse is its divider's own flag, since
-	 * that is the one piece of its state the file can hold.
+	 * A section's collapse (§1.4, §5). An anonymous section's is its divider's own
+	 * flag, since that is the one piece of its state the file can hold; the rest
+	 * follow the view's persistence mode.
 	 */
 	const stateOf = (section: Section): SectionState => {
+		if (section.key.kind === 'anon') return { collapsed: dividerCollapsed(board, section) };
 		const key = stateKeyOf(section.key);
 		const stored = key === null ? undefined : view.sections?.[key];
-		const local = session[sessionKey(section)];
-		const collapsed =
-			section.key.kind === 'anon'
-				? dividerCollapsed(board, section)
-				: (persist ? stored?.collapsed : local?.collapsed) === true;
-		if (locked) {
-			return {
-				collapsed,
-				...(view.sort && { sort: view.sort }),
-				...(view.tags?.length && { tags: view.tags }),
-			};
-		}
-		const source = key !== null && persist ? stored : local;
-		return {
-			collapsed,
-			...(source?.sort && { sort: source.sort }),
-			...(source?.tags?.length && { tags: source.tags }),
-		};
+		const collapsed = persist ? stored?.collapsed === true : session.collapsed[sessionKey(section)] === true;
+		return { collapsed };
 	};
 
 	const patchState = (section: Section, patch: Partial<SectionState>): void => {
+		if (patch.collapsed === undefined) return;
+		const collapsed = patch.collapsed;
 		// An anonymous section's collapse is the divider's, so it is an edit like
 		// any other and travels through an op (§1.4).
-		if (section.key.kind === 'anon' && patch.collapsed !== undefined) {
+		if (section.key.kind === 'anon') {
 			const ref = section.key.ref;
-			const collapsed = patch.collapsed;
 			api.update((b) => ops.setDividerCollapsed(b, ref, collapsed));
-			const { collapsed: _dropped, ...rest } = patch;
-			if (!Object.keys(rest).length) return;
-			patch = rest;
+			return;
 		}
 		const key = stateKeyOf(section.key);
 		if (persist && key !== null) {
-			api.update((b) => ops.setSectionState(b, view.id, key, patch));
+			api.update((b) => ops.setSectionState(b, view.id, key, { collapsed }));
 			return;
 		}
 		const local = sessionKey(section);
-		setSession((current) => ({ ...current, [local]: { ...current[local], ...patch } }));
+		setSession((current) => ({ ...current, collapsed: { ...current.collapsed, [local]: collapsed } }));
+	};
+
+	/** The filter and sort builder (§4). A `session` view keeps the result here. */
+	const editFilters = (): void => {
+		openFilterSortModal(api.app, {
+			board,
+			...(filter && { filter }),
+			...(sorts && { sorts }),
+			onApply: ({ filter: next, sorts: nextSorts }) => {
+				if (persist) {
+					api.update((b) => ops.setViewSorts(ops.setViewFilter(b, view.id, next), view.id, nextSorts));
+					return;
+				}
+				setSession((current) => ({
+					...current,
+					...(next ? { filter: next } : { filter: undefined }),
+					...(nextSorts.length ? { sorts: nextSorts } : { sorts: undefined }),
+				}));
+			},
+		});
 	};
 
 	// Rows as they are drawn: filtered, then sorted (§3). The drop protocol
@@ -125,8 +143,7 @@ export function ListView({ board, view, api, settings }: Props) {
 	// must be visible even when the section's own filter would hide it, and it
 	// must still be addressable as a row.
 	const drawn = sections.map((section) => {
-		const state = stateOf(section);
-		const rows = sortCards(board, filterCards(board, section.cards, state.tags), state.sort);
+		const rows = sortCards(board, filterCards(board, section.cards, filter, ctx), sorts, ctx);
 		if (!pending || rows.some((ref) => sameRef(ref, pending))) return rows;
 		return section.cards.some((ref) => sameRef(ref, pending)) ? [...rows, pending] : rows;
 	});
@@ -187,12 +204,12 @@ export function ListView({ board, view, api, settings }: Props) {
 	 * or every row's memo misses (m10-perf.md §2), and everything it reads it
 	 * reads at click time.
 	 */
-	const menuExtra = useCallback((menu: Menu, ref: ops.ItemRef): void => {
+	const menuExtra = useCallback((menu: Menu, ref: ops.ItemRef, event: MouseEvent): void => {
 		const current = api.getBoard();
 		if (!current) return;
-		const targets = sectionsOf(current).filter((section) => section.key.kind !== 'anon' || section.dividers[0]?.stack === ref.stack);
-		if (targets.length < 2) return;
 		const here = sectionOf(current, ref);
+		const targets = sectionMoveTargets(current, ref);
+		if (!targets.some((section) => !sameKey(here, section.key))) return;
 		const fill = (target: Menu): void => {
 			for (const section of targets) {
 				target.addItem((item) =>
@@ -200,19 +217,36 @@ export function ListView({ board, view, api, settings }: Props) {
 						.setTitle(sectionLabel(current, section))
 						.setIcon(section.key.kind === 'named' ? 'heading' : 'minus')
 						.setDisabled(sameKey(here, section.key))
-						.onClick(() => api.update((b) => ops.moveCardToSection(b, ref, ref.stack, section.key))),
+						.onClick(() => {
+							hideMenuTree(target, menu);
+							api.update((b) =>
+								ops.moveCardToSection(
+									b,
+									ref,
+									ref.stack,
+									section.key,
+									null,
+									cardEntryPos(b.stacks[ref.stack], b.config, settings) === 0,
+								),
+							);
+						}),
 				);
 			}
 		};
-		menu.addSeparator();
+		// Keep both move parents together. With one stack there is no stack parent,
+		// so this section action starts the move group itself.
+		if (current.stacks.length <= 1) menu.addSeparator();
 		menu.addItem((item) => {
 			item.setTitle(t('list.moveToSection')).setIcon('corner-up-right');
 			const submenu = submenuOf(item);
 			if (submenu) fill(submenu);
+			// Without submenus the same children open as their own menu, at the
+			// `⋯` the user actually pressed — the one position both platforms
+			// agree on (kanban-view.md §5.3).
 			else item.onClick(() => {
 				const flat = new Menu();
 				fill(flat);
-				flat.showAtPosition({ x: 0, y: 0 });
+				flat.showAtMouseEvent(event);
 			});
 		});
 	}, []);
@@ -276,8 +310,40 @@ export function ListView({ board, view, api, settings }: Props) {
 		api.update((b) => ops.moveSection(b, name, before));
 	};
 
+	const conditions = countConditions(filter);
+	const filtered = !isEmptyFilter(filter);
+	const sortLabel = sorts?.length
+		? `${fieldLabel(sorts[0]!.field, board.config)} ${sorts[0]!.dir === 'asc' ? '↑' : '↓'}${
+				sorts.length > 1 ? ` +${String(sorts.length - 1)}` : ''
+			}`
+		: t('list.sort.document');
+
 	return (
 		<div class="eb-list" ref={rootRef} data-list={0}>
+			{/* One filter and one sort for the whole list, where the section chips
+			    used to be (filters-and-sorting.md §1). */}
+			<div class="eb-list-toolbar">
+				<button
+					type="button"
+					class={`eb-badge eb-list-filter${filtered ? ' is-active' : ''}`}
+					disabled={locked}
+					title={locked ? t('list.controlsFixed') : t('filter.title')}
+					onClick={editFilters}
+				>
+					<Icon name="filter" class="eb-button-icon" />
+					<span>{filtered ? t('filter.conditions', { count: conditions }) : t('filter.chip')}</span>
+				</button>
+				<button
+					type="button"
+					class={`eb-badge eb-list-sort${sorts?.length ? ' is-active' : ''}`}
+					disabled={locked}
+					title={locked ? t('list.controlsFixed') : t('filter.sortTab')}
+					onClick={editFilters}
+				>
+					<Icon name="arrow-up-down" class="eb-button-icon" />
+					<span>{sortLabel}</span>
+				</button>
+			</div>
 			{board.stacks.length === 0 ? <div class="eb-list-empty">{t('list.emptyBoard')}</div> : null}
 			{sections.map((section, index) => {
 				const state = stateOf(section);
@@ -291,9 +357,7 @@ export function ListView({ board, view, api, settings }: Props) {
 						config={board.config}
 						rows={drawn[index] ?? []}
 						state={state}
-						dateProps={dateProps}
-						locked={locked}
-						ordered={!state.sort}
+						ordered={!sorts?.length}
 						api={api}
 						settings={settings}
 						composerStack={composerStacks[sessionKey(section)] ?? 0}
@@ -306,6 +370,7 @@ export function ListView({ board, view, api, settings }: Props) {
 						onDrop={onDrop}
 						menuExtra={menuExtra}
 						onStackPick={openStackPicker}
+						display={view.display}
 						{...(section.movable && { onMove: (direction: -1 | 1) => moveBy(section, direction) })}
 						canMoveUp={at > 0}
 						canMoveDown={at !== -1 && at < movable.length - 1}

@@ -13,7 +13,9 @@ import {
 	stateKeyOf,
 	type Section,
 } from '../src/model/sections';
-import { filterCards, sortCards, sortKey, tagsOf } from '../src/model/sectionView';
+import { sectionMoveTargets, tagsOf } from '../src/model/sectionView';
+import { filterCards } from '../src/model/filter';
+import { sortCards } from '../src/model/sort';
 import type { Board, Card } from '../src/model/types';
 import { boardHead } from './boardFile';
 
@@ -202,20 +204,40 @@ describe('sections: addressing', () => {
 		expect(stateKeyOf({ kind: 'named', name: 'Backlog' })).toBe('Backlog');
 		expect(stateKeyOf({ kind: 'anon', ref: { stack: 0, item: 0 } })).toBeNull();
 	});
+
+	it('offers only named sections to the card menu', () => {
+		const b = board();
+		const targets = sectionMoveTargets(b, { stack: 0, item: 2 });
+		expect(
+			targets.map((section) =>
+				section.key.kind === 'named' ? section.key.name : section.key.kind,
+			),
+		).toEqual(['Backlog', 'Review']);
+	});
+
+	it('never offers anonymous sections, including inside their own stack', () => {
+		const b = board();
+		const fromOtherStack = sectionMoveTargets(b, { stack: 0, item: 2 });
+		const fromAnonymousStack = sectionMoveTargets(b, { stack: 1, item: 4 });
+		expect(fromOtherStack.some((section) => section.key.kind === 'anon')).toBe(false);
+		expect(fromAnonymousStack.some((section) => section.key.kind === 'anon')).toBe(false);
+	});
 });
 
 describe('sections: sort', () => {
-	const sorted = (b: Board, dir: 'asc' | 'desc'): string[] => {
-		const section = named(b, 'Backlog');
-		return sortCards(b, section.cards, { property: 'due', dir }).map(
+	const ctx = { config: board().config, today: { y: 2026, m: 8, d: 1 } };
+	const by = (property: string, dir: 'asc' | 'desc') => [
+		{ field: { kind: 'property' as const, name: property }, dir },
+	];
+	const sorted = (b: Board, dir: 'asc' | 'desc'): string[] =>
+		sortCards(b, named(b, 'Backlog').cards, by('due', dir), { ...ctx, config: b.config }).map(
 			(ref) => cardAt(b, ref.stack, ref.item).title,
 		);
-	};
 
 	it('leaves document order alone without a sort', () => {
 		const b = board();
 		const section = named(b, 'Backlog');
-		expect(sortCards(b, section.cards, undefined)).toBe(section.cards);
+		expect(sortCards(b, section.cards, undefined, { ...ctx, config: b.config })).toBe(section.cards);
 	});
 
 	it('sorts ascending, undated last', () => {
@@ -239,47 +261,43 @@ describe('sections: sort', () => {
 			].join('\n'),
 		);
 		const refs = sectionsOf(b)[0]!.cards;
-		expect(sortCards(b, refs, { property: 'due', dir: 'asc' }).map((r) => cardAt(b, r.stack, r.item).title)).toEqual(
-			['one', 'two', 'three'],
-		);
-	});
-
-	it('takes the earliest element of a date-list and the start of a range', () => {
-		const head = boardHead({
-			properties: [
-				{ name: 'days', type: 'date-list' },
-				{ name: 'span', type: 'date-range' },
-			],
-		});
-		const b = parseBoard(
-			[head, '## S', '', '- list @{days|2026-09-05; 2026-08-02}', '- range @{span|2026-08-10 → 2026-08-20}', ''].join(
-				'\n',
+		expect(
+			sortCards(b, refs, by('due', 'asc'), { ...ctx, config: b.config }).map(
+				(r) => cardAt(b, r.stack, r.item).title,
 			),
-		);
-		expect(sortKey(cardAt(b, 0, 0), 'days')).toEqual({ y: 2026, m: 8, d: 2 });
-		expect(sortKey(cardAt(b, 0, 1), 'span')).toEqual({ y: 2026, m: 8, d: 10 });
-	});
-
-	it('has no key for a value that is not a date, and none for a missing property', () => {
-		const head = boardHead({ properties: [{ name: 'note', type: 'string' }] });
-		const b = parseBoard([head, '## S', '', '- a @{note|hello}', '- b', ''].join('\n'));
-		expect(sortKey(cardAt(b, 0, 0), 'note')).toBeUndefined();
-		expect(sortKey(cardAt(b, 0, 1), 'due')).toBeUndefined();
+		).toEqual(['one', 'two', 'three']);
 	});
 });
 
 describe('sections: filter', () => {
+	const tagFilter = (...tags: string[]) => ({
+		kind: 'group' as const,
+		op: 'or' as const,
+		children: tags.map((value) => ({
+			kind: 'condition' as const,
+			field: { kind: 'builtin' as const, id: 'tags' as const },
+			op: 'contains' as const,
+			value,
+		})),
+	});
+
 	it('shows a card carrying any of the tags', () => {
 		const b = board();
 		const backlog = named(b, 'Backlog');
-		expect(filterCards(b, backlog.cards, ['bug']).map((r) => cardAt(b, r.stack, r.item).title)).toEqual(['B2']);
+		const ctx = { config: b.config, today: { y: 2026, m: 8, d: 1 } };
+		expect(
+			filterCards(b, backlog.cards, tagFilter('bug'), ctx).map(
+				(r) => cardAt(b, r.stack, r.item).title,
+			),
+		).toEqual(['B2']);
 	});
 
-	it('filters nothing with an empty or absent tag list', () => {
+	it('filters nothing with an empty filter or none at all', () => {
 		const b = board();
 		const backlog = named(b, 'Backlog');
-		expect(filterCards(b, backlog.cards, [])).toBe(backlog.cards);
-		expect(filterCards(b, backlog.cards, undefined)).toBe(backlog.cards);
+		const ctx = { config: b.config, today: { y: 2026, m: 8, d: 1 } };
+		expect(filterCards(b, backlog.cards, tagFilter(), ctx)).toBe(backlog.cards);
+		expect(filterCards(b, backlog.cards, undefined, ctx)).toBe(backlog.cards);
 	});
 
 	it('collects the tags a section actually uses', () => {

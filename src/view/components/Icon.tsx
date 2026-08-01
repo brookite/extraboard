@@ -32,7 +32,7 @@ export function IconButton({ icon, label, class: cls, onClick }: ButtonProps) {
 				onClick(e);
 			}}
 		>
-			<Icon name={icon} />
+			<Icon name={icon} class="eb-button-icon" />
 		</button>
 	);
 }

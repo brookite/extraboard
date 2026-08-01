@@ -13,6 +13,7 @@ export const ICONS = {
 	calendar: 'calendar-days',
 	list: 'list-tree',
 	settings: 'sliders-horizontal',
+	viewOptions: 'settings-2',
 	archive: 'archive',
 	views: 'layers',
 	switchView: 'repeat',
