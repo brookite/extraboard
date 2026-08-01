@@ -511,6 +511,15 @@ body:not(.is-mobile) .eb-board {
 	color: var(--text-muted);
 }
 
+/* `Icon` renders its own, unclassed `span` here — an inline box whose height
+   follows the font's line-height, not the 16px icon inside it. Centering
+   *that* box still leaves the icon riding its baseline near the top, so the
+   inner span needs the same flex treatment as the outer one. */
+.eb-stack-completes > span {
+	display: inline-flex;
+	align-items: center;
+}
+
 .eb-stack-completes .svg-icon {
 	width: 16px;
 	height: 16px;
