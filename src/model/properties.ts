@@ -1,6 +1,8 @@
 // Card property value parsing, formatting, and validation.
 // Spec: docs/specs/properties.md. Pure; no `obsidian` imports.
 
+import { parseSpan, toOrdinal } from './dates';
+import { parseRecurrence } from './recurrence';
 import type { PropertyDef, PropertyValue } from './types';
 
 const ESCAPABLE = new Set(['\\', ';', '|', '}']);
@@ -134,6 +136,34 @@ export function formatValue(pv: PropertyValue): string {
 		case 'raw':
 			return pv.value.map(escapeValue).join('; ');
 	}
+}
+
+/**
+ * Ascending sort key for one `date-list` element (recurrence.md §2.2: a
+ * date, a range, or a recurrence phrase), or `null` when it is none of
+ * those. A recurrence with no explicit `from` has no fixed position, so it
+ * sorts after every element that does.
+ */
+function dateListKey(raw: string): number | null {
+	const span = parseSpan(raw);
+	if (span) return toOrdinal(span.start);
+	const rule = parseRecurrence(raw);
+	if (!rule) return null;
+	return rule.start ? toOrdinal(rule.start) : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Drop `date-list` elements that are neither a date/range nor a recurrence
+ * phrase, then sort what remains ascending by its earliest date. Applied
+ * whenever a `date-list` value is set (`ops.setCardProperty`), not on every
+ * parse, so a file the user has not touched is not silently reordered.
+ */
+export function normalizeDateList(raw: string[]): string[] {
+	return raw
+		.map((value) => ({ value, key: dateListKey(value) }))
+		.filter((e): e is { value: string; key: number } => e.key !== null)
+		.sort((a, b) => a.key - b.key)
+		.map((e) => e.value);
 }
 
 /** Render a full property token, e.g. `@{status|Doing}`. */

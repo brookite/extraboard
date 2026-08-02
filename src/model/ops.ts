@@ -11,7 +11,7 @@ import { ChecklistItem, checkAll, cloneChecklist, progress } from './checklist';
 import { processCardText } from './cardText';
 import { parseCardLink, unlinkedTitle } from './link';
 import { parseCardContent } from './parse';
-import { formatValue, parseValue } from './properties';
+import { formatValue, normalizeDateList, parseValue } from './properties';
 import {
 	dividerIndex,
 	groupRange,
@@ -363,6 +363,15 @@ export function unlinkCardNote(board: Board, ref: ItemRef): Board {
 export function setCardProperty(board: Board, ref: ItemRef, pv: PropertyValue): Board {
 	const entry = board.stacks[ref.stack]?.items[ref.item];
 	if (entry?.kind !== 'card') return board;
+	// A `date-list` is kept sorted and free of unparsable elements on every
+	// write, so the file never shows an out-of-order or dead date (properties.md).
+	// If nothing survives, the property is absent — the same rule an empty
+	// token value follows everywhere else.
+	if (pv.type === 'date-list') {
+		const raw = normalizeDateList(pv.raw);
+		if (!raw.length) return removeCardProperty(board, ref, pv.name);
+		pv = { ...pv, raw };
+	}
 	const properties = mergeProperties(entry.card.properties, [pv]);
 	if (properties === entry.card.properties) return board;
 	return replaceCard(board, ref, { ...entry.card, properties });

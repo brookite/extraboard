@@ -120,3 +120,56 @@ describe('property values from the badge editors', () => {
 		expect(card.checklist).toHaveLength(1);
 	});
 });
+
+describe('date-list values are kept sorted and valid on every write', () => {
+	const board = (): Board => boardFromBody('## S\n- Card\n');
+
+	it('sorts elements ascending by their earliest date', () => {
+		const next = ops.setCardProperty(board(), ref, {
+			name: 'dates',
+			type: 'date-list',
+			raw: ['2026-03-01', '2026-01-15', '2026-02-10'],
+		});
+		expect(cardAt(next, 0, 0).properties).toEqual([
+			{ name: 'dates', type: 'date-list', raw: ['2026-01-15', '2026-02-10', '2026-03-01'] },
+		]);
+	});
+
+	it('drops elements that are neither a date/range nor a recurrence phrase', () => {
+		const next = ops.setCardProperty(board(), ref, {
+			name: 'dates',
+			type: 'date-list',
+			raw: ['2026-01-15', 'not a date', '2026-01-01'],
+		});
+		expect(cardAt(next, 0, 0).properties).toEqual([
+			{ name: 'dates', type: 'date-list', raw: ['2026-01-01', '2026-01-15'] },
+		]);
+	});
+
+	it('removes the property entirely when nothing survives', () => {
+		const next = ops.setCardProperty(board(), ref, { name: 'dates', type: 'date-list', raw: ['garbage'] });
+		expect(cardAt(next, 0, 0).properties).toEqual([]);
+	});
+
+	it('sorts a recurrence phrase by its `from` date alongside plain dates', () => {
+		const next = ops.setCardProperty(board(), ref, {
+			name: 'dates',
+			type: 'date-list',
+			raw: ['2026-05-01', 'every week on Mon from 2026-04-01'],
+		});
+		expect(cardAt(next, 0, 0).properties).toEqual([
+			{ name: 'dates', type: 'date-list', raw: ['every week on Mon from 2026-04-01', '2026-05-01'] },
+		]);
+	});
+
+	it('places a recurrence with no `from` date after every dated element', () => {
+		const next = ops.setCardProperty(board(), ref, {
+			name: 'dates',
+			type: 'date-list',
+			raw: ['every week on Mon', '2026-01-01'],
+		});
+		expect(cardAt(next, 0, 0).properties).toEqual([
+			{ name: 'dates', type: 'date-list', raw: ['2026-01-01', 'every week on Mon'] },
+		]);
+	});
+});
