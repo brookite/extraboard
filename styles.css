@@ -5,6 +5,12 @@
 	position: relative;
 	height: 100%;
 	overflow: hidden;
+	/* Painted explicitly rather than left to inherit: the keyboard reserve
+	   below opens a `padding-bottom` band at the bottom of this element with no
+	   content in it yet, and a transparent band there shows whatever sits
+	   behind the view during a native resize — on Android, that has been the
+	   WebView's own default white, seen as a flash (mobile.md §7). */
+	background: var(--background-primary);
 }
 
 .eb-empty {
@@ -2525,6 +2531,12 @@ body.is-mobile.mod-toolbar-open .eb-root {
 body.is-mobile .eb-root.is-keyboard-open,
 body.is-mobile.mod-toolbar-open .eb-root.is-keyboard-open {
 	padding-bottom: var(--eb-keyboard-inset, 0px);
+	/* The reserve grows in one jump, on its own two measurement passes
+	   (`keyboardReserve.ts`), not on every frame of the keyboard's slide — so
+	   without this the band opens abruptly rather than tracking the keyboard
+	   up. The keyboard's own animation runs ~300–350 ms on both platforms
+	   (keyboard.ts), which this matches. */
+	transition: padding-bottom 300ms ease;
 }
 
 /* A desktop-style horizontal scrollbar becomes a second floating bar above the
