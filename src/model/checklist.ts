@@ -127,6 +127,27 @@ export function cloneChecklist(items: ChecklistItem[]): ChecklistItem[] {
 	return items.map((item) => ({ ...item, children: cloneChecklist(item.children) }));
 }
 
+/**
+ * Drop rows with no text and no children — the ones a stray "Add item" or
+ * Enter leaves behind unfilled. A row with children keeps its place even if
+ * its own text is empty, since deleting it would drop its subtree too.
+ * Returns the same array when nothing was empty.
+ */
+export function pruneEmpty(items: ChecklistItem[]): ChecklistItem[] {
+	let changed = false;
+	const out: ChecklistItem[] = [];
+	for (const item of items) {
+		const children = pruneEmpty(item.children);
+		if (!item.text && !children.length) {
+			changed = true;
+			continue;
+		}
+		if (children !== item.children) changed = true;
+		out.push(children === item.children ? item : { ...item, children });
+	}
+	return changed ? out : items;
+}
+
 // --- tree helpers -----------------------------------------------------------
 
 /** The sibling list a path addresses into, or `null` when the path is stale. */

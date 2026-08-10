@@ -64,6 +64,9 @@ export class ChecklistModal extends Modal {
 		const footer = this.contentEl.createDiv({ cls: 'eb-checklist-footer' });
 		const add = footer.createEl('button', { cls: 'mod-cta', text: t('modal.checklist.addItem') });
 		add.addEventListener('click', () => {
+			// Commit first: `change` → `render` tears the open row's editor down
+			// without saving, and a click here must not race that teardown away.
+			this.closeEditor(true);
 			this.change((items) => {
 				const r = cl.insertAfter(items, this.lastRootPath(items));
 				this.focusPath = r.path;
@@ -78,6 +81,9 @@ export class ChecklistModal extends Modal {
 		// Commit first: the last thing typed is as much an edit as any other, and
 		// dismissing the modal was never a way to undo one.
 		this.closeEditor(true);
+		// Rows left empty by an "Add item"/Enter the user never filled in don't
+		// belong in the saved checklist.
+		this.options.apply((items) => cl.pruneEmpty(items));
 		this.sortable?.destroy();
 		this.sortable = null;
 		this.contentEl.empty();
