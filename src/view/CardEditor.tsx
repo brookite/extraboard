@@ -14,7 +14,9 @@ import type { BoardApi } from './api';
 import { InlineEditor } from './components/InlineEditor';
 import { PropertyBadges } from './components/PropertyBadges';
 import { createEmbeddedEditor } from './embeddedEditor';
+import { useKeyboardReserve } from './keyboardReserve';
 import { useCloseOnReload } from './reload';
+import { isTap } from '../util/gesture';
 import { t } from '../i18n';
 
 function droppedLabel(kind: DroppedKind): string {
@@ -165,6 +167,10 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 	// anything was actually typed.
 	const openedWith = useRef(cardEditText(card, config, showRaw));
 
+	// A card low in a stack would otherwise open its editor underneath the
+	// software keyboard, which overlays the board without resizing it (§7).
+	useKeyboardReserve(rootRef);
+
 	// The board was re-parsed from the file underneath this editor (view/reload.ts).
 	// The field still holds the *old* card's text while `target` is an index that
 	// may now hold a different card, so committing is the one thing that must not
@@ -177,23 +183,54 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 		onClose();
 	});
 
-	// Pointing anywhere outside the editor closes it. The field's own blur
-	// commits asynchronously (it defers to let a completion click land first),
-	// which races the unmount this triggers: closing first can tear the field
-	// down before its deferred commit runs, silently dropping the last edit.
-	// Reading the live text here and saving it before closing removes the race.
+	// **Tapping** outside the editor closes it — not merely pressing outside it.
+	// A finger that presses a card and moves is scrolling the stack, and on a
+	// phone that is the only way to bring anything into view; closing on the
+	// press meant the gesture that would have rescued a card from behind the
+	// keyboard was also the gesture that dropped its editor (§7). `pointercancel`
+	// is the browser saying it took the gesture over for a scroll, which settles
+	// the case even before the finger has drifted past the slop.
+	//
+	// The field's own blur commits asynchronously (it defers to let a completion
+	// click land first), which races the unmount this triggers: closing first can
+	// tear the field down before its deferred commit runs, silently dropping the
+	// last edit. Reading the live text here and saving it before closing removes
+	// the race.
 	useEffect(() => {
-		const onPointerDown = (evt: Event): void => {
-			const target = evt.target;
-			if (!(target instanceof Node)) return;
-			if (rootRef.current?.contains(target)) return;
-			if (target.instanceOf(Element) && target.closest(FLOATING)) return;
+		const dismiss = (): void => {
 			const getValue = fieldValue.current;
 			if (getValue) saveRef.current(getValue());
 			onClose();
 		};
+		// Set while a press outside is still in flight, so an editor that closes
+		// for another reason meanwhile takes its pending listeners with it.
+		let pending: (() => void) | null = null;
+		const onPointerDown = (evt: Event): void => {
+			const target = evt.target;
+			if (!(evt instanceof PointerEvent) || !(target instanceof Node)) return;
+			if (rootRef.current?.contains(target)) return;
+			if (target.instanceOf(Element) && target.closest(FLOATING)) return;
+			const { clientX, clientY, pointerId } = evt;
+			const settle = (up: Event): void => {
+				// A second finger's events are not this press's answer.
+				if (!(up instanceof PointerEvent) || up.pointerId !== pointerId) return;
+				pending?.();
+				if (up.type === 'pointerup' && isTap(up.clientX - clientX, up.clientY - clientY)) dismiss();
+			};
+			pending?.();
+			pending = () => {
+				pending = null;
+				document.removeEventListener('pointerup', settle, true);
+				document.removeEventListener('pointercancel', settle, true);
+			};
+			document.addEventListener('pointerup', settle, true);
+			document.addEventListener('pointercancel', settle, true);
+		};
 		document.addEventListener('pointerdown', onPointerDown, true);
-		return () => document.removeEventListener('pointerdown', onPointerDown, true);
+		return () => {
+			pending?.();
+			document.removeEventListener('pointerdown', onPointerDown, true);
+		};
 	}, [onClose]);
 
 	return (

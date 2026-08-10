@@ -2500,6 +2500,33 @@ body.is-mobile.mod-toolbar-open .eb-root {
 	padding-bottom: 0;
 }
 
+/* Software keyboard (§7). A keyboard takes the bottom of the screen, and the
+   bottom band of every stack keeps being laid out underneath it: the cards are
+   not clipped, they are hidden, and an editor opened on one is unusable.
+
+   The board gives that band back. `view/keyboardReserve.ts` measures how far it
+   reaches into the board — from the app's own `--keyboard-height` plus its
+   editing toolbar, never a constant — and publishes it here, exactly as §4's
+   navbar inset is published, so a theme can still override it. With no keyboard
+   the class is absent and the rules above stand untouched.
+
+   The reserve *replaces* the navbar reserve rather than adding to it: the
+   navbar sits inside the band the keyboard covers, and the toolbar band is
+   already part of what was measured. Both selectors are spelled out because the
+   `mod-toolbar-open` rule above matches at the same time — the toolbar is open
+   precisely when the keyboard is — and one of them has to out-specify it rather
+   than merely follow it: source order is not something a later edit should be
+   able to break.
+
+   Shortening the root is also what makes the editor reachable at all:
+   `.eb-stack` is `max-height: 100%`, so a stack whose cards used to fit now
+   overflows and can be scrolled — which is why the reserve is applied before
+   anything measures the scroller. */
+body.is-mobile .eb-root.is-keyboard-open,
+body.is-mobile.mod-toolbar-open .eb-root.is-keyboard-open {
+	padding-bottom: var(--eb-keyboard-inset, 0px);
+}
+
 /* A desktop-style horizontal scrollbar becomes a second floating bar above the
    mobile toolbar. Touch already supplies the scroll affordance, so hide only
    the board row's visual scrollbar; its horizontal scrolling remains enabled. */

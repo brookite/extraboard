@@ -1,4 +1,6 @@
-// Bringing a stack into view when it is clicked. Spec: docs/specs/kanban-view.md §2.
+// Bringing board content into view: a stack when it is clicked
+// (docs/specs/kanban-view.md §2), and a card editor when the software keyboard
+// has just taken the bottom of the screen (docs/specs/mobile.md §7).
 //
 // The board is one horizontal scroller, so a stack near either end is routinely
 // half-visible: its header is reachable but its cards are cut off. Clicking the
@@ -54,4 +56,40 @@ export function revealStack(stack: HTMLElement): void {
 	if (target === null) return;
 	const max = Math.max(0, board.scrollWidth - board.clientWidth);
 	board.scrollTo({ left: Math.max(0, Math.min(target, max)), behavior: 'smooth' });
+}
+
+/** The nearest ancestor that actually scrolls vertically, or `null`. */
+function verticalScroller(el: HTMLElement): HTMLElement | null {
+	for (let node = el.parentElement; node; node = node.parentElement) {
+		if (node.scrollHeight <= node.clientHeight + 1) continue;
+		const overflow = getComputedStyle(node).overflowY;
+		if (overflow === 'auto' || overflow === 'scroll') return node;
+	}
+	return null;
+}
+
+/**
+ * Scroll `el`'s own vertical scroller — a stack's body, the list — so the whole
+ * element is visible in it. The rule of `revealStack` on the other axis: move by
+ * the smallest amount that shows it, and do nothing when it is already whole.
+ *
+ * Called *after* the board has given up the keyboard's height (mobile.md §7),
+ * never before: the reserve is what shortens this scroller, and on a stack whose
+ * cards used to fit it is what creates the scroller in the first place.
+ *
+ * `scrollIntoView` is not used: it walks *every* scrollable ancestor, so on a
+ * board it also moves the horizontal row and the workspace under the user.
+ */
+export function revealVertical(el: HTMLElement): void {
+	const box = verticalScroller(el);
+	if (!box) return;
+	const elRect = el.getBoundingClientRect();
+	const boxRect = box.getBoundingClientRect();
+	const top = elRect.top - boxRect.top + box.scrollTop;
+	const target = revealOffset(top, elRect.height, box.scrollTop, box.clientHeight);
+	if (target === null) return;
+	const max = Math.max(0, box.scrollHeight - box.clientHeight);
+	// Instantly, unlike the horizontal reveal: this runs repeatedly while the
+	// keyboard animates in, and overlapping smooth scrolls cancel one another.
+	box.scrollTo({ top: Math.max(0, Math.min(target, max)), behavior: 'auto' });
 }
