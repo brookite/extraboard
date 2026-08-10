@@ -4,11 +4,13 @@ import { dateTimeFormat } from '../../i18n/intl';
 import { resolveWeekStart, weekdayName } from '../../i18n/dates';
 import {
 	addMonths,
+	compareDates,
 	dayKey,
 	formatDate,
 	formatSpan,
 	parseDate,
 	parseSpan,
+	sameDay,
 	stripTime,
 	today,
 	type CalDate,
@@ -73,6 +75,13 @@ const initialTime = (pv: PropertyValue | undefined): string => {
 	const minutes = String(date.minutes % 60).padStart(2, '0');
 	return `${hours}:${minutes}`;
 };
+
+/** Whether `day` falls inside an already-saved date/date-range/date-list entry. */
+const isTaken = (day: CalDate, list: string[]): boolean =>
+	list.some((raw) => {
+		const span = parseSpan(raw);
+		return !!span && compareDates(day, span.start) >= 0 && compareDates(day, span.end) <= 0;
+	});
 
 const withTime = (date: CalDate, value: string): CalDate => {
 	const match = /^(\d{2}):(\d{2})$/.exec(value);
@@ -182,11 +191,12 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit }
 						selection &&
 						(key === dayKey(selection.start) ||
 							(selection.end && key === dayKey(selection.end)));
+					const taken = !selected && type === 'date-list' && isTaken(day, list);
 					return (
 						<button
 							type="button"
 							key={key}
-							class={`eb-date-day${isSameMonth(day, month) ? '' : ' is-outside'}${selected ? ' is-selected' : ''}${endpoint ? ' is-endpoint' : ''}`}
+							class={`eb-date-day${isSameMonth(day, month) ? '' : ' is-outside'}${selected ? ' is-selected' : ''}${endpoint ? ' is-endpoint' : ''}${taken ? ' is-taken' : ''}${sameDay(day, today()) ? ' is-today' : ''}`}
 							aria-label={key}
 							aria-pressed={selected}
 							onClick={() => select(day)}

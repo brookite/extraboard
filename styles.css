@@ -1178,6 +1178,17 @@ body.eb-dragging-card
 	color: var(--text-on-accent);
 }
 
+.eb-date-day.is-taken {
+	background: var(--background-modifier-border);
+	color: var(--text-muted);
+	border-radius: var(--radius-s, 6px);
+}
+
+.eb-date-day.is-today {
+	box-shadow: inset 0 0 0 1px var(--interactive-accent);
+	border-radius: var(--radius-s, 6px);
+}
+
 .eb-date-time {
 	justify-content: space-between;
 }
