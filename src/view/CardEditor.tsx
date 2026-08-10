@@ -14,7 +14,6 @@ import type { BoardApi } from './api';
 import { InlineEditor } from './components/InlineEditor';
 import { PropertyBadges } from './components/PropertyBadges';
 import { createEmbeddedEditor } from './embeddedEditor';
-import { useKeyboardReserve } from './keyboardReserve';
 import { useCloseOnReload } from './reload';
 import { isTap } from '../util/gesture';
 import { t } from '../i18n';
@@ -167,10 +166,6 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 	// anything was actually typed.
 	const openedWith = useRef(cardEditText(card, config, showRaw));
 
-	// A card low in a stack would otherwise open its editor underneath the
-	// software keyboard, which overlays the board without resizing it (§7).
-	useKeyboardReserve(rootRef);
-
 	// The board was re-parsed from the file underneath this editor (view/reload.ts).
 	// The field still holds the *old* card's text while `target` is an index that
 	// may now hold a different card, so committing is the one thing that must not
@@ -184,12 +179,11 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 	});
 
 	// **Tapping** outside the editor closes it — not merely pressing outside it.
-	// A finger that presses a card and moves is scrolling the stack, and on a
-	// phone that is the only way to bring anything into view; closing on the
-	// press meant the gesture that would have rescued a card from behind the
-	// keyboard was also the gesture that dropped its editor (§7). `pointercancel`
-	// is the browser saying it took the gesture over for a scroll, which settles
-	// the case even before the finger has drifted past the slop.
+	// A finger that presses a card and moves is scrolling the stack, and closing
+	// on the press meant the gesture that would have scrolled a card into view
+	// was also the gesture that dropped its editor. `pointercancel` is the
+	// browser saying it took the gesture over for a scroll, which settles the
+	// case even before the finger has drifted past the slop.
 	//
 	// The field's own blur commits asynchronously (it defers to let a completion
 	// click land first), which races the unmount this triggers: closing first can
