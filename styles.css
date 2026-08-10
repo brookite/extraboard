@@ -1185,8 +1185,13 @@ body.eb-dragging-card
 }
 
 .eb-date-day.is-taken {
-	background: var(--background-modifier-border);
-	color: var(--text-muted);
+	/* A plain grey here (`--background-modifier-border`) sat too close to the
+	   grid's own background and to `.is-selected`'s hover grey to read as
+	   "already taken" at a glance. A low-alpha tint of the theme's accent is
+	   visible against both without being as loud as `.is-endpoint`'s solid
+	   fill. */
+	background: rgba(var(--interactive-accent-rgb), 0.18);
+	color: var(--text-normal);
 	border-radius: var(--radius-s, 6px);
 }
 
