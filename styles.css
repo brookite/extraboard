@@ -2536,12 +2536,6 @@ body.is-mobile.mod-toolbar-open .eb-root {
 body.is-mobile .eb-root.is-keyboard-open,
 body.is-mobile.mod-toolbar-open .eb-root.is-keyboard-open {
 	padding-bottom: var(--eb-keyboard-inset, 0px);
-	/* The reserve grows in one jump, on its own two measurement passes
-	   (`keyboardReserve.ts`), not on every frame of the keyboard's slide — so
-	   without this the band opens abruptly rather than tracking the keyboard
-	   up. The keyboard's own animation runs ~300–350 ms on both platforms
-	   (keyboard.ts), which this matches. */
-	transition: padding-bottom 300ms ease;
 }
 
 /* A desktop-style horizontal scrollbar becomes a second floating bar above the

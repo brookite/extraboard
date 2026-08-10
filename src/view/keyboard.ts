@@ -1,4 +1,4 @@
-// What the software keyboard occupies, and when it changes.
+// What the software keyboard occupies.
 // Spec: docs/specs/mobile.md §7. Undocumented app internals: docs/NOTICES.md.
 //
 // Obsidian publishes the keyboard's height itself, and this module is the only
@@ -9,11 +9,12 @@
 // late, is the leaf — so the overlap came out `0` and the feature silently did
 // nothing, twice.
 //
-// The signals below are the ones Obsidian's own mobile toolbar uses — it
-// re-reads `--keyboard-height` inside these very events and animates itself by
-// the delta, with explicit Android and iOS branches, which is what establishes
-// that they fire on both. None of them is in `obsidian.d.ts`; a missing value
-// reads as `0` and makes this module inert rather than wrong.
+// The events this module's caller listens for are the ones Obsidian's own
+// mobile toolbar uses — it re-reads `--keyboard-height` inside these very
+// events and animates itself by the delta, with explicit Android and iOS
+// branches, which is what establishes that they fire on both. None of them is
+// in `obsidian.d.ts`; a missing value reads as `0` and makes this module inert
+// rather than wrong.
 
 /** Height of a CSS length in px, or `0` for an absent or unparseable value. */
 function pxOf(value: string): number {
@@ -45,7 +46,9 @@ export function bandOf(keyboard: number, toolbar: number, toolbarOpen: boolean):
  * and → 530 once the keyboard had settled, exactly `914 − 332 − 52`). Reserving
  * the whole band on top of that would take the same space twice and leave a
  * board a few dozen pixels tall. Once the platform has done the work this
- * returns `0` and the reserve lifts itself.
+ * returns `0` and the reserve lifts itself — which is why the caller re-runs
+ * this on every real resize of the root rather than assuming a fixed shape to
+ * the platform's own animation.
  */
 export function overlapOf(rootBottom: number, windowHeight: number, band: number): number {
 	if (band <= 0) return 0;
@@ -63,42 +66,15 @@ export function keyboardBand(): number {
 }
 
 /**
- * What announces a keyboard. `resize` is here for orientation, which changes
- * the band under an open editor; the visual viewport is deliberately *not*,
- * having stayed at a constant 914 px through every measured keyboard on the
- * device this was built against — it is the sensor that failed twice.
+ * What announces a keyboard, for `keyboardReserve.ts` to re-measure on.
+ * `resize` is here for orientation, which changes the band under an open
+ * editor; the visual viewport is deliberately *not*, having stayed at a
+ * constant 914 px through every measured keyboard on the device this was
+ * built against — it is the sensor that failed twice.
+ *
+ * These only say "something may have changed" — none of them fires again once
+ * the platform's own late resize of the leaf actually lands, several hundred
+ * ms after the keyboard is announced. That resize is what a `ResizeObserver`
+ * on the root is for: a real signal instead of a guess at its timing.
  */
-const SIGNALS = ['keyboardWillShow', 'keyboardWillHide', 'resize'] as const;
-
-/**
- * Re-measurements after a change, in ms. The events fire at the *start* of the
- * keyboard's animation (Obsidian animates its own toolbar over 350 ms on
- * Android, 300 on iOS), so nothing about the layout is final when they arrive:
- * the device this was measured on moved the leaf's bottom edge twice, once with
- * the toolbar and again — several hundred ms later — for the keyboard itself.
- * The first pass is where the reserve is allowed to grow; the last one catches
- * a platform that shrank the leaf on its own and lets the reserve go again.
- */
-const SETTLE_MS = [360, 800] as const;
-
-/**
- * Call `onChange` whenever the keyboard may have changed the layout, and again
- * once the animation has run. `settled` is false only for the immediate pass,
- * when the keyboard is announced but not yet drawn. Returns the unsubscribe.
- */
-export function onKeyboardChange(onChange: (settled: boolean) => void): () => void {
-	const timers: number[] = [];
-	const handle = (): void => {
-		onChange(false);
-		for (const t of timers.splice(0)) window.clearTimeout(t);
-		for (const ms of SETTLE_MS) timers.push(window.setTimeout(() => onChange(true), ms));
-	};
-	for (const name of SIGNALS) window.addEventListener(name, handle);
-	// A first pass right away: the editor may open while the keyboard is already
-	// up, in which case no event is coming at all.
-	handle();
-	return () => {
-		for (const t of timers.splice(0)) window.clearTimeout(t);
-		for (const name of SIGNALS) window.removeEventListener(name, handle);
-	};
-}
+export const KEYBOARD_EVENTS = ['keyboardWillShow', 'keyboardWillHide', 'resize'] as const;

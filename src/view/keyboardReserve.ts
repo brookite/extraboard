@@ -11,11 +11,19 @@
 // turns a stack whose cards used to fit into one that overflows — a scroller
 // appears where there was none. Hence the order below, which is load-bearing:
 // reserve first, measure second.
+//
+// The reserve is re-measured, not timed: `KEYBOARD_EVENTS` says a change is
+// coming, and a `ResizeObserver` on the root itself catches the platform's own
+// late resize of the leaf whenever it actually lands, however long that takes
+// on a given device. An earlier version tried to guess that timing with a pair
+// of fixed delays, which meant the reserve grew to a first estimate and then
+// had to shrink again once the real resize caught up — a visible bounce for no
+// reason a real signal does not already give for free.
 
 import { Platform } from 'obsidian';
 import { useEffect } from 'preact/hooks';
 import type { RefObject } from 'preact';
-import { keyboardBand, onKeyboardChange, overlapOf } from './keyboard';
+import { KEYBOARD_EVENTS, keyboardBand, overlapOf } from './keyboard';
 import { revealVertical } from './revealStack';
 
 /** Marks a root that is currently giving up height to the keyboard. */
@@ -61,37 +69,45 @@ export function useKeyboardReserve(ref: RefObject<HTMLElement>): void {
 		const root = el.closest<HTMLElement>('.eb-root');
 		if (root) held.set(root, (held.get(root) ?? 0) + 1);
 
-		// What the board is currently giving up, so the rule below can tell
-		// growing from shrinking.
-		let reserved = 0;
-		const update = (settled: boolean): void => {
+		const update = (): void => {
 			// The reserve first: `revealVertical` measures the scroller this creates.
 			// Only the part of the band the board actually reaches into — the
 			// platform may already have shrunk the leaf itself, and reserving the
 			// whole band on top of that takes the same space twice.
 			if (root) {
-				const want = overlapOf(
-					root.getBoundingClientRect().bottom,
-					window.innerHeight,
-					keyboardBand(),
+				applyReserve(
+					root,
+					overlapOf(root.getBoundingClientRect().bottom, window.innerHeight, keyboardBand()),
 				);
-				// It may **grow** only once the keyboard has actually been drawn.
-				// The announcement comes at the start of a ~350 ms animation, and
-				// giving up the space before the keyboard covers it is a band of bare
-				// background flashing at the bottom of the board — reported from the
-				// device as a white flicker. Shrinking is not delayed: releasing
-				// space early only ever uncovers the board.
-				const next = settled ? want : Math.min(reserved, want);
-				applyReserve(root, next);
-				reserved = next;
 			}
 			revealVertical(el);
 		};
 
-		// `onKeyboardChange` takes the first measurement itself.
-		const off = onKeyboardChange(update);
+		for (const name of KEYBOARD_EVENTS) window.addEventListener(name, update);
+		// Border-box: the reserve above changes the root's own padding, which
+		// would otherwise re-trigger this on its *content* box and loop. Only the
+		// platform's own resize of the leaf changes the border box, which is
+		// exactly the signal `overlapOf` needs to know it can let go again.
+		const observer = root ? new ResizeObserver(update) : null;
+		if (root) observer?.observe(root, { box: 'border-box' });
+		// Dismissing the keyboard by its own collapse gesture, rather than by
+		// leaving the field, drops focus nowhere — Obsidian's own detection is
+		// keyed off *focus* leaving the field, so neither `keyboardWillHide` nor
+		// `--keyboard-height` moves, and the editor stays mounted with the field
+		// still focused. The next touch is the first thing afterwards that is
+		// certain to reach this element in either direction: it either lands
+		// outside (closes the editor, see the cleanup below) or inside, where a
+		// re-measure costs nothing and finds nothing to do once the keyboard is
+		// actually still up.
+		document.addEventListener('pointerdown', update, true);
+		// A first pass right away: the editor may open while the keyboard is
+		// already up, in which case no event is coming at all.
+		update();
+
 		return () => {
-			off();
+			for (const name of KEYBOARD_EVENTS) window.removeEventListener(name, update);
+			observer?.disconnect();
+			document.removeEventListener('pointerdown', update, true);
 			if (!root) return;
 			const left = (held.get(root) ?? 1) - 1;
 			if (left > 0) {
