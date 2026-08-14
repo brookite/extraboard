@@ -55,7 +55,9 @@ with its own file format, not a fork.
   came from and can be restored or deleted from the archive view.
 - **Stacks and dividers that mean something:** a stack can mark the cards
   entering it as done, and a named divider can color the cards in its group.
-- **Tags** with per-board colors; selecting one searches the vault for it.
+- **Tags** with per-board colors; selecting one searches the vault for it. While
+  editing a card, a tag button opens a searchable picker over the board's and
+  the vault's tags — add, remove, or create one without leaving the card.
 - **English and Russian interfaces**, with configurable date/time formats
   (including relative dates and custom `moment.js` patterns) and first day of
   the week.

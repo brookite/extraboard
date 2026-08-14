@@ -67,9 +67,16 @@ export const en = {
 	progress: {
 		checklistAria: 'Checklist {label}',
 	},
+	tagPicker: {
+		search: 'Search tags',
+		create: 'Create #{tag}',
+		empty: 'No matching tag',
+		more: '{count} more — keep typing to narrow',
+	},
 	propertyBadges: {
 		noOtherProperties: 'No other properties on this board',
 		addProperty: 'Add property',
+		addTag: 'Add tag',
 		pickAColor: 'Pick a color',
 		setRepetitionRule: 'Set a repetition rule',
 		valueListPlaceholder: 'value; value',

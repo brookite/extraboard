@@ -62,18 +62,32 @@ export function cardEditText(card: Card, config: BoardConfig, showRaw: boolean):
 	return [card.title, ...card.tags.map((t) => `#${t}`)].filter(Boolean).join(' ');
 }
 
+/**
+ * The mounted field's live text, whichever field that is. Reading it lets a
+ * caller flush the text on its own schedule instead of waiting on the field's
+ * internal blur handling; writing it is how the tag button adds a `#tag`, which
+ * lives in the text and not in the board (model/tags.ts).
+ */
+export interface CardField {
+	getValue(): string;
+	/** `focus: false` leaves focus where it is — see the picker in §3.1.1. */
+	setValue(text: string, options?: { focus?: boolean }): void;
+}
+
 interface FieldProps {
 	app: App;
 	value: string;
 	placeholder: string;
 	/** The whole editor: focus may move to the badges without closing the field. */
 	scope: RefObject<HTMLElement>;
+	/** A field was mounted. */
+	onReady: (field: CardField) => void;
 	/**
-	 * Reports a way to read the field's current text synchronously, or `null`
-	 * while no such reader is mounted. Lets a caller flush the live text on its
-	 * own schedule instead of waiting on the field's internal blur handling.
+	 * That same field is going away. It is handed back rather than simply
+	 * cleared, because the fallback field mounts before the embedded one has
+	 * finished tearing down — the release must not drop its successor.
 	 */
-	onReady: (getValue: (() => string) | null) => void;
+	onRelease: (field: CardField) => void;
 	onSubmit: (text: string) => void;
 	onCommit: (text: string) => void;
 	onCancel: () => void;
@@ -84,15 +98,27 @@ interface FieldProps {
  * does not expose it (docs/NOTICES.md). A card must always be editable, so the
  * fallback is a normal render path, not an error case.
  */
-function RichField({ app, value, placeholder, scope, onReady, onSubmit, onCommit, onCancel }: FieldProps) {
+function RichField({
+	app,
+	value,
+	placeholder,
+	scope,
+	onReady,
+	onRelease,
+	onSubmit,
+	onCommit,
+	onCancel,
+}: FieldProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const [fallback, setFallback] = useState(false);
 	// The callbacks change identity on every render; the editor is mounted once
 	// and owns its text until it closes, so it reads them through a ref rather
 	// than being torn down and rebuilt under the user's cursor.
-	const handlers = useRef({ onReady, onSubmit, onCommit, onCancel });
-	handlers.current = { onReady, onSubmit, onCommit, onCancel };
+	const handlers = useRef({ onReady, onRelease, onSubmit, onCommit, onCancel });
+	handlers.current = { onReady, onRelease, onSubmit, onCommit, onCancel };
 	const initial = useRef(value);
+	// The fallback field's handle, kept so it can be handed back on release.
+	const inlineField = useRef<CardField | null>(null);
 
 	useLayoutEffect(() => {
 		const host = hostRef.current;
@@ -109,9 +135,13 @@ function RichField({ app, value, placeholder, scope, onReady, onSubmit, onCommit
 			return;
 		}
 		handle.focus();
-		handlers.current.onReady(() => handle.getValue());
+		const field: CardField = {
+			getValue: () => handle.getValue(),
+			setValue: (text, options) => handle.setValue(text, options),
+		};
+		handlers.current.onReady(field);
 		return () => {
-			handlers.current.onReady(null);
+			handlers.current.onRelease(field);
 			handle.destroy();
 		};
 	}, [app, fallback, scope]);
@@ -122,6 +152,15 @@ function RichField({ app, value, placeholder, scope, onReady, onSubmit, onCommit
 				value={value}
 				placeholder={placeholder}
 				allowEmpty
+				onReady={(handle) => {
+					if (handle) {
+						inlineField.current = handle;
+						onReady(handle);
+					} else if (inlineField.current) {
+						onRelease(inlineField.current);
+						inlineField.current = null;
+					}
+				}}
 				onSubmit={(text) => onSubmit(text)}
 				onCancel={onCancel}
 			/>
@@ -159,9 +198,9 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 	// handler below never needs to re-bind.
 	const saveRef = useRef(save);
 	saveRef.current = save;
-	// Set while the field is mounted, so its current text can be read
-	// synchronously — see the pointerdown handler below.
-	const fieldValue = useRef<(() => string) | null>(null);
+	// Set while a field is mounted, so its current text can be read synchronously
+	// — see the pointerdown handler below — and rewritten by the tag button.
+	const field = useRef<CardField | null>(null);
 	// What the field was seeded with, so an interrupted edit can tell whether
 	// anything was actually typed.
 	const openedWith = useRef(cardEditText(card, config, showRaw));
@@ -171,7 +210,7 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 	// may now hold a different card, so committing is the one thing that must not
 	// happen: close, discarding the text, and say so when there was any.
 	useCloseOnReload(() => {
-		const current = fieldValue.current?.();
+		const current = field.current?.getValue();
 		if (current !== undefined && current !== openedWith.current) {
 			new Notice(t('notice.editDiscarded'));
 		}
@@ -192,8 +231,8 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 	// the race.
 	useEffect(() => {
 		const dismiss = (): void => {
-			const getValue = fieldValue.current;
-			if (getValue) saveRef.current(getValue());
+			const live = field.current;
+			if (live) saveRef.current(live.getValue());
 			onClose();
 		};
 		// Set while a press outside is still in flight, so an editor that closes
@@ -234,8 +273,11 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 				value={cardEditText(card, config, showRaw)}
 				placeholder={showRaw ? t('cardEditor.placeholderRaw') : t('cardEditor.placeholder')}
 				scope={rootRef}
-				onReady={(getValue) => {
-					fieldValue.current = getValue;
+				onReady={(mounted) => {
+					field.current = mounted;
+				}}
+				onRelease={(released) => {
+					if (field.current === released) field.current = null;
 				}}
 				onSubmit={(text) => {
 					onClose();
@@ -244,7 +286,14 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 				onCommit={save}
 				onCancel={onClose}
 			/>
-			<PropertyBadges config={config} card={card} target={target} api={api} settings={settings} />
+			<PropertyBadges
+				config={config}
+				card={card}
+				target={target}
+				api={api}
+				settings={settings}
+				field={field}
+			/>
 		</div>
 	);
 }

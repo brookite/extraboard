@@ -4,6 +4,13 @@
 
 import { useLayoutEffect, useRef } from 'preact/hooks';
 
+/** Reading and rewriting the live text from outside, without a re-render. */
+export interface InlineEditorHandle {
+	getValue(): string;
+	/** `focus: false` rewrites the text without pulling focus back (tag picker). */
+	setValue(text: string, options?: { focus?: boolean }): void;
+}
+
 interface Props {
 	value?: string;
 	placeholder?: string;
@@ -18,6 +25,8 @@ interface Props {
 	 */
 	onSubmit: (text: string, again: boolean) => void;
 	onCancel: () => void;
+	/** Reports a handle on the live text while this editor is mounted, `null` after. */
+	onReady?: (handle: InlineEditorHandle | null) => void;
 	class?: string;
 }
 
@@ -34,10 +43,15 @@ export function InlineEditor({
 	allowEmpty = false,
 	onSubmit,
 	onCancel,
+	onReady,
 	class: cls,
 }: Props) {
 	const ref = useRef<HTMLTextAreaElement>(null);
 	const closed = useRef(false);
+	// Like every other callback here, read through a ref: the textarea is mounted
+	// once and must not be torn down because a parent re-rendered.
+	const ready = useRef(onReady);
+	ready.current = onReady;
 
 	useLayoutEffect(() => {
 		const el = ref.current;
@@ -45,6 +59,16 @@ export function InlineEditor({
 		el.focus();
 		el.setSelectionRange(el.value.length, el.value.length);
 		autosize(el);
+		ready.current?.({
+			getValue: () => el.value,
+			setValue: (text, options = {}) => {
+				el.value = text;
+				autosize(el);
+				if (options.focus !== false) el.focus();
+				el.setSelectionRange(text.length, text.length);
+			},
+		});
+		return () => ready.current?.(null);
 	}, []);
 
 	const cancel = (): void => {

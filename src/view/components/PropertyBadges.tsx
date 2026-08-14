@@ -4,6 +4,7 @@
 // Every edit goes through an op like any other change — there is no confirm
 // step and no dirty state to lose.
 
+import type { RefObject } from 'preact';
 import { useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import { escapeValue, formatValue, parseValue } from '../../model/properties';
@@ -15,11 +16,13 @@ import { describeRecurrence } from '../../i18n/recurrenceText';
 import { editRecurrence } from '../../ui/RecurrenceModal';
 import { typeLabels } from '../../ui/PropertyDefsEditor';
 import type { BoardApi } from '../api';
+import type { CardField } from '../CardEditor';
 import { Icon } from './Icon';
 import { safeColor } from './style';
 import { t } from '../../i18n';
 import { showDropdownMenu } from '../../util/menu';
 import { DateValueEditor } from './DateValueEditor';
+import { TagPicker } from './TagPicker';
 
 /** Types edited as one text field; the rest have a control of their own. */
 const TEXT_TYPES = new Set(['string']);
@@ -33,11 +36,20 @@ interface Props {
 	api: BoardApi;
 	/** Read for the date/recurrence formatting a badge label needs. */
 	settings: ExtraboardSettings;
+	/**
+	 * The card's text field, when one is mounted. Tags are part of that text, so
+	 * the tag button edits it directly — an op would be overwritten by the field
+	 * the moment it commits (model/tags.ts).
+	 */
+	field?: RefObject<CardField | null>;
 }
 
-export function PropertyBadges({ config, card, target, api, settings }: Props) {
+export function PropertyBadges({ config, card, target, api, settings, field }: Props) {
 	// Name of the property whose editor is open; it need not be on the card yet.
 	const [open, setOpen] = useState<string | null>(null);
+	// The tag picker (§3.1.1) takes the same slot below the row, so the two are
+	// one state: opening either closes the other.
+	const [tagsOpen, setTagsOpen] = useState(false);
 
 	const defFor = (name: string): PropertyDef | undefined =>
 		config.properties.find((d) => d.name === name);
@@ -56,6 +68,7 @@ export function PropertyBadges({ config, card, target, api, settings }: Props) {
 	};
 
 	const addMenu = (evt: MouseEvent): void => {
+		setTagsOpen(false);
 		const missing = config.properties.filter((d) => !valueFor(d.name));
 		showDropdownMenu(evt, (menu) => {
 			if (!missing.length) {
@@ -85,7 +98,10 @@ export function PropertyBadges({ config, card, target, api, settings }: Props) {
 						pv={pv}
 						opts={dateTimeOptsFor(settings)}
 						active={pv.name === openName}
-						onClick={() => setOpen(pv.name === openName ? null : pv.name)}
+						onClick={() => {
+								setTagsOpen(false);
+								setOpen(pv.name === openName ? null : pv.name);
+							}}
 					/>
 				))}
 				<button
@@ -93,10 +109,27 @@ export function PropertyBadges({ config, card, target, api, settings }: Props) {
 					type="button"
 					class="eb-badge eb-badge-add"
 					aria-label={t('propertyBadges.addProperty')}
+					title={t('propertyBadges.addProperty')}
 					onClick={addMenu}
 				>
-					<Icon name="plus" />
+					<Icon name="list-plus" class="eb-button-icon" />
 				</button>
+				{field ? (
+					<button
+						key="add-tag"
+						type="button"
+						class={`eb-badge eb-badge-add${tagsOpen ? ' is-active' : ''}`}
+						aria-label={t('propertyBadges.addTag')}
+						aria-pressed={tagsOpen}
+						title={t('propertyBadges.addTag')}
+						onClick={() => {
+								setOpen(null);
+								setTagsOpen(!tagsOpen);
+							}}
+					>
+						<Icon name="tag" class="eb-button-icon" />
+					</button>
+				) : null}
 			</div>
 			{openName !== null && (
 				<ValueEditor
@@ -111,6 +144,9 @@ export function PropertyBadges({ config, card, target, api, settings }: Props) {
 					onClose={() => setOpen(null)}
 				/>
 			)}
+			{tagsOpen && field ? (
+				<TagPicker field={field} api={api} onClose={() => setTagsOpen(false)} />
+			) : null}
 		</div>
 	);
 }

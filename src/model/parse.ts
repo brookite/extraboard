@@ -100,6 +100,14 @@ const TAG_RE = /(^|\s)#([\p{L}\p{N}_][\p{L}\p{N}/_-]*)/gu;
 /** Obsidian rejects an all-digits tag: `#2026` in running text is a number. */
 const ALL_DIGITS = /^\d+$/;
 
+/** `TAG_RE`'s charset, anchored — the same rule, applied to a bare name. */
+const TAG_NAME_RE = /^[\p{L}\p{N}_][\p{L}\p{N}/_-]*$/u;
+
+/** Would `#name` be a tag? Asked by anything that offers to create one. */
+export function isTagName(name: string): boolean {
+	return TAG_NAME_RE.test(name) && !ALL_DIGITS.test(name);
+}
+
 /** Extract `#tag` tokens, returning deduped tags and the text with tags removed. */
 export function extractTags(s: string): { tags: string[]; rest: string } {
 	const tags: string[] = [];

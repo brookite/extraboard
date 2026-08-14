@@ -1026,8 +1026,13 @@ body.eb-dragging-card
 	border-color: var(--interactive-accent);
 }
 
+/* Icon-only chips (add property, add tag). The glyph is the whole content, so
+   the box is centred on both axes and the vertical padding matches the text
+   badges' line box — otherwise an icon chip sits a pixel high next to them. */
 .eb-badge-add {
-	padding: 1px 5px;
+	justify-content: center;
+	padding: 0 6px;
+	min-height: calc(var(--font-smaller, 0.8em) * 1.5 + 2px);
 	color: var(--text-muted);
 	border: 1px dashed var(--background-modifier-border);
 	box-shadow: none;
@@ -1035,6 +1040,7 @@ body.eb-dragging-card
 }
 
 .eb-badge-add .svg-icon {
+	display: block;
 	width: 12px;
 	height: 12px;
 }
@@ -1097,6 +1103,74 @@ body.eb-dragging-card
 	display: flex;
 	justify-content: flex-end;
 	gap: 6px;
+}
+
+/* The tag picker (§3.1.1): the same panel as a property editor, but its list
+   is the whole vault's tags, so the list scrolls and the panel does not. */
+.eb-tag-picker {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+}
+
+.eb-tag-picker-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-height: 40vh;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.eb-tag-picker-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 6px;
+	font-size: var(--font-smaller, 0.8em);
+	text-align: left;
+	color: var(--text-muted);
+	background: transparent;
+	border: none;
+	border-radius: var(--radius-s, 6px);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.eb-tag-picker-row:hover {
+	background: var(--background-modifier-hover);
+}
+
+.eb-tag-picker-row.is-on {
+	color: var(--text-normal);
+}
+
+.eb-tag-picker-row.is-new {
+	color: var(--text-accent);
+}
+
+/* The name ellipsizes: a nested tag can be longer than the card is wide. */
+.eb-tag-picker-name {
+	overflow: hidden;
+	min-width: 0;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.eb-tag-picker-foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.eb-tag-picker-hint {
+	font-size: var(--font-smaller, 0.8em);
+	color: var(--text-faint);
 }
 
 /* Calendar-backed datetime, range and compound-list editor (0.3.1). */

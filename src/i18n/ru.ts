@@ -68,9 +68,16 @@ export const ru: DeepPartial<typeof en> = {
 	progress: {
 		checklistAria: 'Чек-лист {label}',
 	},
+	tagPicker: {
+		search: 'Поиск тегов',
+		create: 'Создать #{tag}',
+		empty: 'Подходящих тегов нет',
+		more: 'Ещё {count} — уточните запрос',
+	},
 	propertyBadges: {
 		noOtherProperties: 'На этой доске больше нет свойств',
 		addProperty: 'Добавить свойство',
+		addTag: 'Добавить тег',
 		pickAColor: 'Выбрать цвет',
 		setRepetitionRule: 'Задать правило повторения',
 		valueListPlaceholder: 'значение; значение',

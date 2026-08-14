@@ -14,6 +14,11 @@ interface InternalEditor {
 	containerEl?: HTMLElement;
 	editor?: {
 		getValue?(): string;
+		/** Obsidian's `Editor`; the three below are only used to park the caret. */
+		setValue?(value: string): void;
+		lastLine?(): number;
+		getLine?(line: number): string;
+		setCursor?(pos: { line: number; ch: number }): void;
 		focus?(): void;
 		cm?: { contentDOM?: HTMLElement };
 	};
@@ -160,6 +165,14 @@ export function collapseLines(text: string): string {
 
 export interface EmbeddedEditorHandle {
 	getValue(): string;
+	/**
+	 * Replace the text under the user's cursor — the tag picker's way in
+	 * (card-content-and-checklists.md §3.1.1). The caret lands at the end, which
+	 * is where an appended tag is. Focus returns to the field unless the caller
+	 * says otherwise: the picker stays open across several tags, and pulling
+	 * focus back after each one would close the list under the user's finger.
+	 */
+	setValue(text: string, options?: { focus?: boolean }): void;
 	focus(): void;
 	destroy(): void;
 }
@@ -261,8 +274,26 @@ export function createEmbeddedEditor(
 	content.addEventListener('keydown', onKeyDown, capture);
 	content.addEventListener('blur', onBlur);
 
+	/**
+	 * `Editor.setValue` keeps the CodeMirror instance (and its undo history)
+	 * alive; `editMode.set` is the fallback, and rebuilds the state. Either way
+	 * the caret is parked at the very end afterwards, since a rewritten document
+	 * leaves it wherever the implementation happens to put it.
+	 */
+	const writeValue = (text: string, options: { focus?: boolean } = {}): void => {
+		const editor = instance.editor;
+		if (typeof editor?.setValue === 'function') editor.setValue(text);
+		else setValue(text, false);
+		const last = editor?.lastLine?.();
+		if (last !== undefined && editor?.getLine && editor.setCursor) {
+			editor.setCursor({ line: last, ch: editor.getLine(last).length });
+		}
+		if (options.focus !== false) editor?.focus?.();
+	};
+
 	return {
 		getValue: readValue,
+		setValue: writeValue,
 		focus: () => instance.editor?.focus?.(),
 		destroy: () => {
 			closed = true;
