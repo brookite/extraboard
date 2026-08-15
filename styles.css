@@ -1777,6 +1777,7 @@ body.eb-dragging-card .eb-archive-drop {
 /* Sortable puts the dragged card inside the zone while it hovers over it, which
    is both the highlight's trigger and its preview. */
 .eb-archive-drop:has(.eb-item) {
+	flex-direction: column;
 	color: var(--text-normal);
 	background: var(--background-modifier-hover);
 	border-color: var(--text-accent);
@@ -1785,6 +1786,7 @@ body.eb-dragging-card .eb-archive-drop {
 
 .eb-archive-drop .eb-item {
 	width: 100%;
+	min-width: 0;
 	pointer-events: none;
 }
 
