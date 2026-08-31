@@ -1272,6 +1272,24 @@ body.eb-dragging-card
 	justify-content: space-between;
 }
 
+.eb-date-time input[type='time'] {
+	padding: 4px 8px;
+	font-family: inherit;
+	font-size: inherit;
+	color: var(--text-normal);
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 6px);
+}
+
+.eb-date-time input[type='time']:hover {
+	border-color: var(--background-modifier-border-hover);
+}
+
+.eb-date-time input[type='time']:focus {
+	border-color: var(--background-modifier-border-focus, var(--interactive-accent));
+}
+
 .eb-date-actions {
 	justify-content: flex-end;
 }
