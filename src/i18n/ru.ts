@@ -675,7 +675,7 @@ export const ru: DeepPartial<typeof en> = {
 			noName: 'У свойства нет названия.',
 			duplicateName: 'Свойство «{name}» объявлено более одного раза.',
 			strictOptionsWrongType: 'Свойство «{name}»: strict/options допустимы только для string-list.',
-			timeWrongType: 'Свойство «{name}»: time допустимо только для datetime.',
+			timeWrongType: 'Свойство «{name}»: time допустимо только для datetime и date-list.',
 			tooManyColors: 'На доске допускается не более одного свойства цвета.',
 		},
 	},

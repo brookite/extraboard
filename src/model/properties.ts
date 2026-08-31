@@ -203,7 +203,7 @@ export function validatePropertyDefs(defs: PropertyDef[]): PropertyDiagnostic[] 
 		if ((d.strict !== undefined || d.options !== undefined) && d.type !== 'string-list') {
 			diags.push({ kind: 'strictOptionsWrongType', name: d.name });
 		}
-		if (d.time !== undefined && d.type !== 'datetime') {
+		if (d.time !== undefined && d.type !== 'datetime' && d.type !== 'date-list') {
 			diags.push({ kind: 'timeWrongType', name: d.name });
 		}
 	}

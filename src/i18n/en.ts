@@ -677,7 +677,7 @@ export const en = {
 			noName: 'A property has no name.',
 			duplicateName: 'Property "{name}" is declared more than once.',
 			strictOptionsWrongType: 'Property "{name}": strict/options are only valid on string-list.',
-			timeWrongType: 'Property "{name}": time is only valid on datetime.',
+			timeWrongType: 'Property "{name}": time is only valid on datetime or date-list.',
 			tooManyColors: 'At most one color property is allowed per board.',
 		},
 	},

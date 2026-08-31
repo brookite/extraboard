@@ -126,7 +126,7 @@ export class PropertyDefsEditor {
 				delete def.strict;
 				delete def.options;
 			}
-			if (def.type !== 'datetime') delete def.time;
+			if (def.type !== 'datetime' && def.type !== 'date-list') delete def.time;
 			this.commit();
 		});
 
@@ -144,7 +144,7 @@ export class PropertyDefsEditor {
 		});
 
 		if (def.type === 'string-list') this.renderListOptions(row, def);
-		if (def.type === 'datetime') this.renderTimeMode(row, def);
+		if (def.type === 'datetime' || def.type === 'date-list') this.renderTimeMode(row, def);
 	}
 
 	private renderTimeMode(row: HTMLElement, def: PropertyDef): void {

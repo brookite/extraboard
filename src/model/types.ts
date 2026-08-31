@@ -118,7 +118,7 @@ export interface PropertyDef {
 	strict?: boolean;
 	/** string-list only */
 	options?: StringListOption[];
-	/** datetime family only */
+	/** datetime, and single dates within date-list; never date-range */
 	time?: 'none' | 'optional' | 'required';
 }
 

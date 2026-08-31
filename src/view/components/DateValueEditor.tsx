@@ -80,7 +80,11 @@ const initialTime = (pv: PropertyValue | undefined): string => {
 const isTaken = (day: CalDate, list: string[]): boolean =>
 	list.some((raw) => {
 		const span = parseSpan(raw);
-		return !!span && compareDates(day, span.start) >= 0 && compareDates(day, span.end) <= 0;
+		return (
+			!!span &&
+			compareDates(day, stripTime(span.start)) >= 0 &&
+			compareDates(day, stripTime(span.end)) <= 0
+		);
 	});
 
 const withTime = (date: CalDate, value: string): CalDate => {
@@ -98,11 +102,20 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit }
 	const days = monthGrid(month, firstDay);
 	const allowRange = type !== 'datetime';
 	const list = pv?.type === 'date-list' ? pv.raw : [];
-	const timeEnabled = type === 'datetime' && def?.time !== undefined && def.time !== 'none';
+	// date-range never carries a time; date-list carries one only on a single-day entry.
+	const timeEnabled =
+		(type === 'datetime' || type === 'date-list') && def?.time !== undefined && def.time !== 'none';
 	const timeRequired = def?.time === 'required';
+	const isSingleDay = !!selection && !selection.end;
+	const showTime = timeEnabled && (type !== 'date-list' || isSingleDay);
 
 	const select = (day: CalDate): void => {
-		setSelection((current) => selectCalendarDay(current, stripTime(day), allowRange));
+		setSelection((current) => {
+			const next = selectCalendarDay(current, stripTime(day), allowRange);
+			// A range entry never carries a time; drop any time picked before it formed.
+			if (next?.end) setTime('');
+			return next;
+		});
 	};
 
 	const saveSelection = (): void => {
@@ -112,14 +125,20 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit }
 			onCommit({ name, type, raw: formatDate(withTime(selection.start, time)) });
 			return;
 		}
-		const span = { start: selection.start, end: selection.end ?? selection.start };
-		const raw = selection.end ? formatSpan(span) : dayKey(selection.start);
 		if (type === 'date-range') {
+			const span = { start: selection.start, end: selection.end ?? selection.start };
 			onCommit({ name, type, raw: formatSpan(span) });
 			return;
 		}
-		onCommit({ name, type, raw: [...list, raw] });
+		// date-list: a range entry is written as a plain span; a single day may carry a time.
+		if (selection.end) {
+			onCommit({ name, type, raw: [...list, formatSpan({ start: selection.start, end: selection.end })] });
+		} else {
+			if (timeRequired && !time) return;
+			onCommit({ name, type, raw: [...list, formatDate(withTime(selection.start, time))] });
+		}
 		setSelection(null);
+		setTime('');
 	};
 
 	const removeListItem = (index: number): void => {
@@ -207,7 +226,7 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit }
 				})}
 			</div>
 
-			{timeEnabled ? (
+			{showTime ? (
 				<label class="eb-date-time">
 					<span>{t('propertyBadges.time')}</span>
 					<input
@@ -228,7 +247,7 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit }
 				<button
 					type="button"
 					class="mod-cta"
-					disabled={!selection || (timeRequired && !time)}
+					disabled={!selection || (showTime && timeRequired && !time)}
 					onClick={saveSelection}
 				>
 					{type === 'date-list' ? t('propertyBadges.addDate') : t('propertyBadges.setDate')}
