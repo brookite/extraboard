@@ -130,6 +130,27 @@ export class BoardSettingsModal extends Modal {
 		);
 
 		new Setting(contentEl)
+			.setName(t('modal.boardSettings.strikeDoneCards.name'))
+			.setDesc(t('modal.boardSettings.strikeDoneCards.desc'))
+			.addDropdown((drop) =>
+				drop
+					.addOption('inherit', t('modal.boardSettings.addTo.inherit'))
+					.addOption('on', t('modal.boardSettings.strikeDoneCards.on'))
+					.addOption('off', t('modal.boardSettings.strikeDoneCards.off'))
+					.setValue(
+						this.config.strikeDoneCards === undefined
+							? 'inherit'
+							: this.config.strikeDoneCards
+								? 'on'
+								: 'off',
+					)
+					.onChange((value) => {
+						if (value === 'inherit') delete this.config.strikeDoneCards;
+						else this.config.strikeDoneCards = value === 'on';
+					}),
+			);
+
+		new Setting(contentEl)
 			.setName(t('modal.boardSettings.cardNoteFolder.name'))
 			.setDesc(t('modal.boardSettings.cardNoteFolder.desc'))
 			.addText((text) => {

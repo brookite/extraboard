@@ -136,6 +136,10 @@ export interface BoardConfig {
 	/** Board override for the plugin's `progressStyle`; absent => follow it. */
 	progressStyle?: ProgressStyle;
 	/**
+	 * Board override for the plugin's `strikeDoneCards`; absent => follow it.
+	 */
+	strikeDoneCards?: boolean;
+	/**
 	 * Where a card entering a **completing** stack goes: `true` — the top,
 	 * `false` — the end. Absent => follow the plugin setting
 	 * (kanban-view.md §6.7).

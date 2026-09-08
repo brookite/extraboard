@@ -334,7 +334,7 @@ function CardTileInner({
 		'eb-card',
 		color ? 'is-colored' : '',
 		color && settings.fillCardWithColor ? 'is-filled' : '',
-		done ? 'is-done' : '',
+		done && (config.strikeDoneCards ?? settings.strikeDoneCards) ? 'is-done' : '',
 	]
 		.filter(Boolean)
 		.join(' ');

@@ -494,6 +494,12 @@ export const en = {
 				name: 'Completed cards go',
 				desc: 'The same, for stacks on this board that mark cards as completed.',
 			},
+			strikeDoneCards: {
+				name: 'Strike through done cards',
+				desc: 'A card whose checkbox is checked shows its title struck through, on this board. "Follow plugin setting" is the default.',
+				on: 'On',
+				off: 'Off',
+			},
 			cardNoteFolder: {
 				name: 'Card note folder',
 				desc: 'Where this board creates card notes. Empty uses the folder from plugin settings, which defaults to the vault root.',
@@ -603,6 +609,10 @@ export const en = {
 		fillCardWithColor: {
 			name: 'Fill cards with color',
 			desc: 'A card with a color property is tinted, not just striped along its left edge. Display only — it never changes a board file.',
+		},
+		strikeDoneCards: {
+			name: 'Strike through done cards',
+			desc: 'A card whose checkbox is checked shows its title struck through. Off by default.',
 		},
 		allowDeleteWithoutArchive: {
 			name: 'Allow deleting cards without archiving',

@@ -96,6 +96,11 @@ export interface ExtraboardSettings {
 	 */
 	fillCardWithColor: boolean;
 	/**
+	 * `false` (default) — a done card's title is shown normally; `true` — it is
+	 * struck through, like a checked task list item.
+	 */
+	strikeDoneCards: boolean;
+	/**
 	 * `false` — a card leaves the board only through the archive and the card
 	 * menu offers no "Delete card"; `true` — the item comes back (archive.md §1).
 	 * It governs cards only: stacks, dividers and the archive's own delete
@@ -163,6 +168,7 @@ export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	progressStyle: 'ring',
 	showRawPropertyTokens: false,
 	fillCardWithColor: false,
+	strikeDoneCards: false,
 	allowDeleteWithoutArchive: false,
 	archiveLimit: 10000,
 	archiveNewestFirst: true,

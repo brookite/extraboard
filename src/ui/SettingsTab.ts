@@ -132,6 +132,11 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 				(row) => this.renderFillCardWithColor(row),
 			),
 			setting(
+				t('settings.strikeDoneCards.name'),
+				t('settings.strikeDoneCards.desc'),
+				(row) => this.renderStrikeDoneCards(row),
+			),
+			setting(
 				t('settings.allowDeleteWithoutArchive.name'),
 				t('settings.allowDeleteWithoutArchive.desc'),
 				(row) => this.renderAllowDeleteWithoutArchive(row),
@@ -184,6 +189,7 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 		this.renderProgressStyle(new Setting(containerEl));
 		this.renderShowRawPropertyTokens(new Setting(containerEl));
 		this.renderFillCardWithColor(new Setting(containerEl));
+		this.renderStrikeDoneCards(new Setting(containerEl));
 		this.renderAllowDeleteWithoutArchive(new Setting(containerEl));
 		this.renderAddPosition(new Setting(containerEl), 'addToTopOther');
 		this.renderAddPosition(new Setting(containerEl), 'addToTopCompleting');
@@ -283,6 +289,19 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.fillCardWithColor).onChange((value) => {
 					this.plugin.settings.fillCardWithColor = value;
+					void this.plugin.saveSettings();
+					this.plugin.refreshBoards();
+				}),
+			);
+	}
+
+	private renderStrikeDoneCards(setting: Setting): void {
+		setting
+			.setName(t('settings.strikeDoneCards.name'))
+			.setDesc(t('settings.strikeDoneCards.desc'))
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.strikeDoneCards).onChange((value) => {
+					this.plugin.settings.strikeDoneCards = value;
 					void this.plugin.saveSettings();
 					this.plugin.refreshBoards();
 				}),

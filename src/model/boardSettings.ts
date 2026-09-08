@@ -115,6 +115,7 @@ export function toConfig(raw: unknown): BoardConfig {
 	// different from an explicit `false` (kanban-view.md §6.7).
 	if (typeof raw.addToTopCompleting === 'boolean') config.addToTopCompleting = raw.addToTopCompleting;
 	if (typeof raw.addToTopOther === 'boolean') config.addToTopOther = raw.addToTopOther;
+	if (typeof raw.strikeDoneCards === 'boolean') config.strikeDoneCards = raw.strikeDoneCards;
 
 	// Read only when the key is present: an empty list is a board saying "no
 	// highlights", which is different from following the plugin setting (§3.2).
@@ -237,6 +238,7 @@ export function configToPlain(config: BoardConfig): Record<string, unknown> {
 	// `false` would silently turn it back into "follow the plugin".
 	if (config.addToTopCompleting !== undefined) out.addToTopCompleting = config.addToTopCompleting;
 	if (config.addToTopOther !== undefined) out.addToTopOther = config.addToTopOther;
+	if (config.strikeDoneCards !== undefined) out.strikeDoneCards = config.strikeDoneCards;
 	// An empty array is written on purpose — it is how a board says "no
 	// highlights" instead of "follow the plugin setting".
 	if (config.dateHighlights) out.dateHighlights = config.dateHighlights;

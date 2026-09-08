@@ -53,7 +53,7 @@ function ArchiveRow({ entry, board, api, settings, onRestore, onDelete, onOpenLi
 	const done = ops.isCardDone(card);
 
 	return (
-		<div class={`eb-archive-row${done ? ' is-done' : ''}`}>
+		<div class={`eb-archive-row${done && (board.config.strikeDoneCards ?? settings.strikeDoneCards) ? ' is-done' : ''}`}>
 			<div class="eb-card-head">
 				<input
 					type="checkbox"
