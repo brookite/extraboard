@@ -684,6 +684,10 @@ export const en = {
 			optional: 'Time optional',
 			required: 'Time required',
 		},
+		accent: {
+			label: 'Badge accent',
+			field: 'Accent',
+		},
 		empty: 'No properties yet.',
 		addProperty: 'Add property',
 		name: 'Name',

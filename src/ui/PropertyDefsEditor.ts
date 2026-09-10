@@ -54,6 +54,11 @@ export function cloneDefs(defs: PropertyDef[]): PropertyDef[] {
 	}));
 }
 
+/** Types drawn as a badge, and so the ones an accent outline can apply to. */
+function isAccentable(type: PropertyType): boolean {
+	return type !== 'color' && type !== 'percent';
+}
+
 function uniqueName(defs: PropertyDef[]): string {
 	let i = 1;
 	let name = 'property';
@@ -127,6 +132,9 @@ export class PropertyDefsEditor {
 				delete def.options;
 			}
 			if (def.type !== 'datetime' && def.type !== 'date-list') delete def.time;
+			// `color` paints the card and `percent` draws a progress indicator;
+			// neither has a badge to outline (properties.md §accent).
+			if (!isAccentable(def.type)) delete def.accent;
 			this.commit();
 		});
 
@@ -145,6 +153,22 @@ export class PropertyDefsEditor {
 
 		if (def.type === 'string-list') this.renderListOptions(row, def);
 		if (def.type === 'datetime' || def.type === 'date-list') this.renderTimeMode(row, def);
+		if (isAccentable(def.type)) this.renderAccent(row, def);
+	}
+
+	/**
+	 * The property's badge accent. Its own row under the definition, wrapping
+	 * like every other one, so a narrow settings pane on mobile stacks the label
+	 * above the control instead of squeezing it.
+	 */
+	private renderAccent(row: HTMLElement, def: PropertyDef): void {
+		const body = row.createDiv({ cls: 'eb-pe-body eb-pe-accent' });
+		body.createSpan({ cls: 'eb-pe-label', text: t('propertyDefs.accent.label') });
+		colorField(this.app, body, t('propertyDefs.accent.field'), def.accent, (next) => {
+			if (next) def.accent = next;
+			else delete def.accent;
+			this.commit();
+		});
 	}
 
 	private renderTimeMode(row: HTMLElement, def: PropertyDef): void {

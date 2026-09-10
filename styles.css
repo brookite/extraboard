@@ -802,6 +802,15 @@ body.eb-dragging-card
 	color: var(--text-muted);
 }
 
+/* A property's accent (kanban-view.md §3.5): an outline rather than a fill, so
+   the value keeps its own color — a `string-list` option's background, a date
+   highlight — and the property is still told apart at a glance. Drawn as an
+   inset shadow, not a border: the chip's box then measures the same accented or
+   not, which is what keeps a wrapped badge row from reflowing around it. */
+.eb-badge-accent {
+	box-shadow: inset 0 0 0 1px var(--eb-accent, transparent);
+}
+
 /* A badge's text, so a long value ellipsizes instead of overflowing its
    container: `text-overflow` needs the text's own box, not the flex chip. */
 .eb-badge-text {
@@ -1568,6 +1577,15 @@ body.is-mobile .eb-hover-only {
 	margin: 8px 0 0 4px;
 	padding-left: 8px;
 	border-left: 2px solid var(--background-modifier-border);
+}
+
+/* The accent row: label and color control on one line, wrapping to two when the
+   settings pane is narrow (a phone, or a split pane) rather than overflowing. */
+.eb-pe-accent {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
 }
 
 .eb-pe-label {

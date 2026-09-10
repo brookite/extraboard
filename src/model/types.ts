@@ -130,6 +130,14 @@ export interface PropertyDef {
 	options?: StringListOption[];
 	/** datetime, and single dates within date-list; never date-range */
 	time?: 'none' | 'optional' | 'required';
+	/**
+	 * Badge accent: an outline in this color on every badge of this property, so
+	 * two properties of the same type (a due date and a done date) read apart at
+	 * a glance. Never a fill — the fill belongs to the value (a `string-list`
+	 * option's `bg`, a date highlight). Any CSS color, guarded like every other
+	 * stored color. Not offered for `color` or `percent`, which draw no badge.
+	 */
+	accent?: string;
 }
 
 export interface BoardConfig {

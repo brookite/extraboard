@@ -52,6 +52,8 @@ interface DateOpts {
 	/** Property name the rules are matched against. */
 	property: string;
 	now: Now;
+	/** The property's accent outline, already guarded; `null` when it has none. */
+	accent: string | null;
 }
 
 /** A single date reads as a one-day span, so one matcher serves every shape. */
@@ -60,16 +62,39 @@ function spanOf(date: CalDate | null): DateSpan | null {
 }
 
 /**
- * The chip color of the first matching rule (§3.4): its color becomes the
- * background, the text color is derived from it. Layered on top of §2 — the
- * highlight decides the color, the format setting decides the text.
+ * A badge's classes, with the accent marker when the property declares one
+ * (§3.5). The ring itself lives in the stylesheet; only its color is inline.
  */
-function highlightStyle(o: DateOpts, span: DateSpan | null): Record<string, string> | undefined {
-	if (o.highlights.length === 0) return undefined;
+function badgeClass(accent: string | null, extra?: string): string {
+	return `eb-badge${extra ? ` ${extra}` : ''}${accent ? ' eb-badge-accent' : ''}`;
+}
+
+/**
+ * The accent color as a custom property, merged onto whatever the value already
+ * paints. It rides alongside rather than replacing: an accent outlines the badge
+ * and a highlight fills it, so a card can say "this is the due date" and "it is
+ * overdue" at once.
+ */
+function accentStyle(
+	accent: string | null,
+	base?: Record<string, string>,
+): Record<string, string> | undefined {
+	if (!accent) return base;
+	return { ...base, '--eb-accent': accent };
+}
+
+/**
+ * A date badge's own painting: the chip color of the first matching highlight
+ * rule (§3.4) — its color becomes the background, the text color is derived
+ * from it — under the property's accent outline (§3.5). Layered on top of §2:
+ * the highlight decides the color, the format setting decides the text.
+ */
+function dateBadgeStyle(o: DateOpts, span: DateSpan | null): Record<string, string> | undefined {
+	if (o.highlights.length === 0) return accentStyle(o.accent);
 	const rule = matchHighlight(o.highlights, o.property, span, o.now);
 	const bg = rule && safeColor(rule.color);
-	if (!bg) return undefined;
-	return styleFor(bg, readableOn(bg, document.body));
+	if (!bg) return accentStyle(o.accent);
+	return accentStyle(o.accent, styleFor(bg, readableOn(bg, document.body)));
 }
 
 /** Whenever a mode can hide precision, the absolute value stays one hover away. */
@@ -102,7 +127,7 @@ function nextHit(rule: Recurrence, card: Card, propertyName: string, from: CalDa
  */
 function RecurrenceBadge({ raw, card, dates }: { raw: string; card: Card; dates: DateOpts }) {
 	const rule = parseRecurrence(raw);
-	if (!rule) return <span class="eb-badge">{raw}</span>;
+	if (!rule) return <span class={badgeClass(dates.accent)} style={accentStyle(dates.accent)}>{raw}</span>;
 	const next = nextHit(rule, card, dates.property, dates.now.date);
 	// The chip carries the compact form; the tooltip carries everything the
 	// compaction left out — the dates and the next hit (recurrence.md §5).
@@ -112,8 +137,8 @@ function RecurrenceBadge({ raw, card, dates }: { raw: string; card: Card; dates:
 		: full;
 	return (
 		<span
-			class="eb-badge eb-badge-recurrence"
-			style={highlightStyle(dates, spanOf(next))}
+			class={badgeClass(dates.accent, 'eb-badge-recurrence')}
+			style={dateBadgeStyle(dates, spanOf(next))}
 			title={tooltip}
 		>
 			<Icon name="repeat" class="eb-badge-icon" />
@@ -125,12 +150,12 @@ function RecurrenceBadge({ raw, card, dates }: { raw: string; card: Card; dates:
 /** A `datetime` value: the raw text unchanged when it does not parse (§2.3, never garbage). */
 function DateBadge({ raw, dates }: { raw: string; dates: DateOpts }) {
 	const date = parseDate(raw);
-	if (!date) return <span class="eb-badge">{raw}</span>;
+	if (!date) return <span class={badgeClass(dates.accent)} style={accentStyle(dates.accent)}>{raw}</span>;
 	const text = formatCalDate(date, dates.opts);
 	return (
 		<span
-			class="eb-badge"
-			style={highlightStyle(dates, spanOf(date))}
+			class={badgeClass(dates.accent)}
+			style={dateBadgeStyle(dates, spanOf(date))}
 			title={needsTooltip(dates.opts) ? absoluteTooltip(date) : undefined}
 		>
 			{text}
@@ -146,14 +171,14 @@ function SpanBadge({ raw, dates }: { raw: string; dates: DateOpts }) {
 	if (!span) {
 		// A recurrence phrase (compound `date-list` element, recurrence.md §2.2)
 		// keeps its frozen English grammar — only real dates/ranges format here.
-		return <span class="eb-badge">{raw}</span>;
+		return <span class={badgeClass(dates.accent)} style={accentStyle(dates.accent)}>{raw}</span>;
 	}
 	const text = formatCalSpan(span, dates.opts);
 	const tooltip = needsTooltip(dates.opts)
 		? `${absoluteTooltip(span.start)} → ${absoluteTooltip(span.end)}`
 		: undefined;
 	return (
-		<span class="eb-badge" style={highlightStyle(dates, span)} title={tooltip}>
+		<span class={badgeClass(dates.accent)} style={dateBadgeStyle(dates, span)} title={tooltip}>
 			{text}
 		</span>
 	);
@@ -165,6 +190,9 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 	// that read it, and nothing else on the board (m10-perf.md §2.3).
 	const now = useNow();
 	const def = config.properties.find((p) => p.name === pv.name);
+	// The property's own outline, guarded once per badge — an undeclared token
+	// has no definition and therefore never carries one (§3.5).
+	const accent = safeColor(def?.accent);
 	// Built only for the date family, and only once per badge: the board's own
 	// rule list replaces the plugin's rather than merging with it (§3.2).
 	const dateOpts = (): DateOpts => ({
@@ -172,6 +200,7 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 		highlights: highlightsFor(config, settings.dateHighlights),
 		property: pv.name,
 		now,
+		accent,
 	});
 
 	switch (pv.type) {
@@ -182,7 +211,11 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 					{pv.value.map((v) => {
 						const opt = options.find((o) => o.value === v);
 						return (
-							<span class="eb-badge" style={styleFor(opt?.bg, opt?.fg)} key={v}>
+							<span
+								class={badgeClass(accent)}
+								style={accentStyle(accent, styleFor(opt?.bg, opt?.fg))}
+								key={v}
+							>
 								{v}
 							</span>
 						);
@@ -192,13 +225,13 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 		}
 		case 'string':
 			return (
-				<span class="eb-badge">
+				<span class={badgeClass(accent)} style={accentStyle(accent)}>
 					<TextValue text={pv.value} api={api} />
 				</span>
 			);
 		case 'integer':
 			return (
-				<span class="eb-badge eb-badge-num">
+				<span class={badgeClass(accent, 'eb-badge-num')} style={accentStyle(accent)}>
 					{pv.name}: {pv.value}
 				</span>
 			);
@@ -209,7 +242,7 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 			return null;
 		case 'checkbox':
 			return (
-				<span class="eb-badge">
+				<span class={badgeClass(accent)} style={accentStyle(accent)}>
 					{pv.value ? '☑' : '☐'} {pv.name}
 				</span>
 			);
@@ -237,7 +270,7 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 		}
 		case 'raw':
 			return (
-				<span class="eb-badge eb-badge-muted">
+				<span class={badgeClass(accent, 'eb-badge-muted')} style={accentStyle(accent)}>
 					<TextValue text={pv.value.join(', ')} api={api} />
 				</span>
 			);

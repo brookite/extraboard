@@ -92,6 +92,8 @@ function toPropertyDef(v: unknown): PropertyDef | null {
 	}
 	const time = asString(v.time);
 	if (time === 'none' || time === 'optional' || time === 'required') def.time = time;
+	const accent = asString(v.accent);
+	if (accent !== undefined && accent !== '') def.accent = accent;
 	return def;
 }
 

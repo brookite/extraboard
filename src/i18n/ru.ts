@@ -682,6 +682,10 @@ export const ru: DeepPartial<typeof en> = {
 			optional: 'Время необязательно',
 			required: 'Время обязательно',
 		},
+		accent: {
+			label: 'Акцент бейджа',
+			field: 'Акцент',
+		},
 		empty: 'Пока нет свойств.',
 		addProperty: 'Добавить свойство',
 		name: 'Название',
