@@ -2783,12 +2783,16 @@ body.is-mobile .eb-add-stack-button {
 .eb-list-toolbar {
 	display: flex;
 	align-items: center;
+	/* Three chips now: on a narrow screen they wrap onto a second line rather
+	   than squeezing each other out (mobile.md §2). */
+	flex-wrap: wrap;
 	gap: var(--size-4-2, 8px);
 	margin-bottom: var(--size-4-2, 8px);
 }
 
 .eb-list-toolbar .eb-list-filter,
-.eb-list-toolbar .eb-list-sort {
+.eb-list-toolbar .eb-list-sort,
+.eb-list-toolbar .eb-list-group {
 	max-width: 50%;
 }
 
@@ -2842,10 +2846,12 @@ body.is-mobile .eb-add-stack-button {
 	min-width: 0;
 }
 
-/* The list header's two chips and the row's stack badge share one shape. */
+/* The list header's three chips and the row's move badge share one shape. */
 .eb-list-filter,
 .eb-list-sort,
-.eb-list-stack {
+.eb-list-group,
+.eb-list-stack,
+.eb-list-section {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
@@ -2865,19 +2871,23 @@ body.is-mobile .eb-add-stack-button {
 
 .eb-list-filter svg,
 .eb-list-sort svg,
-.eb-list-stack svg {
+.eb-list-group svg,
+.eb-list-stack svg,
+.eb-list-section svg {
 	width: 12px;
 	height: 12px;
 	flex: 0 0 auto;
 }
 
 .eb-list-filter.is-active,
-.eb-list-sort.is-active {
+.eb-list-sort.is-active,
+.eb-list-group.is-active {
 	color: var(--text-accent);
 }
 
 .eb-list-filter:disabled,
-.eb-list-sort:disabled {
+.eb-list-sort:disabled,
+.eb-list-group:disabled {
 	opacity: 0.6;
 	cursor: default;
 }
@@ -2923,7 +2933,8 @@ body.is-mobile .eb-add-stack-button {
 	min-width: 0;
 }
 
-.eb-list-row .eb-list-stack {
+.eb-list-row .eb-list-stack,
+.eb-list-row .eb-list-section {
 	margin-top: 4px;
 	max-width: 30%;
 }
@@ -2956,7 +2967,8 @@ body.is-mobile .eb-add-stack-button {
 
 /* Desktop owns a different stack control inside `.eb-card-head`; this sibling
    remains exclusively the mobile footer. */
-body:not(.is-mobile) .eb-list-row > .eb-list-stack {
+body:not(.is-mobile) .eb-list-row > .eb-list-stack,
+body:not(.is-mobile) .eb-list-row > .eb-list-section {
 	display: none;
 }
 
@@ -3105,7 +3117,8 @@ body.is-mobile .eb-card-stack {
 	border-bottom-left-radius: 0;
 }
 
-.is-phone .eb-list-row .eb-list-stack {
+.is-phone .eb-list-row .eb-list-stack,
+.is-phone .eb-list-row .eb-list-section {
 	justify-content: flex-start;
 	width: 100%;
 	height: 32px;

@@ -28,6 +28,7 @@ import type {
 	Card,
 	Divider,
 	ListControls,
+	ListGroupBy,
 	PropertyDef,
 	PropertyValue,
 	SectionState,
@@ -706,6 +707,10 @@ function sectionEntryIndex(
 ): number | null {
 	const stack = board.stacks[stackIndex];
 	if (!stack) return null;
+	// A stack group is not a section: it is the whole stack, so it names no place
+	// inside one. Grouping by stack moves cards with `moveItem` instead
+	// (list-view.md §1.0), and every section op refuses the key outright.
+	if (key.kind === 'stack') return null;
 	if (key.kind === 'none') return atTop ? 0 : groupRange(stack, null).end;
 	const at =
 		key.kind === 'named'
@@ -1133,6 +1138,7 @@ export function updateView(
 		dateProperties?: string[];
 		mode?: CalendarMode;
 		controls?: ListControls;
+		groupBy?: ListGroupBy;
 	},
 ): Board {
 	const at = board.config.views.findIndex((v) => v.id === id);
@@ -1152,6 +1158,9 @@ export function updateView(
 	}
 	if (next.type === 'list' && patch.controls && patch.controls !== next.controls) {
 		next = { ...next, controls: patch.controls };
+	}
+	if (next.type === 'list' && patch.groupBy && patch.groupBy !== next.groupBy) {
+		next = { ...next, groupBy: patch.groupBy };
 	}
 	if (next === view) return board;
 

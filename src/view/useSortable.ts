@@ -48,9 +48,14 @@ function markDrag(item: HTMLElement, on: boolean): void {
 
 /**
  * Class put on every `.eb-list-row` of a stack other than the one being
- * dragged, while the drag lasts (list-view.md §4.3): a drop never changes a
- * card's stack, wherever in the list it lands, so every other-stack row is
- * shown as what it is — not a place this drag can put the card.
+ * dragged, while the drag lasts (list-view.md §4.3): grouped by section a drop
+ * never changes a card's stack, wherever in the list it lands, so every
+ * other-stack row is shown as what it is — not a place this drag can put the
+ * card.
+ *
+ * A list grouped by stack marks nothing: there a drop moves the card into the
+ * group it lands in, exactly as on the board, so every row is a real target
+ * (list-view.md §1.0).
  */
 const OTHER_STACK = 'eb-list-row-other-stack';
 
@@ -58,6 +63,7 @@ function markStackDrag(item: HTMLElement, on: boolean): void {
 	const stack = item.dataset.stack;
 	const root = item.closest('.eb-list');
 	if (!root) return;
+	if (root.getAttribute('data-group-by') === 'stack') return;
 	if (on && stack !== undefined) {
 		root.querySelectorAll<HTMLElement>('.eb-list-row[data-stack]').forEach((row) => {
 			if (row.dataset.stack !== stack) row.classList.add(OTHER_STACK);

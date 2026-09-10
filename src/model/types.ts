@@ -22,6 +22,14 @@ export type CalendarMode = 'month' | 'week';
 export type ListControls = 'dynamic' | 'fixed' | 'session';
 
 /**
+ * What a list view gathers its cards into (list-view.md §1.0): the dividers read
+ * across every stack, or the stacks themselves. The two readings share one
+ * component and one drop protocol; what differs is which axis is the group and
+ * which one a row's badge names.
+ */
+export type ListGroupBy = 'section' | 'stack';
+
+/**
  * Display state of one list section (list-view.md §5), keyed in `sections` by
  * the section name — the empty string being the sectionless group. Sorting and
  * filtering moved to the view as a whole in 0.3.0
@@ -77,6 +85,8 @@ export type ViewDef =
 	| (ViewCommon & {
 			type: 'list';
 			controls: ListControls;
+			/** What the rows are gathered into (list-view.md §1.0). */
+			groupBy: ListGroupBy;
 			/** The view's filter: one tree for the whole list (filters-and-sorting.md §1). */
 			filter?: FilterNode;
 			/** Its sort keys, most significant first. */

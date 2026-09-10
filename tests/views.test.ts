@@ -364,6 +364,7 @@ describe('views: list views', () => {
 			name: 'All tasks',
 			type: 'list',
 			controls: 'fixed',
+			groupBy: 'section',
 			filter: {
 				kind: 'group',
 				op: 'and',
@@ -389,6 +390,20 @@ describe('views: list views', () => {
 		const serialized = serializeBoard(parseBoard(text));
 		expect(serialized).toContain('```extraboard-settings\n{"version":1,');
 		expect(parseBoard(serialized).config.views).toEqual(parseBoard(text).config.views);
+	});
+
+	it('defaults the grouping and omits it when it is the default', () => {
+		const board = parse({ views: [{ id: 'v1', name: 'L', type: 'list', groupBy: 'columns' }] });
+		const view = board.config.views[0]!;
+		expect(view.type === 'list' && view.groupBy).toBe('section');
+		expect(serializeBoard(board)).not.toContain('groupBy');
+	});
+
+	it('reads and writes back a list grouped by stack', () => {
+		const board = parse({ views: [{ id: 'v1', name: 'L', type: 'list', groupBy: 'stack' }] });
+		const view = board.config.views[0]!;
+		expect(view.type === 'list' && view.groupBy).toBe('stack');
+		expect(serializeBoard(board)).toContain('"groupBy":"stack"');
 	});
 
 	it('defaults the controls mode and omits it when it is the default', () => {

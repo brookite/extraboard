@@ -9,14 +9,23 @@ import { Menu } from 'obsidian';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { countConditions, filterCards, isEmptyFilter, type FilterNode } from '../model/filter';
 import * as ops from '../model/ops';
-import { sameKey, sectionOf, sectionsOf, stateKeyOf, type Section } from '../model/sections';
+import {
+	groupsOf,
+	sameKey,
+	sectionOf,
+	sectionsOf,
+	stateKeyOf,
+	type Section,
+	type SectionKey,
+} from '../model/sections';
 import { sectionMoveTargets } from '../model/sectionView';
 import { sortCards, type SortRule } from '../model/sort';
-import type { Board, SectionState, ViewDef } from '../model/types';
+import type { Board, ListGroupBy, SectionState, ViewDef } from '../model/types';
 import { cardEntryPos, type ExtraboardSettings } from '../settings';
 import { openFilterSortModal } from '../ui/FilterSortModal';
 import type { BoardApi } from './api';
 import { SectionGroup } from './components/Section';
+import { addStack } from './KanbanView';
 import { fieldLabel } from './components/FilterTree';
 import { Icon } from './components/Icon';
 import { InlineEditor } from './components/InlineEditor';
@@ -44,6 +53,9 @@ interface Props {
 interface SessionState {
 	filter?: FilterNode;
 	sorts?: SortRule[];
+	/** Absent means "whatever the view definition says" — unlike a filter, a
+	 * grouping has no empty value to fall back to (§1.0). */
+	groupBy?: ListGroupBy;
 	collapsed: Record<string, boolean>;
 }
 
@@ -52,6 +64,7 @@ function sessionKey(section: Section): string {
 	const key = section.key;
 	if (key.kind === 'none') return 'none';
 	if (key.kind === 'named') return `named:${key.name}`;
+	if (key.kind === 'stack') return `stack:${String(key.index)}`;
 	return `anon:${String(key.ref.stack)}:${String(key.ref.item)}`;
 }
 
@@ -62,6 +75,10 @@ export function ListView({ board, view, api, settings }: Props) {
 	// The composer's stack, per section, remembered for as long as the view is
 	// mounted — a list is filled section by section, not stack by stack (§4.2).
 	const [composerStacks, setComposerStacks] = useState<Record<string, number>>({});
+	// The mirror image, for a list grouped by stack: which **section** each stack
+	// group writes a new card into. Absent means the sectionless group, where a
+	// card with nothing said about it belongs (§1.0).
+	const [composerSections, setComposerSections] = useState<Record<string, SectionKey>>({});
 	// The card a composer just created: it opens itself for editing, and it stays
 	// visible until the **next** edit lands, whatever the section's filter says.
 	// A brand-new card carries no tags, so a filtered section would otherwise
@@ -74,13 +91,17 @@ export function ListView({ board, view, api, settings }: Props) {
 		if (pending && pendingBoard.current !== board) setPending(null);
 	}, [board, pending]);
 
-	const sections = sectionsOf(board);
 	const locked = view.controls === 'fixed';
 	const persist = view.controls !== 'session';
-	// A `session` view's filter and sort live here and are never written; every
-	// other mode reads them off the view definition (§3.4).
+	// A `session` view's filter, sort and grouping live here and are never
+	// written; every other mode reads them off the view definition (§3.4).
 	const filter = persist ? view.filter : session.filter;
 	const sorts = persist ? view.sorts : session.sorts;
+	const groupBy = persist ? view.groupBy : (session.groupBy ?? view.groupBy);
+	const byStack = groupBy === 'stack';
+	/** What the list draws: the board read across its dividers, or along its
+	 * stacks (§1.0). Everything below is expressed against these groups. */
+	const sections = groupsOf(board, groupBy);
 	// Filters ask about dates, and a repetition rule's answer moves at midnight,
 	// so the clock is part of the query (filters-and-sorting.md §2.3).
 	const ctx = { config: board.config, today: useNow().date };
@@ -91,6 +112,12 @@ export function ListView({ board, view, api, settings }: Props) {
 	 * follow the view's persistence mode.
 	 */
 	const stateOf = (section: Section): SectionState => {
+		// A stack group's collapse is the stack's own flag, exactly as an anonymous
+		// section's is its divider's: the file already holds it, and collapsing the
+		// group here collapses the column on the board (§1.0, §1.4).
+		if (section.key.kind === 'stack') {
+			return { collapsed: board.stacks[section.key.index]?.collapsed === true };
+		}
 		if (section.key.kind === 'anon') return { collapsed: dividerCollapsed(board, section) };
 		const key = stateKeyOf(section.key);
 		const stored = key === null ? undefined : view.sections?.[key];
@@ -101,6 +128,11 @@ export function ListView({ board, view, api, settings }: Props) {
 	const patchState = (section: Section, patch: Partial<SectionState>): void => {
 		if (patch.collapsed === undefined) return;
 		const collapsed = patch.collapsed;
+		if (section.key.kind === 'stack') {
+			const at = section.key.index;
+			api.update((b) => ops.setStackCollapsed(b, at, collapsed));
+			return;
+		}
 		// An anonymous section's collapse is the divider's, so it is an edit like
 		// any other and travels through an op (§1.4).
 		if (section.key.kind === 'anon') {
@@ -115,6 +147,35 @@ export function ListView({ board, view, api, settings }: Props) {
 		}
 		const local = sessionKey(section);
 		setSession((current) => ({ ...current, collapsed: { ...current.collapsed, [local]: collapsed } }));
+	};
+
+	/**
+	 * What the list groups on (§1.0). It is display state like the filter and the
+	 * sort keys, so it follows the same mode: written into the view under
+	 * `dynamic`, editable only from the view form under `fixed`, and held here
+	 * under `session`.
+	 */
+	const setGroupBy = (next: ListGroupBy): void => {
+		if (next === groupBy) return;
+		if (persist) {
+			api.update((b) => ops.updateView(b, view.id, { groupBy: next }));
+			return;
+		}
+		setSession((current) => ({ ...current, groupBy: next }));
+	};
+
+	const pickGroupBy = (event: MouseEvent): void => {
+		showDropdownMenu(event, (menu) => {
+			for (const value of ['section', 'stack'] as const) {
+				menu.addItem((item) =>
+					item
+						.setTitle(t(`list.groupBy.${value}`))
+						.setIcon(value === 'stack' ? 'square-kanban' : 'heading')
+						.setChecked(value === groupBy)
+						.onClick(() => setGroupBy(value)),
+				);
+			}
+		});
 	};
 
 	/** The filter and sort builder (§4). A `session` view keeps the result here. */
@@ -154,9 +215,17 @@ export function ListView({ board, view, api, settings }: Props) {
 	 * reports the position itself, since it may have created a divider above it.
 	 */
 	const addCard = (section: Section): void => {
-		const stack = Math.min(composerStacks[sessionKey(section)] ?? 0, board.stacks.length - 1);
+		// Which pair the composer names depends on the axis: a section group picks
+		// the stack, a stack group picks the section (§4.2).
+		const stack =
+			section.key.kind === 'stack'
+				? section.key.index
+				: Math.min(composerStacks[sessionKey(section)] ?? 0, board.stacks.length - 1);
 		if (!board.stacks[stack]) return;
-		const key = section.key;
+		const key: SectionKey =
+			section.key.kind === 'stack'
+				? (composerSections[sessionKey(section)] ?? { kind: 'none' })
+				: section.key;
 		let inserted: ops.ItemRef | null = null;
 		api.update((b) => {
 			const result = ops.addCardToSectionAt(b, stack, key, '', entryTop(b, stack, key));
@@ -187,9 +256,18 @@ export function ListView({ board, view, api, settings }: Props) {
 		const from = drawn[info.fromList]?.[info.fromIndex];
 		const target = sections[info.toList];
 		if (!from || !target) return;
+		const rows = drawn[info.toList] ?? [];
+		// Grouped by stack a drop is a plain item move, exactly as it is on the
+		// board: the card enters that stack at that position, and whichever
+		// section the position falls in is the section it joins (§4.3).
+		if (target.key.kind === 'stack') {
+			const to = target.key.index;
+			const before = info.before === null ? null : (rows[info.before]?.item ?? null);
+			api.update((b) => ops.moveItem(b, from, to, before));
+			return;
+		}
 		let before: ops.ItemRef | null = null;
 		if (info.before !== null) {
-			const rows = drawn[info.toList] ?? [];
 			before = rows.slice(info.before).find((ref) => ref.stack === from.stack) ?? null;
 		}
 		api.update((b) => ops.moveCardToSection(b, from, from.stack, target.key, before));
@@ -251,13 +329,43 @@ export function ListView({ board, view, api, settings }: Props) {
 		});
 	}, []);
 
-	/** Open the card-header stack picker from the live board. The stable callback
-	 * preserves CardTile memoization across unrelated edits. */
-	const openStackPicker = useCallback((event: MouseEvent, ref: ops.ItemRef): void => {
+	/**
+	 * The axis a row's badge names, read at click time. The picker below has to
+	 * stay stable across renders or every card's memo misses (m10-perf.md §2),
+	 * so what it offers cannot come from its closure.
+	 */
+	const groupByRef = useRef<ListGroupBy>(groupBy);
+	groupByRef.current = groupBy;
+
+	/**
+	 * Open the card-header move picker from the live board: the stacks when the
+	 * groups are sections, the sections when the groups are stacks — always the
+	 * axis the row's badge names, which is the one the group does not (§1.0).
+	 */
+	const openMovePicker = useCallback((event: MouseEvent, ref: ops.ItemRef): void => {
 		event.stopPropagation();
 		const current = api.getBoard();
 		if (!current) return;
 		showDropdownMenu(event, (menu) => {
+			if (groupByRef.current === 'stack') {
+				const here = sectionOf(current, ref);
+				const targets: SectionKey[] = [
+					{ kind: 'none' },
+					...sectionsOf(current)
+						.filter((section) => section.key.kind === 'named')
+						.map((section) => section.key),
+				];
+				for (const target of targets) {
+					menu.addItem((item) =>
+						item
+							.setTitle(sectionKeyLabel(current, target))
+							.setIcon(target.kind === 'named' ? 'heading' : 'minus')
+							.setDisabled(sameKey(here, target))
+							.onClick(() => api.update((b) => ops.moveCardToSection(b, ref, ref.stack, target))),
+					);
+				}
+				return;
+			}
 			current.stacks.forEach((stack, index) => {
 				menu.addItem((item) =>
 					item
@@ -277,6 +385,14 @@ export function ListView({ board, view, api, settings }: Props) {
 		{ group: 'eb-list-sections', draggable: '.eb-section.is-movable', handle: '.eb-section-grip' },
 		(info) => {
 			const moved = sections[info.fromIndex];
+			// Grouped by stack the groups *are* the stacks, so reordering them is the
+			// board's own stack move — the columns change order too, which is the
+			// point: the two views show one file (§4.1).
+			if (moved?.key.kind === 'stack') {
+				const from = moved.key.index;
+				api.update((b) => ops.moveStack(b, from, beforeStack(info.before)));
+				return;
+			}
 			if (moved?.key.kind !== 'named') return;
 			api.update((b) => ops.moveSection(b, moved.key.kind === 'named' ? moved.key.name : '', beforeName(info.before)));
 		},
@@ -288,6 +404,13 @@ export function ListView({ board, view, api, settings }: Props) {
 	 * ones the file order can be expressed against. Past the last one it is the
 	 * end of the list, which is `null`.
 	 */
+	/** The stack a stack-group move lands in front of, as `moveStack` names it. */
+	const beforeStack = (position: number | null): number | null => {
+		if (position === null) return null;
+		const target = sections[position]?.key;
+		return target?.kind === 'stack' ? target.index : null;
+	};
+
 	const beforeName = (position: number | null): string | null => {
 		if (position === null) return null;
 		for (const section of sections.slice(position)) {
@@ -299,6 +422,15 @@ export function ListView({ board, view, api, settings }: Props) {
 	const movable = sections.filter((section) => section.movable);
 
 	const moveBy = (section: Section, direction: -1 | 1): void => {
+		if (section.key.kind === 'stack') {
+			const from = section.key.index;
+			const to = from + direction;
+			if (to < 0 || to >= board.stacks.length) return;
+			// "Down" means "in front of the one after the neighbour", which past the
+			// end is simply the end — the same arithmetic sections use.
+			api.update((b) => ops.moveStack(b, from, direction === -1 ? to : to + 1));
+			return;
+		}
 		if (section.key.kind !== 'named') return;
 		const name = section.name;
 		const at = movable.indexOf(section);
@@ -319,7 +451,7 @@ export function ListView({ board, view, api, settings }: Props) {
 		: t('list.sort.document');
 
 	return (
-		<div class="eb-list" ref={rootRef} data-list={0}>
+		<div class="eb-list" ref={rootRef} data-list={0} data-group-by={groupBy}>
 			{/* One filter and one sort for the whole list, where the section chips
 			    used to be (filters-and-sorting.md §1). */}
 			<div class="eb-list-toolbar">
@@ -343,6 +475,18 @@ export function ListView({ board, view, api, settings }: Props) {
 					<Icon name="arrow-up-down" class="eb-button-icon" />
 					<span>{sortLabel}</span>
 				</button>
+				{/* The third control of the same family: what the rows are gathered
+				    into, next to how they are filtered and ordered (§1.0). */}
+				<button
+					type="button"
+					class={`eb-badge eb-list-group${byStack ? ' is-active' : ''}`}
+					disabled={locked}
+					title={locked ? t('list.controlsFixed') : t('list.groupBy.label')}
+					onClick={pickGroupBy}
+				>
+					<Icon name={byStack ? 'square-kanban' : 'heading'} class="eb-button-icon" />
+					<span>{byStack ? t('list.groupBy.chipStack') : t('list.groupBy.chipSection')}</span>
+				</button>
 			</div>
 			{board.stacks.length === 0 ? <div class="eb-list-empty">{t('list.emptyBoard')}</div> : null}
 			{sections.map((section, index) => {
@@ -364,12 +508,16 @@ export function ListView({ board, view, api, settings }: Props) {
 						onComposerStack={(stack) =>
 							setComposerStacks((current) => ({ ...current, [sessionKey(section)]: stack }))
 						}
+						composerSection={composerSections[sessionKey(section)] ?? { kind: 'none' }}
+						onComposerSection={(key) =>
+							setComposerSections((current) => ({ ...current, [sessionKey(section)]: key }))
+						}
 						onState={(patch) => patchState(section, patch)}
 						onAddCard={() => addCard(section)}
 						pending={pending}
 						onDrop={onDrop}
 						menuExtra={menuExtra}
-						onStackPick={openStackPicker}
+						onStackPick={openMovePicker}
 						display={view.display}
 						{...(section.movable && { onMove: (direction: -1 | 1) => moveBy(section, direction) })}
 						canMoveUp={at > 0}
@@ -378,7 +526,18 @@ export function ListView({ board, view, api, settings }: Props) {
 				);
 			})}
 			<div class="eb-list-add-section">
-				{addingSection ? (
+				{byStack ? (
+					// The list's own end of the board's "Add stack" column
+					// (kanban-view.md §6.3): grouped by stack, a new group is a stack.
+					<button
+						type="button"
+						class="eb-list-add-section-button"
+						onClick={() => addStack(api)}
+					>
+						<Icon name="plus" class="eb-button-icon" />
+						<span>{t('list.addStack')}</span>
+					</button>
+				) : addingSection ? (
 					<InlineEditor
 						placeholder={t('list.sectionNamePlaceholder')}
 						class="eb-list-add-section-editor"
@@ -408,12 +567,18 @@ function sameRef(a: ops.ItemRef, b: ops.ItemRef): boolean {
 	return a.stack === b.stack && a.item === b.item;
 }
 
+/** A section key's label as a menu shows it. */
+function sectionKeyLabel(board: Board, key: SectionKey): string {
+	if (key.kind === 'named') return key.name;
+	if (key.kind === 'stack') return board.stacks[key.index]?.name || t('modal.archive.untitled');
+	if (key.kind === 'none') return t('list.noSection');
+	const stack = board.stacks[key.ref.stack]?.name;
+	return t('list.unnamedSection', { stack: stack || t('modal.archive.untitled') });
+}
+
 /** The section's label as a menu shows it. */
 function sectionLabel(board: Board, section: Section): string {
-	if (section.key.kind === 'none') return t('list.noSection');
-	if (section.key.kind === 'named') return section.name;
-	const stack = board.stacks[section.key.ref.stack]?.name;
-	return t('list.unnamedSection', { stack: stack || t('modal.archive.untitled') });
+	return sectionKeyLabel(board, section.key);
 }
 
 /** An anonymous section's collapse lives on its one divider (§1.4). */

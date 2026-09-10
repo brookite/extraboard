@@ -10,6 +10,8 @@ import {
 	sectionOf,
 	sectionOrder,
 	sectionsOf,
+	groupsOf,
+	stackGroupsOf,
 	stateKeyOf,
 	type Section,
 } from '../src/model/sections';
@@ -78,6 +80,53 @@ const cardAt = (b: Board, stack: number, item: number): Card => {
 	if (entry?.kind !== 'card') throw new Error('not a card');
 	return entry.card;
 };
+
+// The other axis the same list can be read along (list-view.md §1.0).
+describe('sections: grouping by stack', () => {
+	it('gives every stack one group, in board order', () => {
+		const b = board();
+		const groups = stackGroupsOf(b);
+		expect(groups.map((g) => g.key.kind)).toEqual(['stack', 'stack', 'stack']);
+		expect(groups.map((g) => g.name)).toEqual(['To do', 'Doing', 'Done']);
+	});
+
+	it('holds every card of its stack, whatever divider it sits under', () => {
+		const b = board();
+		const groups = stackGroupsOf(b);
+		expect(titles(b, groups[0]!)).toEqual(['Loose A', 'B1', 'B2', 'R1']);
+		expect(titles(b, groups[1]!)).toEqual(['Loose B', 'R2', 'Anon card']);
+		expect(titles(b, groups[2]!)).toEqual(['B3']);
+	});
+
+	it('carries no dividers and is always movable', () => {
+		const b = board();
+		for (const group of stackGroupsOf(b)) {
+			expect(group.dividers).toEqual([]);
+			expect(group.movable).toBe(true);
+		}
+	});
+
+	it('keeps an empty stack as a group, since a card can still be dropped in it', () => {
+		const b = parseBoard([FM, '## Empty', ''].join('\n'));
+		expect(stackGroupsOf(b).map((g) => g.cards.length)).toEqual([0]);
+	});
+
+	it('stores no per-view state: a stack group’s collapse is the stack’s own flag', () => {
+		expect(stateKeyOf({ kind: 'stack', index: 0 })).toBeNull();
+	});
+
+	it('compares stack keys by index', () => {
+		expect(sameKey({ kind: 'stack', index: 1 }, { kind: 'stack', index: 1 })).toBe(true);
+		expect(sameKey({ kind: 'stack', index: 1 }, { kind: 'stack', index: 2 })).toBe(false);
+		expect(sameKey({ kind: 'stack', index: 0 }, { kind: 'none' })).toBe(false);
+	});
+
+	it('is what `groupsOf` dispatches to', () => {
+		const b = board();
+		expect(groupsOf(b, 'stack')).toEqual(stackGroupsOf(b));
+		expect(groupsOf(b, 'section')).toEqual(sectionsOf(b));
+	});
+});
 
 describe('sections: grouping', () => {
 	it('lists the sectionless group first, then sections by first appearance', () => {

@@ -4,7 +4,15 @@
 
 import { App, Modal, Setting, setIcon } from 'obsidian';
 import * as ops from '../model/ops';
-import type { Board, CalendarMode, ListControls, PropertyDef, ViewDef, ViewKind } from '../model/types';
+import type {
+	Board,
+	CalendarMode,
+	ListControls,
+	ListGroupBy,
+	PropertyDef,
+	ViewDef,
+	ViewKind,
+} from '../model/types';
 import { dateProperties, defaultViewName, hasKanbanView, isViewUsable } from '../model/views';
 import type { BoardApi } from '../view/api';
 import { ICONS, viewIcon } from '../util/constants';
@@ -151,6 +159,7 @@ class ViewsModal extends Modal {
 				dateProperties: dates.length === 1 && dates[0] ? [dates[0].name] : [],
 				mode: 'month',
 				controls: 'dynamic',
+				groupBy: 'section',
 			},
 			lockType: false,
 			kanbanTaken,
@@ -174,6 +183,7 @@ class ViewsModal extends Modal {
 				dateProperties: view.type === 'calendar' ? [...view.dateProperties] : [],
 				mode: view.type === 'calendar' ? view.mode : 'month',
 				controls: view.type === 'list' ? view.controls : 'dynamic',
+				groupBy: view.type === 'list' ? view.groupBy : 'section',
 			},
 			lockType: true,
 			kanbanTaken: hasKanbanView(board.config.views),
@@ -188,7 +198,7 @@ class ViewsModal extends Modal {
 						dateProperties: fields.dateProperties,
 						mode: fields.mode,
 					}),
-					...(fields.type === 'list' && { controls: fields.controls }),
+					...(fields.type === 'list' && { controls: fields.controls, groupBy: fields.groupBy }),
 				}),
 			);
 			this.render();
@@ -234,10 +244,11 @@ class ViewsModal extends Modal {
 function describe(board: Board, view: ViewDef): string {
 	if (view.type === 'list') {
 		const mode = t(`modal.views.controls.${view.controls}`);
+		const grouping = t(`list.groupBy.${view.groupBy}`);
 		const sort = view.sorts?.length
 			? t('modal.views.sortedBy', { name: sortFieldName(view.sorts[0]!.field) })
 			: t('list.sort.document');
-		return `${t('modal.views.list')} · ${mode} · ${sort}`;
+		return `${t('modal.views.list')} · ${grouping} · ${mode} · ${sort}`;
 	}
 	if (view.type !== 'calendar') return t('modal.views.kanban');
 	const mode = view.mode === 'month' ? t('modal.views.mode.month') : t('modal.views.mode.week');
@@ -255,6 +266,8 @@ interface ViewFields {
 	mode: CalendarMode;
 	/** List only (list-view.md §3.4). */
 	controls: ListControls;
+	/** List only: what the rows are gathered into (list-view.md §1.0). */
+	groupBy: ListGroupBy;
 }
 
 /** How a sort key reads in a view's subtitle. */
@@ -269,7 +282,7 @@ function newViewOf(fields: ViewFields): ops.NewView {
 		return { name, type: 'calendar', dateProperties: fields.dateProperties, mode: fields.mode };
 	}
 	if (fields.type !== 'list') return { name, type: 'kanban' };
-	return { name, type: 'list', controls: fields.controls };
+	return { name, type: 'list', controls: fields.controls, groupBy: fields.groupBy };
 }
 
 interface ViewFormOptions {
@@ -387,6 +400,22 @@ class ViewFormModal extends Modal {
 		}
 
 		if (this.fields.type === 'list') {
+			// The same three display controls the list header carries, in the only
+			// place a `fixed` view can be configured from (§1.0, §3.4).
+			new Setting(el)
+				.setName(t('list.groupBy.label'))
+				.setDesc(t('modal.views.groupByDesc'))
+				.addDropdown((dropdown) =>
+					dropdown
+						.addOptions({
+							section: t('list.groupBy.section'),
+							stack: t('list.groupBy.stack'),
+						})
+						.setValue(this.fields.groupBy)
+						.onChange((value) => {
+							this.fields.groupBy = value as ListGroupBy;
+						}),
+				);
 			new Setting(el)
 				.setName(t('modal.views.controls.label'))
 				.setDesc(t('modal.views.controls.desc'))

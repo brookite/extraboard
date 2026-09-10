@@ -6,7 +6,7 @@
 // before a stack's first divider (the sectionless group, one per board).
 
 import type { ItemRef } from './ops';
-import type { Board, Stack } from './types';
+import type { Board, ListGroupBy, Stack } from './types';
 
 /**
  * What identifies a section. `named` merges across stacks and is the only kind
@@ -16,7 +16,14 @@ import type { Board, Stack } from './types';
 export type SectionKey =
 	| { kind: 'none' }
 	| { kind: 'named'; name: string }
-	| { kind: 'anon'; ref: ItemRef };
+	| { kind: 'anon'; ref: ItemRef }
+	/**
+	 * A whole stack read as one group — what a list grouped by stack shows
+	 * (list-view.md §1.0). It is not a divider, so no op that writes one accepts
+	 * it; it addresses a stack by index and is only valid against the board it
+	 * was computed from, exactly as `anon` is.
+	 */
+	| { kind: 'stack'; index: number };
 
 export interface Section {
 	key: SectionKey;
@@ -36,6 +43,7 @@ export function sameKey(a: SectionKey, b: SectionKey): boolean {
 	if (a.kind === 'anon' && b.kind === 'anon') {
 		return a.ref.stack === b.ref.stack && a.ref.item === b.ref.item;
 	}
+	if (a.kind === 'stack' && b.kind === 'stack') return a.index === b.index;
 	return true;
 }
 
@@ -53,6 +61,8 @@ export function sectionName(name: string | undefined): string {
 export function stateKeyOf(key: SectionKey): string | null {
 	if (key.kind === 'none') return '';
 	if (key.kind === 'named') return key.name;
+	// An anonymous section has no stable key; a stack group's collapse is the
+	// stack's own flag in the file, so neither is stored per view (§1.0, §1.4).
 	return null;
 }
 
@@ -103,6 +113,31 @@ export function sectionsOf(board: Board): Section[] {
 	});
 
 	return sections;
+}
+
+/**
+ * Every **stack** of a board as one group each, in board order — the other way
+ * a list can be read (list-view.md §1.0). The shape is the section's, so the
+ * view draws, drops and collapses both the same way; what differs is that a
+ * stack group holds every card of its stack whatever divider it sits under, and
+ * that it is backed by a stack rather than by dividers.
+ *
+ * Every stack is a group, empty ones included: a stack the user can see on the
+ * board must be somewhere to drop a card in the list.
+ */
+export function stackGroupsOf(board: Board): Section[] {
+	return board.stacks.map((stack, index) => ({
+		key: { kind: 'stack', index },
+		name: stack.name,
+		dividers: [],
+		cards: stack.items.flatMap((entry, item) => (entry.kind === 'card' ? [{ stack: index, item }] : [])),
+		movable: true,
+	}));
+}
+
+/** The groups a list view draws, by what it groups on (list-view.md §1.0). */
+export function groupsOf(board: Board, groupBy: ListGroupBy): Section[] {
+	return groupBy === 'stack' ? stackGroupsOf(board) : sectionsOf(board);
 }
 
 /** Named sections in list order — what a move is expressed against (§4.1). */

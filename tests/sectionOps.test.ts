@@ -563,3 +563,40 @@ describe('sections: view state', () => {
 		expect(ops.setViewFilter(before, 'v1', { kind: 'group', op: 'and', children: [] })).toBe(before);
 	});
 });
+
+// Grouping by stack is not a section: the ops that write dividers refuse the
+// key outright, and the view carries the choice (list-view.md §1.0).
+describe('sections: a stack group is not a section key', () => {
+	const board = (): Board =>
+		parseBoard(
+			[
+				boardHead({ views: [{ id: 'v1', name: 'List', type: 'list' }] }),
+				'## To do',
+				'',
+				'- a',
+				'',
+			].join('\n'),
+		);
+
+	it('inserts nothing for a stack key', () => {
+		const before = board();
+		const result = ops.addCardToSectionAt(before, 0, { kind: 'stack', index: 0 }, 'x');
+		expect(result.board).toBe(before);
+		expect(result.ref).toBeNull();
+	});
+
+	it('moves nothing for a stack key', () => {
+		const before = board();
+		const ref = { stack: 0, item: 0 };
+		expect(ops.moveCardToSection(before, ref, 0, { kind: 'stack', index: 0 })).toBe(before);
+	});
+
+	it('patches the view’s grouping and leaves the rest alone', () => {
+		const before = board();
+		const after = ops.updateView(before, 'v1', { groupBy: 'stack' });
+		const view = after.config.views[0]!;
+		expect(view.type === 'list' && view.groupBy).toBe('stack');
+		expect(view.name).toBe('List');
+		expect(ops.updateView(after, 'v1', { groupBy: 'stack' })).toBe(after);
+	});
+});

@@ -213,6 +213,7 @@ function viewToPlain(v: ViewDef): Record<string, unknown> {
 		...(display && { display }),
 	};
 	if (v.controls !== 'dynamic') out.controls = v.controls;
+	if (v.groupBy !== 'section') out.groupBy = v.groupBy;
 	if (!isEmptyFilter(v.filter) && v.filter) out.filter = filterToPlain(v.filter);
 	if (v.sorts?.length) out.sorts = sortsToPlain(v.sorts);
 	const sections: Record<string, unknown> = {};

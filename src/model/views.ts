@@ -8,6 +8,7 @@ import type {
 	BoardConfig,
 	CalendarMode,
 	ListControls,
+	ListGroupBy,
 	PropertyDef,
 	PropertyType,
 	SectionState,
@@ -40,9 +41,10 @@ export function kanbanView(id: string, name = defaultViewName('kanban')): ViewDe
 	return { id, name, type: 'kanban' };
 }
 
-/** A list view in its default shape: dynamic controls, nothing sorted or filtered. */
+/** A list view in its default shape: dynamic controls, grouped by section,
+ * nothing sorted or filtered. */
 export function listView(id: string, name = defaultViewName('list')): ViewDef {
-	return { id, name, type: 'list', controls: 'dynamic' };
+	return { id, name, type: 'list', controls: 'dynamic', groupBy: 'section' };
 }
 
 /** Lowest free `v<n>` id for a view list. */
@@ -192,6 +194,11 @@ export function toCalendarMode(v: unknown): CalendarMode {
 /** Anything but the two named modes is `dynamic`, the default (list-view.md §5). */
 export function toListControls(v: unknown): ListControls {
 	return v === 'fixed' || v === 'session' ? v : 'dynamic';
+}
+
+/** Anything but `stack` groups by section, the default (list-view.md §1.0). */
+export function toListGroupBy(v: unknown): ListGroupBy {
+	return v === 'stack' ? 'stack' : 'section';
 }
 
 /** A tag list: strings only, `#` stripped, blanks and duplicates dropped. */
@@ -387,6 +394,7 @@ export function toViewDef(v: unknown, id: string): ViewDef | null {
 			name: name || defaultViewName('list'),
 			type,
 			controls: toListControls(v.controls),
+			groupBy: toListGroupBy(v.groupBy),
 			...(filter && { filter }),
 			...(sorts && { sorts }),
 			...(sections && { sections }),
