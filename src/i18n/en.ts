@@ -68,6 +68,7 @@ export const en = {
 		checklistAria: 'Checklist {label}',
 	},
 	tagPicker: {
+		title: 'Tags',
 		search: 'Search tags',
 		create: 'Create #{tag}',
 		empty: 'No matching tag',

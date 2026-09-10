@@ -5,6 +5,7 @@
 // It edits the **field's text**, not the board: tags live in the card's line
 // and the field owns that text until it closes (model/tags.ts).
 
+import { Platform } from 'obsidian';
 import type { RefObject } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { boardTags, isTagName, tagsInText, toggleTag } from '../../model/tags';
@@ -34,7 +35,12 @@ export function TagPicker({ field, api, onClose }: Props) {
 	const [text, setText] = useState(() => field.current?.getValue() ?? '');
 	const searchRef = useRef<HTMLInputElement>(null);
 
-	useEffect(() => searchRef.current?.focus(), []);
+	// Not on a phone: there the picker is a modal (mobile.md §7.1) and the
+	// software keyboard would cover the list the user came to tap. The search is
+	// one tap away for a vault whose tags need narrowing.
+	useEffect(() => {
+		if (!Platform.isMobile) searchRef.current?.focus();
+	}, []);
 
 	// Read once per picker: the vault index is a large object to walk, and
 	// neither list changes while one picker is open.

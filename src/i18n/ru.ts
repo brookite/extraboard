@@ -69,6 +69,7 @@ export const ru: DeepPartial<typeof en> = {
 		checklistAria: 'Чек-лист {label}',
 	},
 	tagPicker: {
+		title: 'Теги',
 		search: 'Поиск тегов',
 		create: 'Создать #{tag}',
 		empty: 'Подходящих тегов нет',

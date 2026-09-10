@@ -1263,7 +1263,13 @@ body.eb-dragging-card
 }
 
 .eb-date-day.is-selected {
-	background: var(--background-modifier-hover);
+	/* A solid grey, not `--background-modifier-hover`: that variable is a ~7%
+	   tint meant to answer a pointer, and the days between a range's two ends
+	   disappeared into the ground it was painted on — plainly so in the modal
+	   host (mobile.md §7.1), where the ground is the modal's own. The band
+	   between the two blue endpoints is a statement about the selection, so it
+	   is drawn as one. */
+	background: var(--background-modifier-border);
 }
 
 .eb-date-day.is-endpoint {
@@ -2412,6 +2418,31 @@ body.eb-dragging-card .eb-archive-drop {
 	padding: 3em 2em;
 	color: var(--text-muted);
 	text-align: center;
+}
+
+/* The card editor's panels hosted in a modal — the phone's tag picker and date
+   editor (mobile.md §7.1). Under the badge row each panel draws its own frame,
+   so it reads as a layer on the card; in a modal that frame is the modal's own,
+   so the panel drops it and simply fills the body. */
+.eb-panel-modal .eb-tag-picker,
+.eb-panel-modal .eb-value-editor {
+	padding: 0;
+	background: none;
+	border: none;
+}
+
+/* The list is bounded by the modal, not by a fraction of the board's height. */
+.eb-panel-modal .eb-tag-picker-list {
+	max-height: min(55vh, 460px);
+}
+
+/* A modal has the room the badge row never had: full-size touch targets. */
+body.is-mobile .eb-panel-modal .eb-tag-picker-row {
+	padding-block: 6px;
+}
+
+body.is-mobile .eb-panel-modal .eb-date-day {
+	height: 38px;
 }
 
 /* The day modal (§5) */

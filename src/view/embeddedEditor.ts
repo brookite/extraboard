@@ -260,7 +260,17 @@ export function createEmbeddedEditor(
 			if (closed || suggestionOpen()) return;
 			if (container.contains(document.activeElement)) return;
 			// Still inside the editor (a property badge): save, but stay open.
-			if (scope.contains(document.activeElement)) {
+			// A modal raised *above* this field counts as inside: the phone's tag
+			// picker and date editor (mobile.md §7.1) are the card's own controls
+			// in another host, and closing the card under them would leave them
+			// editing a field that no longer exists. A field that lives inside a
+			// modal itself (the checklist) still finishes normally — only a modal
+			// that is not its own keeps it open.
+			const own = container.closest('.modal-container');
+			const above = Array.from(document.querySelectorAll('.modal-container')).some(
+				(el) => el !== own,
+			);
+			if (scope.contains(document.activeElement) || above) {
 				options.onCommit?.(readValue());
 				return;
 			}
