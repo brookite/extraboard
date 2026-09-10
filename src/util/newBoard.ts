@@ -8,7 +8,12 @@ import { activeViewOf } from '../model/views';
 
 // The leading blank line separates the settings block from the first stack; it
 // is ordinary preamble, so it round-trips like any other body text.
-const NEW_BOARD_BODY = '\n## To do\n\n## In progress\n\n## Done\n';
+//
+// "Done" is created **completing**
+// (stack-completion-and-divider-colors.md §3.2): a stack called Done is what
+// the flag is for, and a card dragged into it on the first day of a board
+// should be ticked without the user first having to find the setting.
+const NEW_BOARD_BODY = '\n## To do\n\n## In progress\n\n## Done %%completes%%\n';
 
 /**
  * Configuration a new board starts from: the plugin's `defaultProperties`

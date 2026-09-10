@@ -188,4 +188,8 @@ describe('a freshly created board file', () => {
 		expect(parseBoard(text).config.properties).toEqual([{ name: 'priority', type: 'integer' }]);
 		expect(parseBoard(text).stacks.map((s) => s.name)).toEqual(['To do', 'In progress', 'Done']);
 	});
+
+	it('creates Done as a completing stack, and only Done', () => {
+		expect(parseBoard(text).stacks.map((s) => s.completes)).toEqual([false, false, true]);
+	});
 });
