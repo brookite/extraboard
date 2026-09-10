@@ -53,6 +53,8 @@ interface EditorOwner {
 	editor?: InternalEditor['editor'];
 	editMode?: InternalEditor;
 	onMarkdownScroll(): void;
+	/** The mobile build's scroll handler calls it on the owner with no guard. */
+	syncScroll(): void;
 	getMode(): string;
 	toggleMode(): void;
 	showSearch(replace?: boolean): void;
@@ -195,7 +197,11 @@ export function createEmbeddedEditor(
 		hoverPopover: null,
 		// A board is not a Markdown view: there is nothing to scroll, the editor
 		// is always in source mode, and there is no reading view to toggle to.
+		// `syncScroll` is the mobile build's own scroll handler calling back into
+		// its owner — unguarded, so its absence is an uncaught `TypeError` on the
+		// first scroll of a card's field on a phone ([`../NOTICES.md`]).
 		onMarkdownScroll: () => undefined,
+		syncScroll: () => undefined,
 		getMode: () => 'source',
 		toggleMode: () => undefined,
 		showSearch: (replace) => mounted?.showSearch?.(replace),
