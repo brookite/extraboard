@@ -1262,14 +1262,19 @@ body.eb-dragging-card
 	color: var(--text-faint);
 }
 
-.eb-date-grid .eb-date-day.is-selected {
-	/* A solid grey, not `--background-modifier-hover`: that variable is a ~7%
-	   tint meant to answer a pointer, and the days between a range's two ends
-	   disappeared into the ground it was painted on — plainly so in the modal
-	   host (mobile.md §7.1), where the ground is the modal's own. The band
-	   between the two blue endpoints is a statement about the selection, so it
-	   is drawn as one. */
-	background: var(--background-modifier-border);
+.eb-date-day.is-selected {
+	/* The band between a range's two ends, drawn as its own grey rather than
+	   borrowed from a theme variable. Two greys were tried and both vanished:
+	   `--background-modifier-hover` is a ~7% tint meant to answer a pointer, and
+	   `--background-modifier-border` sits close enough to the modal's own ground
+	   in some themes to disappear against it. A mono tint is neutral by
+	   construction — black over a light theme, white over a dark one — and 22%
+	   cannot be lost against any ground. The fallback keeps it visible even
+	   where `--mono-rgb-100` is not defined.
+
+	   Specificity stays at one element and one class: `.is-endpoint` below is
+	   written after it and must win on the two days that carry both. */
+	background: rgba(var(--mono-rgb-100, 128, 128, 128), 0.22);
 }
 
 .eb-date-day.is-endpoint {
