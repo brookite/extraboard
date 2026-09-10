@@ -190,12 +190,19 @@ function chipText(card: Card): string {
 	return text || t('modal.archive.untitled');
 }
 
+/**
+ * What paints a chip, most specific first: the card's own `color` property, the
+ * color of its divider group (stack-completion-and-divider-colors.md §4.1), and
+ * finally its stack's accent (§6.3). The last one is what the calendar adds:
+ * the stacks are not drawn here, so without it a card arrives with no trace of
+ * where on the board it lives.
+ */
 function chipColor(board: Board, ref: ops.ItemRef, card: Card): string | undefined {
 	const own = card.properties.find((pv) => pv.type === 'color');
 	const stack = board.stacks[ref.stack];
 	const color =
 		safeColor(own?.type === 'color' ? own.value : '') ??
-		(stack ? safeColor(ops.groupColor(stack, ref.item)) : null);
+		(stack ? (safeColor(ops.groupColor(stack, ref.item)) ?? safeColor(stack.accent)) : null);
 	return color ?? undefined;
 }
 

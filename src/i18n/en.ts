@@ -327,6 +327,9 @@ export const en = {
 			completes: 'Counts cards as completed',
 			completesDesc:
 				'A card moved into this stack is marked done, together with every item of its checklist. Cards already here are left as they are.',
+			accent: 'Accent color',
+			accentDesc:
+				'Outlines the stack on the board, and colors its cards in the calendar unless a card sets a color of its own.',
 		},
 		views: {
 			title: 'Views',

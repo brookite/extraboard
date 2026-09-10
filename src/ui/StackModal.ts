@@ -1,16 +1,20 @@
-// A stack's parameters in one small form: its name and whether it completes the
-// cards that land in it. Spec: stack-completion-and-divider-colors.md §3.3.
+// A stack's parameters in one small form: its name, whether it completes the
+// cards that land in it, and its accent color. Spec:
+// stack-completion-and-divider-colors.md §3.3, §6.
 //
-// The same modal creates a stack and edits one, so the flag is offered wherever
-// a stack comes into being — the composer never leaves it to be discovered later
+// The same modal creates a stack and edits one, so both are offered wherever a
+// stack comes into being — the composer never leaves them to be discovered later
 // in a menu.
 
 import { App, Modal, Setting } from 'obsidian';
+import { colorField } from './ColorPicker';
 import { t } from '../i18n';
 
 export interface StackFields {
 	name: string;
 	completes: boolean;
+	/** Any CSS color; `''` means the stack has no accent. */
+	accent: string;
 }
 
 interface StackModalOptions extends Partial<StackFields> {
@@ -40,7 +44,11 @@ class StackModal extends Modal {
 		private readonly done: (fields: StackFields | null) => void,
 	) {
 		super(app);
-		this.fields = { name: options.name ?? '', completes: options.completes ?? false };
+		this.fields = {
+			name: options.name ?? '',
+			completes: options.completes ?? false,
+			accent: options.accent ?? '',
+		};
 	}
 
 	override onOpen(): void {
@@ -72,6 +80,15 @@ class StackModal extends Modal {
 					this.fields.completes = value;
 				}),
 			);
+
+		// The shared color control, the same one the property and tag editors use,
+		// so a stack accent is picked from the same palette as everything else.
+		const accent = new Setting(el)
+			.setName(t('modal.stack.accent'))
+			.setDesc(t('modal.stack.accentDesc'));
+		colorField(this.app, accent.controlEl, t('modal.stack.accent'), this.fields.accent, (value) => {
+			this.fields.accent = value;
+		});
 
 		const buttons = el.createDiv({ cls: 'modal-button-container' });
 		const cancel = buttons.createEl('button', { text: t('common.cancel') });

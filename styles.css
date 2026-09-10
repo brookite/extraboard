@@ -353,6 +353,16 @@ body:not(.is-mobile) .eb-board {
 	border-radius: var(--radius-m, 8px);
 }
 
+/* A stack's accent (stack-completion-and-divider-colors.md §6.1): the column's
+   own border, thickened to 2px so it reads as a deliberate color rather than as
+   a theme edge. `box-sizing` is border-box throughout, so the extra pixel comes
+   out of the padding box and the column keeps its width. The list view's
+   sections carry the same rule when they are grouped by stack. */
+.eb-stack.is-accented,
+.eb-section.is-accented {
+	border: 2px solid var(--eb-stack-accent);
+}
+
 /* Layout invariant: nothing inside a stack may widen it (mobile.md §2).
    A flex item's automatic minimum size is its content's intrinsic minimum, so
    any descendant with one — the embedded CodeMirror editor above all, under

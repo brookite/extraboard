@@ -12,6 +12,7 @@ import { CardTile } from './Card';
 import { DividerRow } from './Divider';
 import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
+import { safeColor } from './style';
 import { t } from '../../i18n';
 import { showDropdownMenu } from '../../util/menu';
 
@@ -68,6 +69,8 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 	});
 
 	const collapsed = stack.collapsed;
+	// The stack's own outline (§6.1); guarded here, like every stored color.
+	const accent = safeColor(stack.accent);
 	const hidden = ops.hiddenItems(stack);
 	const toggleLabel = collapsed ? t('stack.expand') : t('stack.collapse');
 
@@ -84,16 +87,23 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 		setPendingNewCard(true);
 	};
 
-	/** Name plus the completion flag, in one form (§3.3). */
+	/** Name, the completion flag and the accent, in one form (§3.3, §6.2). */
 	const editParameters = async (): Promise<void> => {
 		const fields = await editStack(api.app, {
 			title: t('modal.stack.editTitle'),
 			cta: t('modal.stack.editCta'),
 			name: stack.name,
 			completes: stack.completes,
+			accent: stack.accent,
 		});
 		if (!fields) return;
-		api.update((b) => ops.setStackCompletes(ops.renameStack(b, index, fields.name), index, fields.completes));
+		api.update((b) =>
+			ops.setStackAccent(
+				ops.setStackCompletes(ops.renameStack(b, index, fields.name), index, fields.completes),
+				index,
+				fields.accent,
+			),
+		);
 	};
 
 	/** Insert a stack beside this one, configured before it exists. */
@@ -103,7 +113,7 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 			cta: t('modal.stack.addCta'),
 		});
 		if (!fields) return;
-		api.update((b) => ops.addStack(b, fields.name, at, fields.completes));
+		api.update((b) => ops.addStack(b, fields.name, at, fields.completes, fields.accent));
 	};
 
 	const deleteStack = async (): Promise<void> => {
@@ -190,8 +200,9 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 
 	return (
 		<div
-			class={`eb-stack${collapsed ? ' is-collapsed' : ''}`}
+			class={`eb-stack${collapsed ? ' is-collapsed' : ''}${accent ? ' is-accented' : ''}`}
 			data-index={index}
+			style={accent ? { '--eb-stack-accent': accent } : undefined}
 			ref={rootRef}
 			onContextMenu={(e) => {
 				if (e.target instanceof Element && e.target.closest('.eb-item')) return;

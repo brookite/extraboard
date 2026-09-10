@@ -206,3 +206,53 @@ describe('divider colors', () => {
 		expect(body(next)).toContain('---\n');
 	});
 });
+
+describe('stack accent (§6)', () => {
+	it('reads the marker, in any order, and writes it canonically', () => {
+		const text = [FM, '## Done %%collapsed%% %%accent|#e93147%% %%completes%%', '', '- Card', ''].join('\n');
+		const b = parseBoard(text);
+		expect(b.stacks[0]!.name).toBe('Done');
+		expect(b.stacks[0]!.accent).toBe('#e93147');
+		expect(b.stacks[0]!.completes).toBe(true);
+		expect(b.stacks[0]!.collapsed).toBe(true);
+		// Canonical: name, completion, accent, collapse state last.
+		expect(body(b)).toContain('## Done %%completes%% %%accent|#e93147%% %%collapsed%%');
+	});
+
+	it('escapes a percent sign in the value, like every other marker', () => {
+		const text = [FM, '## S %%accent|hsl(30 100\\% 50\\%)%%', '', '- Card', ''].join('\n');
+		const b = parseBoard(text);
+		expect(b.stacks[0]!.accent).toBe('hsl(30 100% 50%)');
+		expect(serializeBoard(b)).toBe(text);
+	});
+
+	it('is ordinary text on a divider heading', () => {
+		const text = [FM, '## S', '', '### Group %%accent|#fff%%', '', '- Card', ''].join('\n');
+		const b = parseBoard(text);
+		const entry = b.stacks[0]!.items[0];
+		expect(entry?.kind === 'divider' && entry.divider.name).toBe('Group %%accent|#fff%%');
+		expect(serializeBoard(b)).toBe(text);
+	});
+
+	it('sets and clears the accent without touching a card', () => {
+		const accented = ops.setStackAccent(board(), 1, '#08b94e');
+		expect(body(accented)).toContain('## Done %%completes%% %%accent|#08b94e%%');
+		expect(body(accented)).toContain('- [x] Shipped');
+
+		const cleared = ops.setStackAccent(accented, 1, '  ');
+		expect(cleared.stacks[1]!.accent).toBeUndefined();
+		expect(body(cleared)).toContain('## Done %%completes%%\n');
+	});
+
+	it('is a no-op when nothing changes, so the file is not rewritten', () => {
+		const b = ops.setStackAccent(board(), 1, '#08b94e');
+		expect(ops.setStackAccent(b, 1, '#08b94e')).toBe(b);
+		expect(ops.setStackAccent(b, 9, '#08b94e')).toBe(b);
+	});
+
+	it('travels with a stack created from the modal', () => {
+		const b = ops.addStack(board(), 'Review', 1, false, '#7852ee');
+		expect(b.stacks[1]!.accent).toBe('#7852ee');
+		expect(body(b)).toContain('## Review %%accent|#7852ee%%');
+	});
+});

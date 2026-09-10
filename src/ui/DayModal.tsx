@@ -153,12 +153,14 @@ function DayRow({ board, refItem, api, settings, display }: RowProps) {
 
 	return (
 		<div class="eb-day-row">
+			{/* The day list is the calendar too, so a card falls back to its stack's
+			    accent here exactly as its chip does in the grid (§6.3). */}
 			<CardTile
 				card={entry.card}
 				stackIndex={refItem.stack}
 				index={refItem.item}
 				config={board.config}
-				groupColor={ops.groupColor(stack, refItem.item)}
+				groupColor={ops.groupColor(stack, refItem.item) ?? stack.accent}
 				api={api}
 				settings={settings}
 				display={display}

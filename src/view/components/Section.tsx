@@ -22,6 +22,7 @@ import { useSortable, type DropInfo } from '../useSortable';
 import { CardTile } from './Card';
 import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
+import { safeColor } from './style';
 import { t } from '../../i18n';
 import { showDropdownMenu } from '../../util/menu';
 import { isDoubleTap } from '../../util/gesture';
@@ -259,8 +260,8 @@ export function SectionGroup(props: SectionProps) {
 		else if (key.kind === 'anon') api.update((b) => ops.renameDivider(b, key.ref, next));
 	};
 
-	/** Name plus the completion flag, in the stack form the board itself uses
-	 * (stack-completion-and-divider-colors.md §3.3). */
+	/** Name, the completion flag and the accent, in the stack form the board
+	 * itself uses (stack-completion-and-divider-colors.md §3.3, §6.2). */
 	const editParameters = async (): Promise<void> => {
 		if (stackIndex === null || !stack) return;
 		const fields = await editStack(api.app, {
@@ -268,10 +269,15 @@ export function SectionGroup(props: SectionProps) {
 			cta: t('modal.stack.editCta'),
 			name: stack.name,
 			completes: stack.completes,
+			accent: stack.accent,
 		});
 		if (!fields) return;
 		api.update((b) =>
-			ops.setStackCompletes(ops.renameStack(b, stackIndex, fields.name), stackIndex, fields.completes),
+			ops.setStackAccent(
+				ops.setStackCompletes(ops.renameStack(b, stackIndex, fields.name), stackIndex, fields.completes),
+				stackIndex,
+				fields.accent,
+			),
 		);
 	};
 
@@ -445,12 +451,24 @@ export function SectionGroup(props: SectionProps) {
 			/>
 		);
 
-	const classes = ['eb-section', collapsed ? 'is-collapsed' : '', section.movable ? 'is-movable' : '']
+	// Grouped by stack, a section *is* a stack, so it carries the stack's accent
+	// the same way the Kanban column does (§6.1).
+	const accent = stackIndex === null ? null : safeColor(stack?.accent);
+	const classes = [
+		'eb-section',
+		collapsed ? 'is-collapsed' : '',
+		section.movable ? 'is-movable' : '',
+		accent ? 'is-accented' : '',
+	]
 		.filter(Boolean)
 		.join(' ');
 
 	return (
-		<div class={classes} data-index={index}>
+		<div
+			class={classes}
+			data-index={index}
+			style={accent ? { '--eb-stack-accent': accent } : undefined}
+		>
 			<div class="eb-section-header">
 				{section.movable ? (
 					<span class="eb-section-grip" title={t('modal.checklist.dragToReorder')} aria-hidden="true">

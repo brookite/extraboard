@@ -143,8 +143,10 @@ function resolveIndex<T>(items: T[], target: T | undefined): number {
 
 // --- constructors -----------------------------------------------------------
 
-export function emptyStack(name: string, completes = false): Stack {
-	return { name, collapsed: false, completes, lead: [''], items: [] };
+export function emptyStack(name: string, completes = false, accent?: string): Stack {
+	const stack: Stack = { name, collapsed: false, completes, lead: [''], items: [] };
+	if (accent) stack.accent = accent;
+	return stack;
 }
 
 /**
@@ -165,10 +167,11 @@ export function addStack(
 	name: string,
 	at: InsertPos = null,
 	completes = false,
+	accent?: string,
 ): Board {
 	const stacks = board.stacks.slice();
 	const index = at === null ? stacks.length : Math.max(0, Math.min(at, stacks.length));
-	stacks.splice(index, 0, emptyStack(name, completes));
+	stacks.splice(index, 0, emptyStack(name, completes, accent));
 	// Normalize the neighbour too: a stack that used to end the file may need a
 	// blank line before the new heading.
 	const board2 = { ...board, stacks };
@@ -197,6 +200,23 @@ export function setStackCompletes(board: Board, index: number, completes: boolea
 	const stack = board.stacks[index];
 	if (!stack || stack.completes === completes) return board;
 	return replaceStack(board, index, { ...stack, completes });
+}
+
+/**
+ * The stack's accent color, or `''` to clear it
+ * (stack-completion-and-divider-colors.md §6). Like a divider's color it is
+ * stored on the container alone: the cards it stands in for read it at render
+ * time, and no card line is touched.
+ */
+export function setStackAccent(board: Board, index: number, accent: string): Board {
+	const stack = board.stacks[index];
+	if (!stack) return board;
+	const value = accent.trim() || undefined;
+	if (value === stack.accent) return board;
+	const next: Stack = { ...stack };
+	if (value === undefined) delete next.accent;
+	else next.accent = value;
+	return replaceStack(board, index, next);
 }
 
 /**

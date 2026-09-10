@@ -233,6 +233,12 @@ export interface Stack {
 	 * stack-completion-and-divider-colors.md §3.
 	 */
 	completes: boolean;
+	/**
+	 * `%%accent|…%%` — a CSS color, verbatim, that outlines the stack and stands
+	 * in for a card's color where the stack itself is not drawn (the calendar).
+	 * Spec: stack-completion-and-divider-colors.md §6.
+	 */
+	accent?: string;
 	/** Verbatim lines between the `## ` heading and the first item. */
 	lead: string[];
 	items: StackItem[];

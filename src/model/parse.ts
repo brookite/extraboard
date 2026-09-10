@@ -212,8 +212,9 @@ export function parseBody(
 
 		const h2 = H2_RE.exec(line);
 		if (h2) {
-			// `%%completes%%` is meaningful on a stack heading, `%%color|…%%` on a
-			// named divider's; each is ordinary text on the other (§1.1).
+			// `%%completes%%` and `%%accent|…%%` are meaningful on a stack heading,
+			// `%%color|…%%` on a named divider's; each is ordinary text on the
+			// other (§1.1).
 			const { text, markers } = stripMarkers(h2[1] ?? '', 'stack');
 			stack = {
 				name: text,
@@ -222,6 +223,7 @@ export function parseBody(
 				lead: [],
 				items: [],
 			};
+			if (markers.accent !== undefined) stack.accent = markers.accent;
 			stacks.push(stack);
 			sink = stack.lead;
 			continue;

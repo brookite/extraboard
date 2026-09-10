@@ -28,6 +28,8 @@ export const MARKER_VALUE = '(?:\\\\[\\s\\S]|[^\\\\%])*?';
 export interface HeadingMarkers {
 	/** `%%completes%%` — a stack completes the cards entering it (§3). */
 	completes: boolean;
+	/** `%%accent|…%%` — a stack's accent color, verbatim (§6). */
+	accent?: string;
 	/** `%%color|…%%` — a named divider's color, verbatim (§4). */
 	color?: string;
 	/** `%%collapsed%%` — written last, so a collapse toggle reorders nothing. */
@@ -39,14 +41,18 @@ export type HeadingKind = 'stack' | 'divider';
 
 // One trailing marker: recognized ones are stripped, anything else stays in the
 // name. Non-greedy value + `$` anchor, so the token is taken from the end.
-// `%%completes%%` only means something on a stack and `%%color|…%%` only on a
-// divider, so each heading recognizes its own pair — on the other one the token
-// is ordinary text and survives verbatim.
-// Group 1 is the text before the marker, group 2 is `collapsed`, and group 3 is
-// the kind's own marker: `completes` on a stack, the color value on a divider.
+// `%%completes%%` / `%%accent|…%%` only mean something on a stack and
+// `%%color|…%%` only on a divider, so each heading recognizes its own set — on
+// the other one the token is ordinary text and survives verbatim.
+// Group `head` is the text before the marker; the rest are named after the
+// marker they matched, so the two kinds can differ without renumbering.
 const TRAILING_RE: Record<HeadingKind, RegExp> = {
-	stack: /^(.*?)\s*%%(?:(collapsed)|(completes))%%\s*$/,
-	divider: new RegExp(`^(.*?)\\s*%%(?:(collapsed)|color\\|(${MARKER_VALUE}))%%\\s*$`),
+	stack: new RegExp(
+		`^(?<head>.*?)\\s*%%(?:(?<collapsed>collapsed)|(?<completes>completes)|accent\\|(?<accent>${MARKER_VALUE}))%%\\s*$`,
+	),
+	divider: new RegExp(
+		`^(?<head>.*?)\\s*%%(?:(?<collapsed>collapsed)|color\\|(?<color>${MARKER_VALUE}))%%\\s*$`,
+	),
 };
 
 /**
@@ -63,15 +69,20 @@ export function stripMarkers(
 	for (;;) {
 		const m = re.exec(rest);
 		if (!m) break;
-		if (m[2] !== undefined) markers.collapsed = true;
-		else if (kind === 'stack') markers.completes = true;
+		const g = m.groups ?? {};
+		if (g.collapsed !== undefined) markers.collapsed = true;
+		else if (g.completes !== undefined) markers.completes = true;
 		else {
-			const color = unescapeMarker(m[3] ?? '').trim();
-			// An empty value means "no color" (§1.2) and is simply dropped. The last
-			// marker read is the outermost one, so an earlier color wins.
-			if (color) markers.color = color;
+			// An empty value means "no color" (§1.2, §6.1) and is simply dropped.
+			// The last marker read is the outermost one, so an earlier color wins.
+			const raw = g.accent ?? g.color ?? '';
+			const color = unescapeMarker(raw).trim();
+			if (color) {
+				if (g.accent !== undefined) markers.accent = color;
+				else markers.color = color;
+			}
 		}
-		rest = m[1] ?? '';
+		rest = g.head ?? '';
 	}
 	return { text: rest.trim(), markers };
 }
@@ -80,6 +91,7 @@ export function stripMarkers(
 export function withMarkers(name: string, markers: Partial<HeadingMarkers>): string {
 	const parts = [name];
 	if (markers.completes) parts.push('%%completes%%');
+	if (markers.accent) parts.push(`%%accent|${escapeMarker(markers.accent)}%%`);
 	if (markers.color) parts.push(`%%color|${escapeMarker(markers.color)}%%`);
 	if (markers.collapsed) parts.push('%%collapsed%%');
 	return parts.filter(Boolean).join(' ');

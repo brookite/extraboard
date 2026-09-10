@@ -46,13 +46,13 @@ function ArchiveTarget() {
 
 /**
  * A new stack is configured before it exists: the same form the stack menu's
- * "Edit stack" opens, so the completion flag is offered at creation
- * (stack-completion-and-divider-colors.md §3.3).
+ * "Edit stack" opens, so the completion flag and the accent are offered at
+ * creation (stack-completion-and-divider-colors.md §3.3, §6.2).
  */
 export function addStack(api: BoardApi, at: ops.InsertPos = null, onAdded?: () => void): void {
 	void editStack(api.app, { title: t('modal.stack.addTitle'), cta: t('modal.stack.addCta') }).then((fields) => {
 		if (!fields) return;
-		api.update((b) => ops.addStack(b, fields.name, at, fields.completes));
+		api.update((b) => ops.addStack(b, fields.name, at, fields.completes, fields.accent));
 		onAdded?.();
 	});
 }

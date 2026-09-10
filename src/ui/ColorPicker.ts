@@ -61,7 +61,16 @@ export function colorField(
 	input.value = value ?? '';
 	input.placeholder = label;
 	input.setAttribute('aria-label', label);
-	input.addEventListener('change', () => onChange(input.value.trim()));
+
+	// The control keeps itself current, so it can live in a form that is not
+	// re-rendered on every change (the stack modal) as well as in one that is.
+	const set = (next: string): void => {
+		input.value = next;
+		swatch.style.background = safeColor(next) ?? 'transparent';
+		onChange(next);
+	};
+
+	input.addEventListener('change', () => set(input.value.trim()));
 
 	swatch.addEventListener('click', () => {
 		void pickColor(app, {
@@ -69,7 +78,7 @@ export function colorField(
 			value: input.value,
 			clearLabel: t('colorPicker.noColor'),
 		}).then((next) => {
-			if (next !== null) onChange(next);
+			if (next !== null) set(next);
 		});
 	});
 }
