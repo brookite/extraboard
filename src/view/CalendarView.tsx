@@ -249,7 +249,7 @@ function Chip({ board, card, occRef, index, time, opts, repeating, sources, onOp
 				if (!isDragging()) onOpen();
 			}}
 		>
-			{color ? <span class="eb-cal-chip-dot" /> : null}
+			{color ? <span class="eb-cal-dot" /> : null}
 			{done ? <Icon name="check" class="eb-cal-chip-check" /> : null}
 			{repeating ? <Icon name="repeat" class="eb-cal-chip-repeat" /> : null}
 			{time !== undefined && opts ? (
@@ -677,7 +677,8 @@ function WeekRow({
 								if (!isDragging()) onOpenDay(days[Math.max(0, segment.column)]!);
 							}}
 						>
-							{chipText(card)}
+							{color ? <span class="eb-cal-dot" /> : null}
+							<span class="eb-cal-bar-text">{chipText(card)}</span>
 						</div>
 					);
 				})}

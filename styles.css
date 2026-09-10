@@ -1262,7 +1262,7 @@ body.eb-dragging-card
 	color: var(--text-faint);
 }
 
-.eb-date-day.is-selected {
+.eb-date-grid .eb-date-day.is-selected {
 	/* A solid grey, not `--background-modifier-hover`: that variable is a ~7%
 	   tint meant to answer a pointer, and the days between a range's two ends
 	   disappeared into the ground it was painted on — plainly so in the modal
@@ -2202,12 +2202,13 @@ body.eb-dragging-card .eb-archive-drop {
 	cursor: pointer;
 }
 
-/* The card's color as a dot at the head of the chip rather than a stripe down
-   its side (§3.4): a 3px edge on a 20px row is read as chrome — the row's own
-   frame — while a dot beside the time and the title is read as a mark on *this*
-   card, which is what it is. It also survives a cell too narrow to show more
-   than a word of the title. */
-.eb-cal-chip-dot {
+/* The card's color as a dot at the head of a chip or a bar, rather than a
+   stripe down the chip's side and a solid fill on the bar (§3.1, §3.2). An edge
+   3px wide on a 20px row is read as chrome — the row's own frame — and a filled
+   bar is read as the calendar's own banding, while a dot beside the time and
+   the title is read as a mark on *this* card, which is what it is. It also
+   survives a cell too narrow to show more than a word of the title. */
+.eb-cal-dot {
 	flex: 0 0 auto;
 	width: 8px;
 	height: 8px;
@@ -2341,6 +2342,9 @@ body.eb-dragging-card .eb-archive-drop {
 }
 
 .eb-cal-bar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
 	margin: 0 2px 1px;
 	padding: 0 6px;
 	height: calc(var(--eb-cal-bar-h) - 2px);
@@ -2350,14 +2354,13 @@ body.eb-dragging-card .eb-archive-drop {
 	border-radius: var(--radius-s, 4px);
 	white-space: nowrap;
 	overflow: hidden;
-	text-overflow: ellipsis;
 	pointer-events: auto;
 	cursor: pointer;
 }
 
-.eb-cal-bar.is-colored {
-	background: var(--eb-card-color);
-	color: var(--text-on-accent);
+.eb-cal-bar-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 /* A segment that continues into another row must not look like a shorter one. */
