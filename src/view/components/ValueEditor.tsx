@@ -20,11 +20,18 @@ const TEXT_TYPES = new Set(['string']);
 /** Types whose text is the raw token value, so `;` separates list elements. */
 const LIST_TEXT_TYPES = new Set(['raw']);
 
-/** The types whose editor is a calendar — an undeclared property has none. */
-export const DATE_TYPES: ReadonlySet<PropertyDef['type']> = new Set<PropertyDef['type']>([
+/**
+ * The types whose editor is a **panel** rather than a control: a calendar, or a
+ * list of options to tick. Those are the ones tall enough to push the card out
+ * of view when they open under the badge row, so on a phone they open as a
+ * modal instead (mobile.md §7.1). An undeclared property has no definition and
+ * so is never one of them.
+ */
+export const PANEL_TYPES: ReadonlySet<PropertyDef['type']> = new Set<PropertyDef['type']>([
 	'datetime',
 	'date-range',
 	'date-list',
+	'string-list',
 ]);
 
 export interface EditorProps {

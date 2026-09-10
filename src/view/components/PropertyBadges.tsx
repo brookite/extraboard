@@ -4,10 +4,10 @@
 // Every edit goes through an op like any other change — there is no confirm
 // step and no dirty state to lose.
 //
-// On a phone the two panels that are tall enough to move the board — the tag
-// picker and a date property's calendar — open as modals instead of under the
-// badge row (mobile.md §7.1). The panel itself is the same component either
-// way; only its host changes.
+// On a phone the panels that are tall enough to move the board — the tag
+// picker, a date property's calendar, a string list's options — open as modals
+// instead of under the badge row (mobile.md §7.1). The panel itself is the same
+// component either way; only its host changes.
 
 import { Platform } from 'obsidian';
 import type { RefObject } from 'preact';
@@ -27,7 +27,7 @@ import { safeColor } from './style';
 import { t } from '../../i18n';
 import { showDropdownMenu } from '../../util/menu';
 import { TagPicker } from './TagPicker';
-import { DATE_TYPES, ValueEditor } from './ValueEditor';
+import { PANEL_TYPES, ValueEditor } from './ValueEditor';
 
 interface Props {
 	config: BoardConfig;
@@ -68,14 +68,15 @@ export function PropertyBadges({ config, card, target, api, settings, field }: P
 	};
 
 	/**
-	 * Open one property's editor. A calendar is the one editor tall enough to
-	 * shove the card out of view when the phone opens it under the badge row, so
-	 * there it becomes a modal (mobile.md §7.1) and no inline slot is claimed.
+	 * Open one property's editor. The editors that are panels rather than
+	 * controls — a calendar, a list of options — are tall enough to shove the
+	 * card out of view when the phone opens them under the badge row, so there
+	 * they become modals (mobile.md §7.1) and claim no inline slot.
 	 */
 	const openProperty = (name: string): void => {
 		setTagsOpen(false);
 		const def = defFor(name);
-		if (Platform.isMobile && def && DATE_TYPES.has(def.type)) {
+		if (Platform.isMobile && def && PANEL_TYPES.has(def.type)) {
 			setOpen(null);
 			openValueEditorModal(api.app, {
 				name,
