@@ -249,6 +249,7 @@ function Chip({ board, card, occRef, index, time, opts, repeating, sources, onOp
 				if (!isDragging()) onOpen();
 			}}
 		>
+			{color ? <span class="eb-cal-chip-dot" /> : null}
 			{done ? <Icon name="check" class="eb-cal-chip-check" /> : null}
 			{repeating ? <Icon name="repeat" class="eb-cal-chip-repeat" /> : null}
 			{time !== undefined && opts ? (

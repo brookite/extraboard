@@ -2202,8 +2202,17 @@ body.eb-dragging-card .eb-archive-drop {
 	cursor: pointer;
 }
 
-.eb-cal-chip.is-colored {
-	border-left: 3px solid var(--eb-card-color);
+/* The card's color as a dot at the head of the chip rather than a stripe down
+   its side (§3.4): a 3px edge on a 20px row is read as chrome — the row's own
+   frame — while a dot beside the time and the title is read as a mark on *this*
+   card, which is what it is. It also survives a cell too narrow to show more
+   than a word of the title. */
+.eb-cal-chip-dot {
+	flex: 0 0 auto;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--eb-card-color);
 }
 
 .eb-cal-chip.is-done .eb-cal-chip-text {
