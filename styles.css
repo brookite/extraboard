@@ -916,7 +916,8 @@ body.eb-dragging-card
 	color: var(--text-muted);
 	text-transform: uppercase;
 	letter-spacing: 0.03em;
-	cursor: text;
+	/* One tap collapses the group; renaming takes a second one (mobile.md §8). */
+	cursor: pointer;
 }
 
 .eb-divider-line {
@@ -2828,12 +2829,12 @@ body.is-mobile .eb-add-stack-button {
 	font-weight: var(--font-medium, 500);
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	cursor: text;
+	/* One tap collapses the section; renaming takes a second one (mobile.md §8). */
+	cursor: pointer;
 }
 
 .eb-section-name.is-muted {
 	color: var(--text-muted);
-	cursor: default;
 }
 
 .eb-section-name-editor {

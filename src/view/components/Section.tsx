@@ -19,6 +19,7 @@ import { Icon, IconButton } from './Icon';
 import { InlineEditor } from './InlineEditor';
 import { t } from '../../i18n';
 import { showDropdownMenu } from '../../util/menu';
+import { isDoubleTap } from '../../util/gesture';
 
 export interface SectionProps {
 	board: Board;
@@ -144,6 +145,23 @@ export function SectionGroup(props: SectionProps) {
 
 	const setCollapsed = (value: boolean): void => onState({ collapsed: value });
 
+	// The header name carries the divider row's two gestures (mobile.md §8): one
+	// tap collapses or expands the section, a second one within the window puts it
+	// back and opens the rename editor. The sectionless group has no name to edit,
+	// so there its tap only ever collapses.
+	const tap = useRef({ at: 0, collapsed: false });
+	const onNameClick = (): void => {
+		const now = Date.now();
+		if (key.kind !== 'none' && isDoubleTap(tap.current.at, now)) {
+			tap.current.at = 0;
+			setCollapsed(tap.current.collapsed);
+			setRenaming(true);
+			return;
+		}
+		tap.current = { at: now, collapsed };
+		setCollapsed(!collapsed);
+	};
+
 	/**
 	 * Insert an empty card and let its tile open the board's own inline editor —
 	 * the Kanban composer's gesture (kanban-view.md §6.7). A plain text field
@@ -259,9 +277,8 @@ export function SectionGroup(props: SectionProps) {
 				) : (
 					<span
 						class={`eb-section-name${key.kind === 'none' ? ' is-muted' : ''}`}
-						onClick={() => {
-							if (key.kind !== 'none') setRenaming(true);
-						}}
+						title={collapsed ? t('stack.expand') : t('stack.collapse')}
+						onClick={onNameClick}
 					>
 						{label}
 					</span>

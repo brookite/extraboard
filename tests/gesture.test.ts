@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isTap } from '../src/util/gesture';
+import { isDoubleTap, isTap } from '../src/util/gesture';
 
 // Closing the editor on a press meant the scroll that would have moved a card
 // into view was also the gesture that dropped it.
@@ -22,5 +22,25 @@ describe('isTap', () => {
 
 	it('is symmetric about the press point', () => {
 		expect(isTap(10, 10)).toBe(isTap(-10, -10));
+	});
+});
+
+// A named divider's label opens its group on one tap and renames on two, so the
+// window has to separate a deliberate second tap from an unrelated later one.
+describe('isDoubleTap', () => {
+	it('has nothing to continue when no tap is pending', () => {
+		expect(isDoubleTap(0, 1000)).toBe(false);
+	});
+
+	it('accepts a second tap inside the window', () => {
+		expect(isDoubleTap(1000, 1200)).toBe(true);
+	});
+
+	it('accepts the very same instant, as a doubled click event would report', () => {
+		expect(isDoubleTap(1000, 1000)).toBe(true);
+	});
+
+	it('rejects a tap long after the first one', () => {
+		expect(isDoubleTap(1000, 2500)).toBe(false);
 	});
 });

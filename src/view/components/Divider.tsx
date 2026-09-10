@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { Divider } from '../../model/types';
 import type { BoardApi } from '../api';
@@ -9,6 +9,7 @@ import { InlineEditor } from './InlineEditor';
 import { safeColor } from './style';
 import { t } from '../../i18n';
 import { showDropdownMenu } from '../../util/menu';
+import { isDoubleTap } from '../../util/gesture';
 
 /** Identity-stable props, so the memo below holds across an unrelated edit
  * (m10-perf.md §2) — the divider object, never the board. */
@@ -32,8 +33,28 @@ function DividerRowInner({ divider, stackIndex, index, api, hiddenCount }: Props
 
 	const color = safeColor(divider.color);
 
-	const toggle = (): void =>
-		api.update((b) => ops.setDividerCollapsed(b, ref, !divider.collapsed));
+	const setCollapsed = (collapsed: boolean): void =>
+		api.update((b) => ops.setDividerCollapsed(b, ref, collapsed));
+
+	const toggle = (): void => setCollapsed(!divider.collapsed);
+
+	// The label's two gestures (mobile.md §8). One tap opens or closes the group —
+	// the thing a finger wants from a heading — and a second one within the window
+	// puts the group back as it was and opens the rename editor instead. The
+	// collapsed state is captured on the first tap rather than re-read on the
+	// second, so the undo is exact even if the re-render has not landed yet.
+	const tap = useRef({ at: 0, collapsed: false });
+	const onLabelClick = (): void => {
+		const now = Date.now();
+		if (isDoubleTap(tap.current.at, now)) {
+			tap.current.at = 0;
+			setCollapsed(tap.current.collapsed);
+			setEditing(true);
+			return;
+		}
+		tap.current = { at: now, collapsed: divider.collapsed === true };
+		toggle();
+	};
 
 	/** The color the group's cards inherit (stack-completion-and-divider-colors.md §4). */
 	const chooseColor = async (): Promise<void> => {
@@ -131,7 +152,11 @@ function DividerRowInner({ divider, stackIndex, index, api, hiddenCount }: Props
 				/>
 			</button>
 			{named ? (
-				<span class="eb-divider-label" onClick={() => setEditing(true)}>
+				<span
+					class="eb-divider-label"
+					title={toggleLabel}
+					onClick={onLabelClick}
+				>
 					{divider.name || <span class="eb-placeholder">{t('divider.unnamed')}</span>}
 				</span>
 			) : null}
