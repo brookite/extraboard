@@ -247,7 +247,9 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 				</span>
 			);
 		case 'datetime':
-			return <DateBadge raw={pv.raw} dates={dateOpts()} />;
+			// Through `SpanBadge`, which falls back to a plain date: a `datetime`
+			// whose property allows it carries a timespan (properties.md §time).
+			return <SpanBadge raw={pv.raw} dates={dateOpts()} />;
 		case 'date-range':
 			return <SpanBadge raw={pv.raw} dates={dateOpts()} />;
 		case 'recurrence':

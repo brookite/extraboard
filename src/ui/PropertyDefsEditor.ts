@@ -18,6 +18,8 @@ function describePropertyDiagnostic(diag: PropertyDiagnostic): string {
 			return t('propertyDefs.diagnostic.strictOptionsWrongType', { name: diag.name });
 		case 'timeWrongType':
 			return t('propertyDefs.diagnostic.timeWrongType', { name: diag.name });
+		case 'timespanNeedsTime':
+			return t('propertyDefs.diagnostic.timespanNeedsTime', { name: diag.name });
 		case 'tooManyColors':
 			return t('propertyDefs.diagnostic.tooManyColors');
 	}
@@ -131,7 +133,10 @@ export class PropertyDefsEditor {
 				delete def.strict;
 				delete def.options;
 			}
-			if (def.type !== 'datetime' && def.type !== 'date-list') delete def.time;
+			if (def.type !== 'datetime' && def.type !== 'date-list') {
+				delete def.time;
+				delete def.timespan;
+			}
 			// `color` paints the card and `percent` draws a progress indicator;
 			// neither has a badge to outline (properties.md §accent).
 			if (!isAccentable(def.type)) delete def.accent;
@@ -182,6 +187,21 @@ export class PropertyDefsEditor {
 		select.value = def.time ?? 'optional';
 		select.addEventListener('change', () => {
 			def.time = select.value as 'none' | 'optional' | 'required';
+			// Without a time there is nothing for a second one to end.
+			if (def.time === 'none') delete def.timespan;
+			this.commit();
+		});
+
+		// Only where a time is actually offered, and on by default: a board that
+		// says nothing gets the richer value (properties.md §time).
+		if (def.time === undefined || def.time === 'none') return;
+		const spanLabel = body.createEl('label', { cls: 'eb-pe-check' });
+		const allow = spanLabel.createEl('input', { type: 'checkbox' });
+		allow.checked = def.timespan !== false;
+		spanLabel.createSpan({ text: t('propertyDefs.time.allowSpans') });
+		allow.addEventListener('change', () => {
+			if (allow.checked) delete def.timespan;
+			else def.timespan = false;
 			this.commit();
 		});
 	}

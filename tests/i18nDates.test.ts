@@ -118,6 +118,19 @@ describe('formatCalSpan', () => {
 		expect(formatCalSpan({ start: DUE, end: DUE }, opts())).toBe('2026-07-27 → 2026-07-27');
 	});
 
+	it('reads a timespan as one day and two clocks', () => {
+		const from: CalDate = { y: 2026, m: 7, d: 27, minutes: 9 * 60 };
+		const to: CalDate = { y: 2026, m: 7, d: 27, minutes: 10 * 60 + 30 };
+		expect(formatCalSpan({ start: from, end: to }, opts())).toBe('2026-07-27 09:00\u201310:30');
+	});
+
+	it('keeps both dates when only one end carries a time', () => {
+		const to: CalDate = { y: 2026, m: 7, d: 27, minutes: 10 * 60 + 30 };
+		expect(formatCalSpan({ start: DUE, end: to }, opts())).toBe(
+			'2026-07-27 → 2026-07-27 10:30',
+		);
+	});
+
 	it('formats both ends independently', () => {
 		expect(
 			formatCalSpan({ start: DUE, end: { y: 2026, m: 7, d: 29 } }, opts()),

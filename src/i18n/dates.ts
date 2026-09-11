@@ -3,7 +3,14 @@
 // value never changes; only its presentation does.
 
 import type { CalDate, DateSpan } from '../model/dates';
-import { RANGE_SEPARATOR, dayKey, daysBetween, formatDate as formatBuiltIn, today } from '../model/dates';
+import {
+	RANGE_SEPARATOR,
+	dayKey,
+	daysBetween,
+	formatDate as formatBuiltIn,
+	isTimespan,
+	today,
+} from '../model/dates';
 import { currentLanguage, type Lang } from './index';
 import { dateTimeFormat, relativeTimeFormat } from './intl';
 
@@ -200,11 +207,23 @@ export function formatCalDate(date: CalDate, opts: DateTimeOpts): string {
 	return `${datePart} ${formatTimePart(date.minutes, opts)}`;
 }
 
+/** The dash a timespan's two clocks are read with — not the range arrow. */
+const TIME_RANGE_SEPARATOR = '\u2013';
+
 /**
  * Always both ends, even for a one-day span (dates.ts:formatSpan's invariant
  * carries over): a `date-range` that reads `d → d` must still read that way.
+ *
+ * The exception is a **timespan** — one day from one time to another — which
+ * reads as the day and its two clocks (`4 Aug 09:00–10:30`). Repeating the day
+ * would say nothing, and the value is one duration rather than two dates.
  */
 export function formatCalSpan(span: DateSpan, opts: DateTimeOpts): string {
+	if (isTimespan(span)) {
+		const from = formatTimePart(span.start.minutes!, opts);
+		const to = formatTimePart(span.end.minutes!, opts);
+		return `${formatDatePart(span.start, opts)} ${from}${TIME_RANGE_SEPARATOR}${to}`;
+	}
 	return `${formatCalDate(span.start, opts)}${RANGE_SEPARATOR}${formatCalDate(span.end, opts)}`;
 }
 

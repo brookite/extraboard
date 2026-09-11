@@ -11,6 +11,7 @@ import {
 	formatSpan,
 	parseDate,
 	parseSpan,
+	parseTimespan,
 	sameDay,
 	stripTime,
 	today,
@@ -52,7 +53,9 @@ interface Props {
 }
 
 const initialDate = (type: DatePropertyValue['type'], pv: PropertyValue | undefined): CalDate => {
-	if (type === 'datetime' && pv?.type === 'datetime') return parseDate(pv.raw) ?? today();
+	// `parseSpan`, not `parseDate`: a `datetime` that carries a timespan is a
+	// two-ended value, and it still opens on the day it starts.
+	if (type === 'datetime' && pv?.type === 'datetime') return parseSpan(pv.raw)?.start ?? today();
 	if (type === 'date-range' && pv?.type === 'date-range') return parseSpan(pv.raw)?.start ?? today();
 	if (type === 'date-list' && pv?.type === 'date-list') {
 		for (const raw of pv.raw) {
@@ -68,8 +71,8 @@ const initialSelection = (
 	pv: PropertyValue | undefined,
 ): DateSelection | null => {
 	if (type === 'datetime' && pv?.type === 'datetime') {
-		const date = parseDate(pv.raw);
-		return date ? { start: stripTime(date) } : null;
+		const span = parseSpan(pv.raw);
+		return span ? { start: stripTime(span.start) } : null;
 	}
 	if (type === 'date-range' && pv?.type === 'date-range') {
 		const span = parseSpan(pv.raw);
@@ -78,10 +81,13 @@ const initialSelection = (
 	return null;
 };
 
-const initialTime = (pv: PropertyValue | undefined): string => {
-	if (pv?.type !== 'datetime') return '';
+/** The two clocks a `datetime` opens with: its time, and a timespan's end. */
+const initialTimes = (pv: PropertyValue | undefined): { time: string; endTime: string } => {
+	if (pv?.type !== 'datetime') return { time: '', endTime: '' };
+	const span = parseTimespan(pv.raw);
+	if (span) return { time: formatClock(span.start), endTime: formatClock(span.end) };
 	const date = parseDate(pv.raw);
-	return date ? formatClock(date) : '';
+	return { time: date ? formatClock(date) : '', endTime: '' };
 };
 
 /** Whether `day` falls inside an already-saved date/date-range/date-list entry. */
@@ -104,7 +110,8 @@ const withTime = (date: CalDate, value: string): CalDate => {
 export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, commitRef }: Props) {
 	const [month, setMonth] = useState(() => initialDate(type, pv));
 	const [selection, setSelection] = useState<DateSelection | null>(() => initialSelection(type, pv));
-	const [time, setTime] = useState(() => initialTime(pv));
+	const [time, setTime] = useState(() => initialTimes(pv).time);
+	const [endTime, setEndTime] = useState(() => initialTimes(pv).endTime);
 	// The list index an entry was taken out of, while it is being edited on the
 	// grid; it goes back where it was, not to the end of the list.
 	const [editing, setEditing] = useState<number | null>(null);
@@ -119,22 +126,42 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 	const timeRequired = def?.time === 'required';
 	const isSingleDay = !!selection && !selection.end;
 	const showTime = timeEnabled && (type !== 'date-list' || isSingleDay);
+	// A second clock turns the value into a timespan (`d HH:mm → d HH:mm`).
+	// Allowed by default wherever a time is: only an explicit `false` takes it
+	// away (properties.md §time).
+	const spanEnabled = timeEnabled && def?.timespan !== false;
+	// An end alone means nothing, and an end that is not later is not a duration.
+	const endValid = !endTime || (!!time && endTime > time);
 
 	const select = (day: CalDate): void => {
 		setSelection((current) => {
 			const next = selectCalendarDay(current, stripTime(day), allowRange);
-			// A range entry never carries a time; drop any time picked before it formed.
-			if (next?.end) setTime('');
+			// A range of days never carries a time; drop any picked before it formed.
+			if (next?.end) {
+				setTime('');
+				setEndTime('');
+			}
 			return next;
 		});
+	};
+
+	/**
+	 * One day as the text it is written with: a bare date, a date with a time,
+	 * or — with both clocks set — the timespan the two of them make.
+	 */
+	const rawForDay = (day: CalDate): string | null => {
+		if (timeRequired && !time) return null;
+		if (!endValid) return null;
+		const start = withTime(day, time);
+		if (!spanEnabled || !time || !endTime) return formatDate(start);
+		return formatSpan({ start, end: withTime(day, endTime) });
 	};
 
 	/** The selection as the text one `date-list` entry would be written with. */
 	const pendingEntry = (): string | null => {
 		if (!selection) return null;
 		if (selection.end) return formatSpan({ start: selection.start, end: selection.end });
-		if (timeRequired && !time) return null;
-		return formatDate(withTime(selection.start, time));
+		return rawForDay(selection.start);
 	};
 
 	/**
@@ -153,13 +180,15 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 		setEditing(null);
 		setSelection(null);
 		setTime('');
+		setEndTime('');
 	};
 
 	const saveSelection = (): void => {
 		if (!selection) return;
 		if (type === 'datetime') {
-			if (timeRequired && !time) return;
-			onCommit({ name, type, raw: formatDate(withTime(selection.start, time)) });
+			const raw = rawForDay(selection.start);
+			if (raw === null) return;
+			onCommit({ name, type, raw });
 			return;
 		}
 		if (type === 'date-range') {
@@ -210,6 +239,7 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 		setEditing(at);
 		setSelection(entry.selection);
 		setTime(entry.time);
+		setEndTime(entry.endTime);
 		setMonth(entry.month);
 	};
 
@@ -244,6 +274,7 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 	const canCommitOnClose =
 		!!selection &&
 		!(showTime && timeRequired && !time) &&
+		endValid &&
 		(type !== 'date-list' || editing !== null || list.length === 0);
 	if (commitRef) commitRef.current = canCommitOnClose ? saveSelection : null;
 
@@ -329,15 +360,42 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 			</div>
 
 			{showTime ? (
-				<label class="eb-date-time">
-					<span>{t('propertyBadges.time')}</span>
-					<input
-						type="time"
-						value={time}
-						required={timeRequired}
-						onChange={(event) => setTime(event.currentTarget.value)}
-					/>
-				</label>
+				<div class="eb-date-times">
+					<label class="eb-date-time">
+						<span>{spanEnabled ? t('propertyBadges.timeFrom') : t('propertyBadges.time')}</span>
+						<input
+							type="time"
+							value={time}
+							required={timeRequired}
+							onChange={(event) => {
+								setTime(event.currentTarget.value);
+								// An end without a start is not a value; drop it with it.
+								if (!event.currentTarget.value) setEndTime('');
+							}}
+						/>
+					</label>
+					{spanEnabled ? (
+						<label class={`eb-date-time${endValid ? '' : ' is-invalid'}`}>
+							<span>{t('propertyBadges.timeTo')}</span>
+							<input
+								type="time"
+								value={endTime}
+								disabled={!time}
+								aria-invalid={endValid ? undefined : 'true'}
+								onChange={(event) => setEndTime(event.currentTarget.value)}
+							/>
+							<button
+								type="button"
+								class="eb-icon-button"
+								aria-label={t('propertyBadges.clearEndTime')}
+								disabled={!endTime}
+								onClick={() => setEndTime('')}
+							>
+								<Icon name="x" />
+							</button>
+						</label>
+					) : null}
+				</div>
 			) : null}
 
 			<div class={`eb-date-actions${type === 'date-list' ? ' is-list' : ''}`}>
@@ -349,7 +407,7 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 				<button
 					type="button"
 					class="mod-cta"
-					disabled={!selection || (showTime && timeRequired && !time)}
+					disabled={!selection || (showTime && timeRequired && !time) || !endValid}
 					onClick={saveSelection}
 				>
 					{type !== 'date-list'

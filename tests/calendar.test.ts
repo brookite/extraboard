@@ -13,6 +13,7 @@ import {
 	fromOrdinal,
 	parseDate,
 	parseSpan,
+	parseTimespan,
 	startOfWeek,
 	toOrdinal,
 	weekday,
@@ -216,6 +217,19 @@ describe('calendar: date edits (§5.3, §6)', () => {
 		expect(body(moved)).toContain('@{due|2026-08-03 09:00}');
 	});
 
+	it('moving a timespan keeps both of its clocks', () => {
+		const b = board('- Standup @{due|2026-07-28 09:00 → 2026-07-28 10:30}');
+		const moved = moveOccurrence(
+			b,
+			only(b, 'due'),
+			{ property: 'due', index: 0 },
+			'datetime',
+			{ y: 2026, m: 7, d: 28 },
+			day,
+		);
+		expect(body(moved)).toContain('@{due|2026-08-03 09:00 → 2026-08-03 10:30}');
+	});
+
 	it('moving a range shifts it by the drag delta and keeps its length', () => {
 		const b = board('- Sprint @{sprint|2026-07-24 → 2026-08-07}');
 		// Dragged from its third day (2026-07-26) onto 2026-08-03: +8 days.
@@ -267,5 +281,34 @@ describe('calendar: date edits (§5.3, §6)', () => {
 		expect(body(clearOccurrence(one, solo, { property: 'dates', index: 0 }, 'date-list'))).not.toContain(
 			'@{dates',
 		);
+	});
+});
+
+describe('timespans', () => {
+	it('is a two-ended, same-day value with a time at both ends', () => {
+		expect(parseTimespan('2026-07-28 09:00 → 2026-07-28 10:30')).toEqual({
+			start: { y: 2026, m: 7, d: 28, minutes: 540 },
+			end: { y: 2026, m: 7, d: 28, minutes: 630 },
+		});
+	});
+
+	it('is never a single date, however its span reads', () => {
+		expect(parseTimespan('2026-07-28 09:00')).toBeNull();
+		expect(parseTimespan('2026-07-28')).toBeNull();
+	});
+
+	it('is neither a range of days nor a half-timed span', () => {
+		expect(parseTimespan('2026-07-28 09:00 → 2026-07-29 10:30')).toBeNull();
+		expect(parseTimespan('2026-07-28 09:00 → 2026-07-28')).toBeNull();
+		expect(parseTimespan('every week on Mon')).toBeNull();
+	});
+
+	it('places as one day, and the grid can read its length off the ends', () => {
+		const b = board('- Standup @{due|2026-07-28 09:00 → 2026-07-28 10:30}');
+		const occurrence = placeCards(b, ['due']).occurrences[0]!;
+		expect(occurrence.length).toBe(1);
+		expect(occurrence.hasTime).toBe(true);
+		expect(occurrence.start.minutes).toBe(540);
+		expect(occurrence.end.minutes).toBe(630);
 	});
 });

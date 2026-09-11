@@ -52,11 +52,14 @@ describe('editing a stored date entry', () => {
 		expect(readDateEntry('2026-08-04')).toEqual({
 			selection: { start: date(4) },
 			time: '',
+			endTime: '',
 			month: date(4),
 		});
+		// A single moment has no end, whatever its span's two ends look like.
 		expect(readDateEntry('2026-08-04 09:05')).toEqual({
 			selection: { start: date(4) },
 			time: '09:05',
+			endTime: '',
 			month: date(4),
 		});
 	});
@@ -65,6 +68,16 @@ describe('editing a stored date entry', () => {
 		expect(readDateEntry('2026-08-04 09:05 → 2026-08-09')).toEqual({
 			selection: { start: date(4), end: date(9) },
 			time: '',
+			endTime: '',
+			month: date(4),
+		});
+	});
+
+	it('reads a timespan back as one day with two clocks', () => {
+		expect(readDateEntry('2026-08-04 09:00 → 2026-08-04 10:30')).toEqual({
+			selection: { start: date(4) },
+			time: '09:00',
+			endTime: '10:30',
 			month: date(4),
 		});
 	});

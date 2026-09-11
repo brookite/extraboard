@@ -5,6 +5,7 @@ import {
 	compareDates,
 	formatClock,
 	parseSpan,
+	parseTimespan,
 	sameDay,
 	startOfMonth,
 	stripTime,
@@ -57,8 +58,10 @@ export function isSameMonth(day: CalDate, month: CalDate): boolean {
 /** A stored entry read back into the calendar's own controls. */
 export interface DateEntryEdit {
 	selection: DateSelection;
-	/** `HH:mm`, or `''` — a range never carries one. */
+	/** `HH:mm`, or `''` — a range of days never carries one. */
 	time: string;
+	/** The end of a timespan (`d HH:mm → d HH:mm`), or `''`. */
+	endTime: string;
 	/** The month the calendar should be showing to see the entry. */
 	month: CalDate;
 }
@@ -72,11 +75,15 @@ export function readDateEntry(raw: string): DateEntryEdit | null {
 	const span = parseSpan(raw);
 	if (!span) return null;
 	const oneDay = sameDay(span.start, span.end);
+	const timespan = parseTimespan(raw);
 	return {
 		selection: oneDay
 			? { start: stripTime(span.start) }
 			: { start: stripTime(span.start), end: stripTime(span.end) },
 		time: oneDay ? formatClock(span.start) : '',
+		// One day from one time to another is a timespan, not two days; a bare
+		// `d HH:mm` has no end at all, whatever its span's ends look like.
+		endTime: timespan ? formatClock(timespan.end) : '',
 		month: stripTime(span.start),
 	};
 }

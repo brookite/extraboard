@@ -181,6 +181,7 @@ export type PropertyDiagnostic =
 	| { kind: 'duplicateName'; name: string }
 	| { kind: 'strictOptionsWrongType'; name: string }
 	| { kind: 'timeWrongType'; name: string }
+	| { kind: 'timespanNeedsTime'; name: string }
 	| { kind: 'tooManyColors' };
 
 /**
@@ -205,6 +206,10 @@ export function validatePropertyDefs(defs: PropertyDef[]): PropertyDiagnostic[] 
 		}
 		if (d.time !== undefined && d.type !== 'datetime' && d.type !== 'date-list') {
 			diags.push({ kind: 'timeWrongType', name: d.name });
+		}
+		// A range of times inside a value that carries none is nothing at all.
+		if (d.timespan !== undefined && (d.time === undefined || d.time === 'none')) {
+			diags.push({ kind: 'timespanNeedsTime', name: d.name });
 		}
 	}
 	if (colors > 1) diags.push({ kind: 'tooManyColors' });

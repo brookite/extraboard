@@ -131,6 +131,14 @@ export interface PropertyDef {
 	/** datetime, and single dates within date-list; never date-range */
 	time?: 'none' | 'optional' | 'required';
 	/**
+	 * Whether a value that carries a time may carry an **end** time as well —
+	 * `d HH:mm → d HH:mm`, one day of some duration (properties.md §time).
+	 * Absent means allowed: a board that says nothing gets the richer value, and
+	 * only an explicit `false` takes it away. Meaningless where `time` is
+	 * `none` or absent, and dropped with it.
+	 */
+	timespan?: boolean;
+	/**
 	 * Badge accent: an outline in this color on every badge of this property, so
 	 * two properties of the same type (a due date and a done date) read apart at
 	 * a glance. Never a fill — the fill belongs to the value (a `string-list`

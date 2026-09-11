@@ -166,6 +166,31 @@ export function parseDate(raw: string): CalDate | null {
 }
 
 /**
+ * A **timespan** — one day from one time to another, written as a span whose
+ * two ends share a day and both carry a time (`d HH:mm → d HH:mm`). The format
+ * gains nothing new for it: a same-day span already round-trips everywhere.
+ *
+ * Only the two-ended text is one. `parseSpan` answers a bare `d HH:mm` with a
+ * span whose ends are the same date, and that is one moment, not a duration —
+ * so this reads the text, never a span someone already parsed.
+ */
+export function parseTimespan(raw: string): DateSpan | null {
+	if (parseDate(raw)) return null;
+	const span = parseSpan(raw);
+	if (!span) return null;
+	return isTimespan(span) ? span : null;
+}
+
+/** Whether a span that came from two-ended text is a {@link parseTimespan}. */
+export function isTimespan(span: DateSpan): boolean {
+	return (
+		sameDay(span.start, span.end) &&
+		span.start.minutes !== undefined &&
+		span.end.minutes !== undefined
+	);
+}
+
+/**
  * Parse a date or a range into an inclusive span. A reversed range is
  * normalized by swapping its ends rather than dropped.
  */

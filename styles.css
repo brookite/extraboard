@@ -1250,6 +1250,26 @@ body.eb-dragging-card
 	box-shadow: none;
 }
 
+/* Start and end time, stacked: two clocks never fit one narrow row (§2.2). */
+.eb-date-times {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.eb-date-time > span {
+	flex: 0 0 auto;
+}
+
+.eb-date-time input[type='time'] {
+	flex: 1;
+	min-width: 0;
+}
+
+.eb-date-time.is-invalid input[type='time'] {
+	box-shadow: 0 0 0 1px var(--text-error);
+}
+
 .eb-date-nav {
 	justify-content: space-between;
 	font-weight: var(--font-semibold, 600);
@@ -2226,6 +2246,15 @@ body.eb-dragging-card .eb-archive-drop {
 	white-space: nowrap;
 	overflow: hidden;
 	cursor: pointer;
+}
+
+/* A timespan in week mode is drawn as tall as it is long (calendar-view.md
+   §3.3): one chip height per half hour, capped so one card cannot take the
+   whole day. The text stays on the first line, where the chip starts. */
+.eb-cal-chip.is-span {
+	flex: 0 0 auto;
+	height: calc(var(--eb-cal-chip-h) * var(--eb-cal-chip-units, 1));
+	align-items: flex-start;
 }
 
 /* The card's color as a dot at the head of a chip or a bar, rather than a

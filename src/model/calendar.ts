@@ -10,6 +10,7 @@ import {
 	formatDate,
 	formatSpan,
 	parseSpan,
+	parseTimespan,
 	stripTime,
 } from './dates';
 import { removeCardProperty, setCardProperty, type ItemRef } from './ops';
@@ -351,10 +352,13 @@ export function moveOccurrence(
 	// The moved value's own span, which a merged occurrence's geometry is not:
 	// the widest source lends the bar its length, and shifting *that* would
 	// stretch a shorter sibling to match.
-	const own = parseSpan(raw[at] ?? '');
+	const text = raw[at] ?? '';
+	const own = parseSpan(text);
 	const start = addDays(own?.start ?? occurrence.start, delta);
 	const end = addDays(own?.end ?? occurrence.end, delta);
-	const single = daysBetween(end, start) === 0;
+	// A timespan is one day and still two-ended: collapsing it to `formatDate`
+	// would drop the hour it ends at, so only a real single date collapses.
+	const single = daysBetween(end, start) === 0 && !parseTimespan(text);
 	raw[at] = single && type !== 'date-range' ? formatDate(start) : formatSpan({ start, end });
 	return write(board, occurrence.ref, property, type, raw);
 }

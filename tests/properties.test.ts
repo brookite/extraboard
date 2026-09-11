@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { parseBoardSettings, serializeSettingsBlock } from '../src/model/boardSettings';
 import {
 	escapeValue,
 	unescapeValue,
@@ -99,11 +100,44 @@ describe('validatePropertyDefs', () => {
 		]);
 		expect(diags.length).toBe(2);
 	});
+	it('flags a timespan setting on a property that carries no time', () => {
+		expect(validatePropertyDefs([{ name: 'due', type: 'datetime', timespan: false }])).toEqual([
+			{ kind: 'timespanNeedsTime', name: 'due' },
+		]);
+		expect(
+			validatePropertyDefs([{ name: 'due', type: 'datetime', time: 'none', timespan: true }]),
+		).toEqual([{ kind: 'timespanNeedsTime', name: 'due' }]);
+	});
 	it('accepts a valid config', () => {
 		expect(validatePropertyDefs([
 			{ name: 'status', type: 'string-list', strict: true, options: [{ value: 'A' }] },
 			{ name: 'due', type: 'datetime', time: 'optional' },
+			{ name: 'slot', type: 'date-list', time: 'required', timespan: false },
 			{ name: 'flag', type: 'checkbox' },
 		])).toEqual([]);
+	});
+});
+
+// `PropertyDef.timespan` (properties.md §time): absent is "allowed", so only an
+// explicit `false` is stored — and it has to survive the settings block.
+describe('the timespan setting in the settings block', () => {
+	const bodyOf = (settings: Record<string, unknown>): string =>
+		'```extraboard-settings\n' + JSON.stringify(settings, null, 2) + '\n```\n\n## Todo\n';
+
+	it('reads an explicit false and leaves a property that says nothing alone', () => {
+		const defs = [
+			{ name: 'due', type: 'datetime', time: 'optional', timespan: false },
+			{ name: 'slot', type: 'datetime', time: 'optional' },
+		];
+		const { config } = parseBoardSettings(bodyOf({ version: 1, properties: defs }));
+		expect(config.properties).toEqual(defs);
+		expect(config.properties[1]?.timespan).toBeUndefined();
+	});
+
+	it('writes it back unchanged', () => {
+		const defs = [{ name: 'due', type: 'datetime', time: 'required', timespan: false }];
+		const { config } = parseBoardSettings(bodyOf({ version: 1, properties: defs }));
+		const round = parseBoardSettings(serializeSettingsBlock(config));
+		expect(round.config.properties).toEqual(defs);
 	});
 });
