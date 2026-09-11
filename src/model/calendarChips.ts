@@ -15,9 +15,6 @@ const SPAN_UNIT_MINUTES = 30;
 /** Four hours of chip is as much as one cell can give a single card. */
 const MAX_SPAN_UNITS = 8;
 
-/** At most this many lines for a chip with no duration to fill. */
-const MAX_CHIP_LINES = 2;
-
 /**
  * The minutes a timespan covers, or 0 when the occurrence is not one — a single
  * day, whatever time it carries, has no duration to draw (`dates.parseTimespan`).
@@ -54,12 +51,12 @@ export interface ChipPlan {
  * costs as many rows as it is tall, and the last row is kept for `+N` whenever
  * anything is left behind.
  *
- * Rows the cell does not need are then handed back as **second lines**, in
- * order, so a title too long for one line wraps wherever there is room for it
- * to and nowhere else — a chip is never drawn outside its cell, and what the
- * plan cannot pay for the `+N` accounts for. A chip granted two lines is not
- * made two rows tall, only allowed to be: a short title still draws one row,
- * and the row it did not use is simply not filled.
+ * A chip only ever wraps to a second line when it is itself stretched by a
+ * time range (§3.3): that is the one case where the extra height is already
+ * spent on the chip and would otherwise sit empty. A chip with no range keeps
+ * to one line even when the cell has spare rows to give it — granting those
+ * rows to plain chips made a cell's layout jump around with occupancy for no
+ * reason a reader could see.
  */
 export function planChips(
 	occurrences: Occurrence[],
@@ -76,12 +73,9 @@ export function planChips(
 		shown.push({ occurrence, units });
 	}
 
-	let spare = capacity - used - (shown.length < occurrences.length ? 1 : 0);
 	return shown.map(({ occurrence, units }) => {
 		// A duration already says how tall the chip is; its text simply fills it.
 		if (units > 1) return { occurrence, units, lines: units };
-		const extra = Math.max(0, Math.min(MAX_CHIP_LINES - 1, spare));
-		spare -= extra;
-		return { occurrence, units: 0, lines: 1 + extra };
+		return { occurrence, units: 0, lines: 1 };
 	});
 }

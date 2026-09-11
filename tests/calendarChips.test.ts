@@ -49,16 +49,15 @@ describe('durationOf / chipUnits', () => {
 });
 
 describe('planChips', () => {
-	it('gives a second line to every chip a roomy cell can afford', () => {
+	it('never wraps a plain chip to a second line, however roomy the cell is', () => {
 		const plan = planChips([day(), day()], 5, false);
-		expect(plan.map((p) => p.lines)).toEqual([2, 2]);
+		expect(plan.map((p) => p.lines)).toEqual([1, 1]);
 		expect(rows(plan)).toBeLessThanOrEqual(5);
 	});
 
-	it('hands the spare rows out in order, and stops when they run out', () => {
-		// Four chips in five rows: one row is spare, so only the first may wrap.
+	it('leaves spare rows unused rather than handing them to plain chips', () => {
 		const plan = planChips([day(), day(), day(), day()], 5, false);
-		expect(plan.map((p) => p.lines)).toEqual([2, 1, 1, 1]);
+		expect(plan.map((p) => p.lines)).toEqual([1, 1, 1, 1]);
 		expect(rows(plan)).toBeLessThanOrEqual(5);
 	});
 

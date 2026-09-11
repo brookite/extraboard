@@ -2583,6 +2583,14 @@ body.is-mobile .eb-panel-modal .eb-date-day {
 	box-shadow: none;
 }
 
+/* The day list is the calendar too, so a card keeps its color mark here
+   exactly as it does on the board (kanban-view.md §3) — the plain border
+   above would otherwise take the stripe with it. */
+.eb-day-row .eb-card.is-colored {
+	border-left: 4px solid var(--eb-card-color);
+	padding-left: 7px;
+}
+
 .eb-day-meta {
 	display: flex;
 	flex-wrap: wrap;

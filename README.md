@@ -68,7 +68,7 @@ with its own file format, not a fork.
 ## Status
 
 **Post-MVP active development.** The full feature set above is implemented and
-manually verified on desktop and mobile. The current version is **0.5.2**;
+manually verified on desktop and mobile. The current version is **0.5.3**;
 packaging and draft GitHub Releases are automated.
 
 ## Development
