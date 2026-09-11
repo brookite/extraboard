@@ -70,13 +70,38 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 		const setting = (
 			name: string,
 			desc: string,
-			render: (row: Setting, containerEl: HTMLElement) => void | (() => void),
+			render: (row: Setting) => void | (() => void),
 			visible?: () => boolean,
 		): SettingDefinition => ({
 			name,
 			desc,
-			render: (row) => render(row, row.settingEl.parentElement ?? row.settingEl),
+			render,
 			...(visible && { visible }),
+		});
+
+		// A row whose control is a whole editor. The editor has to live *inside*
+		// the row element: after every render Obsidian resets the group's list to
+		// exactly the rows it knows about (`listEl.setChildrenInPlace`), so an
+		// element put next to a row — or appended to the list — is dropped again
+		// without a trace. The row is made to wrap so the editor gets a full-width
+		// line of its own under the name and description.
+		const nested = (
+			name: string,
+			desc: string,
+			build: (row: Setting, containerEl: HTMLElement) => () => void,
+		): SettingDefinition => ({
+			name,
+			desc,
+			render: (row) => {
+				row.settingEl.addClass('eb-setting-nested');
+				const host = row.settingEl.createDiv({ cls: 'eb-setting-nested-body' });
+				const cleanup = build(row, host);
+				return () => {
+					cleanup();
+					host.remove();
+					row.settingEl.removeClass('eb-setting-nested');
+				};
+			},
 		});
 
 		return [
@@ -108,7 +133,7 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 					setting(t('settings.weekStart.name'), t('settings.weekStart.desc'), (row) =>
 						this.renderWeekStart(row),
 					),
-					setting(
+					nested(
 						t('settings.dateHighlights.heading'),
 						t('settings.dateHighlights.desc'),
 						(row, containerEl) => this.renderDateHighlights(row, containerEl),
@@ -157,7 +182,7 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 			setting(t('settings.archiveLimit.name'), t('settings.archiveLimit.desc'), (row) =>
 				this.renderArchiveLimit(row),
 			),
-			setting(
+			nested(
 				t('settings.defaultProperties.heading'),
 				t('settings.defaultProperties.desc'),
 				(row, containerEl) => this.renderDefaultProperties(row, containerEl),

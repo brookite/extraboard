@@ -1593,6 +1593,17 @@ body.is-mobile .eb-hover-only {
 	border-radius: var(--radius-m, 8px);
 }
 
+/* A settings-tab row that carries a whole editor: it wraps, and the editor
+   takes a full-width line of its own under the name and description. */
+.setting-item.eb-setting-nested {
+	flex-wrap: wrap;
+}
+
+.eb-setting-nested-body {
+	flex: 0 0 100%;
+	min-width: 0;
+}
+
 /* Property / tag color editors (board settings modal + settings tab) */
 .eb-pe {
 	display: flex;
