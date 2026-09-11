@@ -8,6 +8,15 @@
 
 import type { App, TFile } from 'obsidian';
 
+/**
+ * Obsidian's own editing toolbar, which sits above the software keyboard on a
+ * phone. Pressing it is not leaving the field (mobile.md §7.3).
+ */
+const MOBILE_TOOLBAR = '.mobile-toolbar, .mobile-toolbar-options-container';
+
+/** How long after a toolbar press a blur still counts as that press's doing. */
+const TOOLBAR_GRACE = 1000;
+
 /** The slice of the internal editor component this plugin uses. */
 interface InternalEditor {
 	editorEl?: HTMLElement;
@@ -259,6 +268,17 @@ export function createEmbeddedEditor(
 	};
 
 	const scope = options.scope ?? container;
+	// When the phone's own editing toolbar was last pressed. The press moves the
+	// focus out of the field, and the blur that follows must not read that as
+	// "the user left" — the toolbar is this field's own chrome, the one the user
+	// reaches for to insert a link into the text they are typing.
+	let toolbarPress = 0;
+	const onPointerDown = (evt: Event): void => {
+		const target = evt.target;
+		if (target instanceof Element && target.closest(MOBILE_TOOLBAR)) toolbarPress = Date.now();
+	};
+	container.doc.addEventListener('pointerdown', onPointerDown, true);
+
 	const onBlur = (): void => {
 		// Deferred: clicking a completion moves focus briefly, and the click must
 		// not be read as "the user left the card".
@@ -276,7 +296,13 @@ export function createEmbeddedEditor(
 			const above = Array.from(document.querySelectorAll('.modal-container')).some(
 				(el) => el !== own,
 			);
-			if (scope.contains(document.activeElement) || above) {
+			// The editing toolbar likewise: its command runs against this editor
+			// (Obsidian aims one at `workspace.activeEditor`, which is this field
+			// while it has been focused), so the field has to still be there when
+			// it lands. The window is generous — the press is what matters, not
+			// how long the browser took to move the focus.
+			const fromToolbar = Date.now() - toolbarPress < TOOLBAR_GRACE;
+			if (scope.contains(document.activeElement) || above || fromToolbar) {
 				options.onCommit?.(readValue());
 				return;
 			}
@@ -315,6 +341,7 @@ export function createEmbeddedEditor(
 			closed = true;
 			content.removeEventListener('keydown', onKeyDown, capture);
 			content.removeEventListener('blur', onBlur);
+			container.doc.removeEventListener('pointerdown', onPointerDown, true);
 			releaseOwner(app, owner);
 			destroy(instance);
 		},

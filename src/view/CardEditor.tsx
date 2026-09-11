@@ -180,8 +180,14 @@ interface Props {
 	onClose: () => void;
 }
 
-/** Obsidian surfaces that float above the board and must not close the editor. */
-const FLOATING = '.modal-container, .menu, .suggestion-container, .notice-container';
+/**
+ * Obsidian surfaces that float above the board and must not close the editor.
+ * The phone's **editing toolbar** is one of them (mobile.md §7.3): it is the
+ * card field's own chrome while it is being typed into, and its commands run
+ * against that very field.
+ */
+const FLOATING =
+	'.modal-container, .menu, .suggestion-container, .notice-container, .mobile-toolbar, .mobile-toolbar-options-container';
 
 export function CardEditor({ config, card, target, api, settings, onClose }: Props) {
 	const showRaw = settings.showRawPropertyTokens;
