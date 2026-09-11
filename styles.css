@@ -3270,23 +3270,34 @@ body.is-mobile .eb-card-stack {
 /* The keyboard covers the page rather than shrinking it, so a modal laid out
    against the whole screen keeps its footer — and often the row being typed
    into — underneath it. `--keyboard-height` is Obsidian's own measurement;
-   `--eb-keyboard-height` is this plugin's `visualViewport` fallback for where
-   that is not set. Applied only while the keyboard is actually up, so a closed
-   one leaves every modal's sizing exactly as it was. */
-.is-mobile .eb-keyboard-aware.is-keyboard-open {
-	box-sizing: border-box;
-	padding-bottom: max(var(--keyboard-height, 0px), var(--eb-keyboard-height, 0px));
+   `--eb-keyboard-height` is what `keyboardInset.ts` resolves (that variable,
+   or its own `visualViewport` reading, whichever is larger). Both are read
+   here so a value set by hand — Obsidian's, or a devtools simulation — works
+   on its own. `.is-keyboard-open` is the gate: a closed keyboard leaves every
+   modal's sizing exactly as it was, and the class only ever appears on a
+   phone, which is the only place the script measures anything. */
+.eb-keyboard-aware {
+	--eb-keyboard-inset: max(var(--keyboard-height, 0px), var(--eb-keyboard-height, 0px));
+}
+
+/* The container is shrunk, not padded: whatever the modal is positioned
+   against — a flex centre, or the container's own bottom edge — is then above
+   the keyboard. `bottom` covers a container inset to the viewport, the
+   max-height one sized to it. */
+.eb-keyboard-aware.is-keyboard-open {
+	bottom: var(--eb-keyboard-inset);
+	max-height: calc(100% - var(--eb-keyboard-inset));
 }
 
 /* Above the keyboard the modal is short, so its content has to be the part
    that scrolls — otherwise the box simply clips its own footer. */
-.is-mobile .eb-keyboard-aware.is-keyboard-open .modal {
+.eb-keyboard-aware.is-keyboard-open .modal {
 	display: flex;
 	flex-direction: column;
 	max-height: 100%;
 }
 
-.is-mobile .eb-keyboard-aware.is-keyboard-open .modal-content {
+.eb-keyboard-aware.is-keyboard-open .modal-content {
 	min-height: 0;
 	overflow-y: auto;
 }
@@ -3294,9 +3305,9 @@ body.is-mobile .eb-card-stack {
 /* A panel that bounds itself against the *layout* viewport, which the keyboard
    does not change, would keep its full height above a modal that no longer has
    it. The modal's own scroller takes over instead. */
-.is-mobile .eb-keyboard-aware.is-keyboard-open .eb-checklist,
-.is-mobile .eb-keyboard-aware.is-keyboard-open .eb-archive-list,
-.is-mobile .eb-keyboard-aware.is-keyboard-open .eb-value-list,
-.is-mobile .eb-keyboard-aware.is-keyboard-open .eb-tag-picker-list {
+.eb-keyboard-aware.is-keyboard-open .eb-checklist,
+.eb-keyboard-aware.is-keyboard-open .eb-archive-list,
+.eb-keyboard-aware.is-keyboard-open .eb-value-list,
+.eb-keyboard-aware.is-keyboard-open .eb-tag-picker-list {
 	max-height: none;
 }

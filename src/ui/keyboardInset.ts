@@ -10,8 +10,8 @@
 // So the modal is told how tall the keyboard is and ends above it. Obsidian
 // publishes that as `--keyboard-height`, which is what the rest of the
 // ecosystem reads; `visualViewport` is measured alongside it as a fallback for
-// the builds and platforms where the variable is not set, and the CSS takes
-// whichever is larger. Where the keyboard shrinks the layout viewport instead
+// the builds and platforms where the variable is not set, and the larger of the
+// two wins. Where the keyboard shrinks the layout viewport instead
 // of covering it — some Android web views — both are zero, which is correct:
 // there is nothing left to reserve.
 
@@ -20,8 +20,13 @@ import { Platform, type Modal } from 'obsidian';
 /** Below this, the gap is browser chrome or rounding, not a keyboard. */
 const MIN_KEYBOARD = 80;
 
-/** What the keyboard covers, as `visualViewport` sees it; 0 when it is closed. */
+/**
+ * What the keyboard covers, as `visualViewport` sees it; 0 when it is closed.
+ * Mobile only: a desktop's pinch-zoom moves the visual viewport too, and there
+ * is no keyboard there to confuse it with.
+ */
 function measuredKeyboard(win: Window): number {
+	if (!Platform.isMobile) return 0;
 	const view = win.visualViewport;
 	if (!view) return 0;
 	const gap = win.innerHeight - view.height - view.offsetTop;
@@ -29,15 +34,26 @@ function measuredKeyboard(win: Window): number {
 }
 
 /**
+ * `--keyboard-height` as the host has set it, in px. This is the authority:
+ * Obsidian sets it only on a phone with the keyboard open, so reading it needs
+ * no platform test of its own — and a value set by hand, in devtools, then
+ * behaves exactly like the real one.
+ */
+function declaredKeyboard(el: HTMLElement): number {
+	const raw = getComputedStyle(el).getPropertyValue('--keyboard-height').trim();
+	const value = Number.parseFloat(raw);
+	return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/**
  * Reserve the software keyboard's height under `modal`, and keep whatever is
- * focused inside it on screen. Desktop is left alone entirely — there is no
- * keyboard to reserve, and no `visualViewport` change to react to.
+ * focused inside it on screen. On a desktop both readings are zero, so nothing
+ * is applied and nothing is measured.
  *
  * One call in `onOpen` is the whole contract: the listeners come down with the
  * modal, through its own `onClose`.
  */
 export function keyboardAwareModal(modal: Modal): void {
-	if (!Platform.isMobile) return;
 	const container = modal.containerEl;
 	// The modal's own window, not the ambient one: a board opened in a popout
 	// has a viewport of its own (and it is what the lint rule is about).
@@ -56,12 +72,14 @@ export function keyboardAwareModal(modal: Modal): void {
 	};
 
 	const apply = (): void => {
-		const height = measuredKeyboard(win);
+		// Whichever source knows about the keyboard: the host's variable is the
+		// authority, the measurement covers the platforms that do not set it.
+		const height = Math.max(declaredKeyboard(container), measuredKeyboard(win));
 		container.style.setProperty('--eb-keyboard-height', `${String(height)}px`);
 		// The reserve is only ever applied while the keyboard is actually up, so
 		// a closed keyboard leaves the modal's own sizing untouched.
 		container.toggleClass('is-keyboard-open', height > 0);
-		showFocus();
+		if (height > 0) showFocus();
 	};
 
 	// The keyboard opens after the focus that summoned it, so the focus alone
@@ -74,6 +92,12 @@ export function keyboardAwareModal(modal: Modal): void {
 	view?.addEventListener('resize', apply);
 	view?.addEventListener('scroll', apply);
 	modal.modalEl.addEventListener('focusin', onFocusIn);
+	// `--keyboard-height` is a style, and a style change raises no event of its
+	// own. The keyboard's arrival always moves the focus or the visual viewport
+	// too, so this is a backstop rather than the signal — but it is also what
+	// makes a hand-set value, in devtools or from a host that only writes the
+	// variable, behave exactly like the real thing.
+	const poll = win.setInterval(apply, 250);
 	apply();
 
 	// Patched rather than left to each caller: a listener on the visual viewport
@@ -83,6 +107,7 @@ export function keyboardAwareModal(modal: Modal): void {
 	const close = modal.onClose.bind(modal);
 	modal.onClose = (): void => {
 		close();
+		win.clearInterval(poll);
 		view?.removeEventListener('resize', apply);
 		view?.removeEventListener('scroll', apply);
 		modal.modalEl.removeEventListener('focusin', onFocusIn);
