@@ -5,6 +5,7 @@
 // Split out of `PropertyBadges` so the modal can mount the very same editor:
 // one implementation, two hosts, no second rendering of dates to keep in step.
 
+import { useRef } from 'preact/hooks';
 import { escapeValue, formatValue, parseValue } from '../../model/properties';
 import type { PropertyDef, PropertyValue } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
@@ -52,6 +53,10 @@ export interface EditorProps {
  */
 export function ValueEditor({ name, def, pv, api, settings, onCommit, onRemove, onClose }: EditorProps) {
 	const type = def?.type ?? 'raw';
+	// What the date editor leaves here for **Done** to run on its way out: the
+	// selection that has no button of its own to save it (2026-08-01-v0.3.1-date-editor.md §2.1).
+	const dateCommit = useRef<(() => void) | null>(null);
+	dateCommit.current = null;
 	const current = pv ? formatValue(pv) : '';
 	const typeLabel = type === 'raw' ? t('propertyDefs.type.raw') : typeLabels()[type];
 
@@ -113,6 +118,7 @@ export function ValueEditor({ name, def, pv, api, settings, onCommit, onRemove, 
 					api={api}
 					settings={settings}
 					onCommit={onCommit}
+					commitRef={dateCommit}
 				/>
 			) : type === 'recurrence' ? (
 				// A rule is not something to type by hand (recurrence.md §4).
@@ -163,7 +169,13 @@ export function ValueEditor({ name, def, pv, api, settings, onCommit, onRemove, 
 				<button type="button" class="mod-warning" onClick={onRemove}>
 					{t('propertyBadges.remove')}
 				</button>
-				<button type="button" onClick={onClose}>
+				<button
+					type="button"
+					onClick={() => {
+						dateCommit.current?.();
+						onClose();
+					}}
+				>
 					{t('propertyBadges.done')}
 				</button>
 			</div>

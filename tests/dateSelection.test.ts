@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
 	inSelection,
+	insertDateEntry,
 	monthGrid,
+	readDateEntry,
 	selectCalendarDay,
 } from '../src/model/dateSelection';
 import { dayKey, type CalDate } from '../src/model/dates';
@@ -42,5 +44,50 @@ describe('calendar property selection', () => {
 
 		const sunday = monthGrid(date(1), 0);
 		expect(dayKey(sunday[0]!)).toBe('2026-07-26');
+	});
+});
+
+describe('editing a stored date entry', () => {
+	it('reads a single day back, with its time', () => {
+		expect(readDateEntry('2026-08-04')).toEqual({
+			selection: { start: date(4) },
+			time: '',
+			month: date(4),
+		});
+		expect(readDateEntry('2026-08-04 09:05')).toEqual({
+			selection: { start: date(4) },
+			time: '09:05',
+			month: date(4),
+		});
+	});
+
+	it('reads a range back as a two-ended selection and drops any time', () => {
+		expect(readDateEntry('2026-08-04 09:05 → 2026-08-09')).toEqual({
+			selection: { start: date(4), end: date(9) },
+			time: '',
+			month: date(4),
+		});
+	});
+
+	it('opens the calendar on the month the entry starts in', () => {
+		expect(readDateEntry('2026-07-30 → 2026-08-02')?.month).toEqual(date(30, 7));
+	});
+
+	it('refuses what the calendar cannot show', () => {
+		expect(readDateEntry('every week on Mon')).toBeNull();
+		expect(readDateEntry('')).toBeNull();
+	});
+
+	it('puts an entry back where it came from', () => {
+		const list = ['2026-08-01', '2026-08-03', '2026-08-07'];
+		expect(insertDateEntry(list, 1, '2026-08-02')).toEqual([
+			'2026-08-01',
+			'2026-08-02',
+			'2026-08-03',
+			'2026-08-07',
+		]);
+		expect(insertDateEntry(list, 9, '2026-08-09')).toEqual([...list, '2026-08-09']);
+		expect(insertDateEntry([], 3, '2026-08-09')).toEqual(['2026-08-09']);
+		expect(list).toHaveLength(3);
 	});
 });

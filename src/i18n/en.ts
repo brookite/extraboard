@@ -88,6 +88,8 @@ export const en = {
 		setDate: 'Set date',
 		addDate: 'Add',
 		addRepetition: 'Add repetition',
+		saveDate: 'Save',
+		editDate: 'Edit {value}',
 		removeDate: 'Remove {value}',
 		remove: 'Remove',
 		done: 'Done',

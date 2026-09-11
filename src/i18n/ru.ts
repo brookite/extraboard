@@ -89,6 +89,8 @@ export const ru: DeepPartial<typeof en> = {
 		setDate: 'Задать дату',
 		addDate: 'Добавить',
 		addRepetition: 'Добавить повторение',
+		saveDate: 'Сохранить',
+		editDate: 'Изменить {value}',
 		removeDate: 'Удалить {value}',
 		remove: 'Удалить',
 		done: 'Готово',

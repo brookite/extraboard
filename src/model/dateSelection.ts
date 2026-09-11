@@ -3,7 +3,11 @@
 import {
 	addDays,
 	compareDates,
+	formatClock,
+	parseSpan,
+	sameDay,
 	startOfMonth,
+	stripTime,
 	toOrdinal,
 	weekday,
 	type CalDate,
@@ -48,4 +52,38 @@ export function inSelection(day: CalDate, selection: DateSelection | null): bool
 
 export function isSameMonth(day: CalDate, month: CalDate): boolean {
 	return day.y === month.y && day.m === month.m;
+}
+
+/** A stored entry read back into the calendar's own controls. */
+export interface DateEntryEdit {
+	selection: DateSelection;
+	/** `HH:mm`, or `''` — a range never carries one. */
+	time: string;
+	/** The month the calendar should be showing to see the entry. */
+	month: CalDate;
+}
+
+/**
+ * Read one `date-list`/`date-range`/`datetime` entry back into a selection, so
+ * tapping it in the list puts it back on the grid. `null` when the text is not
+ * a date at all — a recurrence rule, or something hand-written and unparseable.
+ */
+export function readDateEntry(raw: string): DateEntryEdit | null {
+	const span = parseSpan(raw);
+	if (!span) return null;
+	const oneDay = sameDay(span.start, span.end);
+	return {
+		selection: oneDay
+			? { start: stripTime(span.start) }
+			: { start: stripTime(span.start), end: stripTime(span.end) },
+		time: oneDay ? formatClock(span.start) : '',
+		month: stripTime(span.start),
+	};
+}
+
+/** `list` with `raw` put back at `index` (appended when `index` is past the end). */
+export function insertDateEntry(list: readonly string[], index: number, raw: string): string[] {
+	const next = [...list];
+	next.splice(Math.min(Math.max(index, 0), next.length), 0, raw);
+	return next;
 }

@@ -1223,10 +1223,31 @@ body.eb-dragging-card
 	border-radius: var(--radius-s, 6px);
 }
 
-.eb-date-value > span {
+.eb-date-value > span,
+.eb-date-value-text {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* The entry's own text is the control that takes it back to the calendar. */
+.eb-date-value-text {
+	flex: 1;
+	min-width: 0;
+	padding: 0;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.eb-date-value-text:hover {
+	color: var(--text-accent);
+	background: transparent;
+	box-shadow: none;
 }
 
 .eb-date-nav {

@@ -141,6 +141,12 @@ export function formatSpan(span: DateSpan): string {
 	return `${formatDate(span.start)}${RANGE_SEPARATOR}${formatDate(span.end)}`;
 }
 
+/** `HH:mm` when the date carries a time, `''` when it does not. */
+export function formatClock(date: CalDate): string {
+	if (date.minutes === undefined) return '';
+	return `${pad(Math.floor(date.minutes / 60))}:${pad(date.minutes % 60)}`;
+}
+
 /** Parse one date; `null` when the text is not one (§1.1 — never an error). */
 export function parseDate(raw: string): CalDate | null {
 	const match = DATE_RE.exec(raw.trim());
