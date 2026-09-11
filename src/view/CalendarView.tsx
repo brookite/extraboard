@@ -41,6 +41,7 @@ import { openDayModal } from '../ui/DayModal';
 import type { BoardApi } from './api';
 import { Icon } from './components/Icon';
 import { safeColor } from './components/style';
+import { readableOn } from '../util/color';
 import { DropInfo, isDragging, useSortable } from './useSortable';
 import { useNow } from './now';
 import { currentLanguage, t } from '../i18n';
@@ -236,6 +237,18 @@ function chipColor(board: Board, ref: ops.ItemRef, card: Card): string | undefin
 }
 
 /**
+ * The inline custom properties a coloured chip or bar carries. With the fill
+ * setting on (§3.4) the colour becomes the background, so the text has to be
+ * picked for it — `util/color.ts:readableOn` is the one place that decides
+ * black or white on a colour, shared with the date highlights' badges.
+ */
+function colorStyle(color: string | undefined, fill: boolean): string | undefined {
+	if (!color) return undefined;
+	const text = fill ? readableOn(color, document.body) : undefined;
+	return `--eb-card-color: ${color}${text === undefined ? '' : `; --eb-card-text: ${text}`}`;
+}
+
+/**
  * What a chip says on hover. With one date property that is the card's text and
  * nothing else — the day is already the cell it sits in. With several, the
  * tooltip is the only place that says *which* of them put it there, so it lists
@@ -265,23 +278,39 @@ interface ChipProps {
 	repeating?: boolean;
 	/** Named in the tooltip; passed only when the view reads several properties. */
 	sources?: OccurrenceSource[];
+	/** Paint the card's colour over the whole chip rather than as a dot (§3.4). */
+	fill?: boolean;
 	onOpen: () => void;
 }
 
-function Chip({ board, card, occRef, index, time, endTime, units, opts, repeating, sources, onOpen }: ChipProps) {
+function Chip({
+	board,
+	card,
+	occRef,
+	index,
+	time,
+	endTime,
+	units,
+	opts,
+	repeating,
+	sources,
+	fill,
+	onOpen,
+}: ChipProps) {
 	const color = chipColor(board, occRef, card);
 	const done = ops.isCardDone(card);
+	const filled = !!fill && !!color;
 	// A duration is drawn only when it is both known and worth a row of its own.
 	const span = units !== undefined && units > 1;
 	const style = [
-		color ? `--eb-card-color: ${color}` : '',
+		colorStyle(color, filled) ?? '',
 		span ? `--eb-cal-chip-units: ${String(units)}` : '',
 	]
 		.filter(Boolean)
 		.join('; ');
 	return (
 		<div
-			class={`eb-cal-chip${done ? ' is-done' : ''}${color ? ' is-colored' : ''}${span ? ' is-span' : ''}`}
+			class={`eb-cal-chip${done ? ' is-done' : ''}${color ? ' is-colored' : ''}${filled ? ' is-filled' : ''}${span ? ' is-span' : ''}`}
 			data-index={index}
 			style={style || undefined}
 			title={chipTooltip(card, sources)}
@@ -290,7 +319,7 @@ function Chip({ board, card, occRef, index, time, endTime, units, opts, repeatin
 				if (!isDragging()) onOpen();
 			}}
 		>
-			{color ? <span class="eb-cal-dot" /> : null}
+			{color && !filled ? <span class="eb-cal-dot" /> : null}
 			{done ? <Icon name="check" class="eb-cal-chip-check" /> : null}
 			{repeating ? <Icon name="repeat" class="eb-cal-chip-repeat" /> : null}
 			{time !== undefined && opts ? (
@@ -634,6 +663,7 @@ export function CalendarView({ board, view, api, settings }: Props) {
 							capacity={Math.max(1, capacity - lanes)}
 							compact={compact}
 							stretch={stretch}
+							fill={settings.fillCalendarEvents}
 							multi={multi}
 							rowStartIndex={row * 7}
 							dateTimeOpts={dateTimeOpts}
@@ -647,6 +677,7 @@ export function CalendarView({ board, view, api, settings }: Props) {
 			<Tray
 				board={board}
 				undated={undated}
+				fill={settings.fillCalendarEvents}
 				open={trayOpen}
 				onToggle={() => setTrayOpen(!trayOpen)}
 				onOpen={() => openDay(null)}
@@ -674,6 +705,8 @@ interface RowProps {
 	compact: boolean;
 	/** Draw a timespan chip as tall as it is long (week mode, §3.3). */
 	stretch: boolean;
+	/** Paint a card's colour over its whole chip or bar, not as a dot (§3.4). */
+	fill: boolean;
 	/** The view reads several date properties, so tooltips name them (§3.1). */
 	multi: boolean;
 	rowStartIndex: number;
@@ -696,6 +729,7 @@ function WeekRow({
 	capacity,
 	compact,
 	stretch,
+	fill,
 	multi,
 	rowStartIndex,
 	dateTimeOpts,
@@ -714,6 +748,8 @@ function WeekRow({
 					const card = cardOf(board, segment.occurrence.ref);
 					if (!card) return null;
 					const color = chipColor(board, segment.occurrence.ref, card);
+					const filled = fill && !!color;
+					const paint = colorStyle(color, filled);
 					return (
 						<div
 							key={`${String(segment.index)}`}
@@ -722,18 +758,19 @@ function WeekRow({
 								segment.continuesBefore ? 'is-cut-start' : '',
 								segment.continuesAfter ? 'is-cut-end' : '',
 								color ? 'is-colored' : '',
+								filled ? 'is-filled' : '',
 							]
 								.filter(Boolean)
 								.join(' ')}
 							data-index={segment.index}
-							style={`grid-column: ${String(segment.column + 1)} / span ${String(segment.span)}; grid-row: ${String(segment.lane + 1)};${color ? ` --eb-card-color: ${color};` : ''}`}
+							style={`grid-column: ${String(segment.column + 1)} / span ${String(segment.span)}; grid-row: ${String(segment.lane + 1)};${paint === undefined ? '' : ` ${paint};`}`}
 							title={chipTooltip(card, multi ? segment.occurrence.sources : undefined)}
 							onClick={(e) => {
 								e.stopPropagation();
 								if (!isDragging()) onOpenDay(days[Math.max(0, segment.column)]!);
 							}}
 						>
-							{color ? <span class="eb-cal-dot" /> : null}
+							{color && !filled ? <span class="eb-cal-dot" /> : null}
 							<span class="eb-cal-bar-text">{chipText(card)}</span>
 						</div>
 					);
@@ -763,6 +800,7 @@ function WeekRow({
 							capacity={capacity}
 							indexOf={indexOf}
 							stretch={stretch}
+							fill={fill}
 							multi={multi}
 							dateTimeOpts={dateTimeOpts}
 						/>
@@ -792,6 +830,8 @@ interface CellProps extends BaseCellProps {
 	indexOf: Map<Occurrence, number>;
 	/** Draw a timespan as tall as it is long, and budget the cell by height. */
 	stretch: boolean;
+	/** Paint a card's colour over its whole chip (§3.4). */
+	fill: boolean;
 	/** Name the properties in chip tooltips (§3.1). */
 	multi: boolean;
 	dateTimeOpts: DateTimeOpts;
@@ -873,6 +913,7 @@ function DayCell({
 	occurrences,
 	indexOf,
 	stretch,
+	fill,
 	multi,
 	dateTimeOpts,
 	onOpen,
@@ -913,6 +954,7 @@ function DayCell({
 							opts={dateTimeOpts}
 							repeating={occurrence.repeating}
 							sources={multi ? occurrence.sources : undefined}
+							fill={fill}
 							onOpen={onOpen}
 						/>
 					);
@@ -928,13 +970,15 @@ function DayCell({
 interface TrayProps {
 	board: Board;
 	undated: ops.ItemRef[];
+	/** Paint a card's colour over its whole chip (§3.4). */
+	fill: boolean;
 	open: boolean;
 	onToggle: () => void;
 	onOpen: () => void;
 	onDrop: (drop: DropInfo) => void;
 }
 
-function Tray({ board, undated, open, onToggle, onOpen, onDrop }: TrayProps) {
+function Tray({ board, undated, fill, open, onToggle, onOpen, onDrop }: TrayProps) {
 	const listRef = useRef<HTMLDivElement>(null);
 	// Always mounted as a drop target, so a date can be cleared even while the
 	// tray is collapsed (§4).
@@ -959,6 +1003,7 @@ function Tray({ board, undated, open, onToggle, onOpen, onDrop }: TrayProps) {
 							card={card}
 							occRef={ref}
 							index={i}
+							fill={fill}
 							onOpen={onOpen}
 						/>
 					);

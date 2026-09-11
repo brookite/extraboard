@@ -132,6 +132,11 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 				(row) => this.renderFillCardWithColor(row),
 			),
 			setting(
+				t('settings.fillCalendarEvents.name'),
+				t('settings.fillCalendarEvents.desc'),
+				(row) => this.renderFillCalendarEvents(row),
+			),
+			setting(
 				t('settings.strikeDoneCards.name'),
 				t('settings.strikeDoneCards.desc'),
 				(row) => this.renderStrikeDoneCards(row),
@@ -289,6 +294,19 @@ export class ExtraboardSettingTab extends PluginSettingTab {
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.fillCardWithColor).onChange((value) => {
 					this.plugin.settings.fillCardWithColor = value;
+					void this.plugin.saveSettings();
+					this.plugin.refreshBoards();
+				}),
+			);
+	}
+
+	private renderFillCalendarEvents(setting: Setting): void {
+		setting
+			.setName(t('settings.fillCalendarEvents.name'))
+			.setDesc(t('settings.fillCalendarEvents.desc'))
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.fillCalendarEvents).onChange((value) => {
+					this.plugin.settings.fillCalendarEvents = value;
 					void this.plugin.saveSettings();
 					this.plugin.refreshBoards();
 				}),

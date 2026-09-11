@@ -96,6 +96,12 @@ export interface ExtraboardSettings {
 	 */
 	fillCardWithColor: boolean;
 	/**
+	 * `false` (default) — a card's colour marks a calendar chip or bar with a
+	 * dot; `true` — it fills the whole chip or bar, and the text on it is picked
+	 * for contrast (calendar-view.md §3.4).
+	 */
+	fillCalendarEvents: boolean;
+	/**
 	 * `false` (default) — a done card's title is shown normally; `true` — it is
 	 * struck through, like a checked task list item.
 	 */
@@ -168,6 +174,7 @@ export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	progressStyle: 'ring',
 	showRawPropertyTokens: false,
 	fillCardWithColor: false,
+	fillCalendarEvents: false,
 	strikeDoneCards: false,
 	allowDeleteWithoutArchive: false,
 	archiveLimit: 10000,

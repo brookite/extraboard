@@ -632,6 +632,10 @@ export const en = {
 			name: 'Fill cards with color',
 			desc: 'A card with a color property is tinted, not just striped along its left edge. Display only — it never changes a board file.',
 		},
+		fillCalendarEvents: {
+			name: 'Fill calendar events with color',
+			desc: "A card's color fills its whole chip or range bar in the calendar instead of marking it with a dot, and the text on it is picked for contrast. Display only — it never changes a board file.",
+		},
 		strikeDoneCards: {
 			name: 'Strike through done cards',
 			desc: 'A card whose checkbox is checked shows its title struck through. Off by default.',

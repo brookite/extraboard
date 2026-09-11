@@ -2257,6 +2257,19 @@ body.eb-dragging-card .eb-archive-drop {
 	align-items: flex-start;
 }
 
+/* Aligned to the top, a chip's row is its *first line*, not its whole box, so
+   everything beside the title has to be centred against that line rather than
+   against the top edge — otherwise the dot rides up as the chip grows. */
+.eb-cal-chip.is-span .eb-cal-dot {
+	margin-top: calc((var(--eb-cal-chip-h) - 8px) / 2);
+}
+
+.eb-cal-chip.is-span .eb-cal-chip-check,
+.eb-cal-chip.is-span .eb-cal-chip-repeat {
+	height: var(--eb-cal-chip-h);
+	align-items: center;
+}
+
 /* The card's color as a dot at the head of a chip or a bar, rather than a
    stripe down the chip's side and a solid fill on the bar (§3.1, §3.2). An edge
    3px wide on a 20px row is read as chrome — the row's own frame — and a filled
@@ -3263,6 +3276,24 @@ body.is-mobile .eb-card-stack {
 	border: 1px solid var(--background-modifier-border);
 	border-top: none;
 	border-radius: 0 0 6px 6px;
+}
+
+/* A card's colour over the whole chip or bar, instead of the dot
+   (calendar-view.md §3.4, the `fillCalendarEvents` setting). The text colour is
+   picked for the fill in `util/color.ts:readableOn`; everything that dims
+   itself against the theme — the time, a done title — follows the fill instead,
+   because the theme's muted grey means nothing on an arbitrary colour. */
+.eb-cal-chip.is-filled,
+.eb-cal-bar.is-filled {
+	background: var(--eb-card-color);
+	color: var(--eb-card-text, var(--text-normal));
+}
+
+.eb-cal-chip.is-filled .eb-cal-chip-time,
+.eb-cal-chip.is-filled.is-done .eb-cal-chip-text,
+.eb-cal-chip.is-filled .eb-cal-chip-check {
+	color: inherit;
+	opacity: 0.75;
 }
 
 /* --- The software keyboard (mobile.md §7.2) ------------------------------- */
