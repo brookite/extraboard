@@ -3,7 +3,7 @@
 // tab (`defaultProperties`). Specs: properties.md, settings.md.
 
 import { App } from 'obsidian';
-import { validatePropertyDefs, type PropertyDiagnostic } from '../model/properties';
+import { allowsTime, validatePropertyDefs, type PropertyDiagnostic } from '../model/properties';
 import type { PropertyDef, PropertyType, StringListOption } from '../model/types';
 import { colorField } from './ColorPicker';
 import { t } from '../i18n';
@@ -194,7 +194,7 @@ export class PropertyDefsEditor {
 
 		// Only where a time is actually offered, and on by default: a board that
 		// says nothing gets the richer value (properties.md §time).
-		if (def.time === 'none') return;
+		if (!allowsTime(def, def.type)) return;
 		const spanLabel = body.createEl('label', { cls: 'eb-pe-check' });
 		const allow = spanLabel.createEl('input', { type: 'checkbox' });
 		allow.checked = def.timespan !== false;

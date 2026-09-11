@@ -27,6 +27,7 @@ import {
 	type DateSelection,
 } from '../../model/dateSelection';
 import { isRecurrence } from '../../model/recurrence';
+import { allowsTime, allowsTimespan } from '../../model/properties';
 import type { PropertyDef, PropertyValue } from '../../model/types';
 import type { ExtraboardSettings } from '../../settings';
 import { editRecurrence } from '../../ui/RecurrenceModal';
@@ -162,18 +163,14 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 		},
 		[],
 	);
-	// date-range never carries a time; date-list carries one only on a single-day
-	// entry. An absent `time` is **optional**, which is what the property editor
-	// has always shown for one (properties.md §time) — only `none` takes the
-	// clock away.
-	const timeEnabled = (type === 'datetime' || type === 'date-list') && def?.time !== 'none';
+	// date-list carries a time only on a single-day entry; the rest of the rule
+	// — including what an absent setting means — is `properties.ts` (§time).
+	const timeEnabled = allowsTime(def, type);
 	const timeRequired = def?.time === 'required';
 	const isSingleDay = !!selection && !selection.end;
 	const showTime = timeEnabled && (type !== 'date-list' || isSingleDay);
 	// A second clock turns the value into a timespan (`d HH:mm → d HH:mm`).
-	// Allowed by default wherever a time is: only an explicit `false` takes it
-	// away (properties.md §time).
-	const spanEnabled = timeEnabled && def?.timespan !== false;
+	const spanEnabled = allowsTimespan(def, type);
 	// An end alone means nothing, and an end that is not later is not a duration.
 	const endValid = !endTime || (!!time && endTime > time);
 

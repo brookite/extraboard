@@ -7,6 +7,8 @@ import {
 	formatValue,
 	formatToken,
 	validatePropertyDefs,
+	allowsTime,
+	allowsTimespan,
 } from '../src/model/properties';
 import type { PropertyDef } from '../src/model/types';
 
@@ -84,6 +86,36 @@ describe('formatValue round-trips through parseValue', () => {
 	it('formatToken wraps correctly', () => {
 		const pv = parseValue('status', 'Doing', { name: 'status', type: 'string' })!;
 		expect(formatToken(pv)).toBe('@{status|Doing}');
+	});
+});
+
+// The board file is not migrated when an option is added, so a definition
+// written before one existed has to keep meaning what its editor shows.
+describe('allowsTime / allowsTimespan', () => {
+	it('a definition from before the option carries no key, and still allows both', () => {
+		const old = { name: 'dates', type: 'date-list' } as const;
+		expect(allowsTime(old, 'date-list')).toBe(true);
+		expect(allowsTimespan(old, 'date-list')).toBe(true);
+	});
+
+	it('only `none` takes the clock away, and only `false` the second one', () => {
+		expect(allowsTime({ name: 'due', type: 'datetime', time: 'none' }, 'datetime')).toBe(false);
+		expect(allowsTime({ name: 'due', type: 'datetime', time: 'required' }, 'datetime')).toBe(true);
+		expect(
+			allowsTimespan({ name: 'due', type: 'datetime', time: 'optional', timespan: false }, 'datetime'),
+		).toBe(false);
+		// A timespan needs a time to end: `none` refuses both.
+		expect(
+			allowsTimespan({ name: 'due', type: 'datetime', time: 'none', timespan: true }, 'datetime'),
+		).toBe(false);
+	});
+
+	it('a range of days carries no time at all, whatever it says', () => {
+		expect(allowsTime({ name: 'sprint', type: 'date-range', time: 'required' }, 'date-range')).toBe(
+			false,
+		);
+		// Not a date at all, with or without a definition behind it.
+		expect(allowsTime(undefined, 'string')).toBe(false);
 	});
 });
 

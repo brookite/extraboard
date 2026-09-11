@@ -3,7 +3,7 @@
 
 import { parseSpan, toOrdinal } from './dates';
 import { parseRecurrence } from './recurrence';
-import type { PropertyDef, PropertyValue } from './types';
+import type { PropertyDef, PropertyType, PropertyValue } from './types';
 
 const ESCAPABLE = new Set(['\\', ';', '|', '}']);
 
@@ -169,6 +169,25 @@ export function normalizeDateList(raw: string[]): string[] {
 /** Render a full property token, e.g. `@{status|Doing}`. */
 export function formatToken(pv: PropertyValue): string {
 	return `@{${pv.name}|${formatValue(pv)}}`;
+}
+
+/**
+ * Whether a value of this property may carry a **time of day** (§time). Only
+ * `datetime` and the single-day entries of a `date-list` ever can; a
+ * `date-range` never does.
+ *
+ * An **absent** `time` is `optional`, not `none`. Every definition written
+ * before the option existed has no key, the property editor has always shown
+ * those as "Time optional", and a board must not have to be re-saved to mean
+ * what its settings already say.
+ */
+export function allowsTime(def: PropertyDef | undefined, type: PropertyType): boolean {
+	return (type === 'datetime' || type === 'date-list') && def?.time !== 'none';
+}
+
+/** Whether such a value may carry an **end** time too — absent is allowed (§time). */
+export function allowsTimespan(def: PropertyDef | undefined, type: PropertyType): boolean {
+	return allowsTime(def, type) && def?.timespan !== false;
 }
 
 /**
