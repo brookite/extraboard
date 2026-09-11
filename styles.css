@@ -2562,6 +2562,13 @@ body.is-mobile .eb-panel-modal .eb-date-day {
 	width: 4em;
 }
 
+/* A whole date is picked, not typed; the field only has to hold one day. */
+.eb-date-input {
+	width: auto;
+	max-width: 100%;
+	font-family: inherit;
+}
+
 .eb-weekday-row {
 	display: flex;
 	flex-wrap: wrap;

@@ -4,8 +4,8 @@
 // what it is about to write — the canonical phrase — and the next three days it
 // produces. That preview is the thing that makes a rule checkable.
 
-import { App, Modal, Setting } from 'obsidian';
-import { CalDate, formatDate, parseDate, today, weekday } from '../model/dates';
+import { App, Modal, Setting, TextComponent } from 'obsidian';
+import { CalDate, dayKey, formatDate, parseDate, today, weekday } from '../model/dates';
 import {
 	Freq,
 	Recurrence,
@@ -155,16 +155,14 @@ class RecurrenceModal extends Modal {
 		if (rule.freq === 'month') this.renderMonthly(el);
 		if (rule.freq === 'year') this.renderYearly(el);
 
-		new Setting(el).setName(t('modal.recurrence.starts')).addText((text) =>
-			text
-				.setPlaceholder('2026-07-27')
-				.setValue(this.startText)
-				.onChange((value) => {
-					this.startText = value;
-					this.rule.start = parseDate(value) ?? undefined;
-					this.renderPreview();
-				}),
-		);
+		new Setting(el).setName(t('modal.recurrence.starts')).addText((text) => {
+			this.asDatePicker(text, this.startText);
+			text.onChange((value) => {
+				this.startText = value;
+				this.rule.start = parseDate(value) ?? undefined;
+				this.renderPreview();
+			});
+		});
 
 		new Setting(el)
 			.setName(t('modal.recurrence.ends'))
@@ -184,16 +182,14 @@ class RecurrenceModal extends Modal {
 			);
 
 		if (this.end === 'until') {
-			new Setting(el).setName(t('modal.recurrence.until')).addText((text) =>
-				text
-					.setPlaceholder('2026-12-31')
-					.setValue(this.untilText)
-					.onChange((value) => {
-						this.untilText = value;
-						this.rule.until = parseDate(value) ?? undefined;
-						this.renderPreview();
-					}),
-			);
+			new Setting(el).setName(t('modal.recurrence.until')).addText((text) => {
+				this.asDatePicker(text, this.untilText);
+				text.onChange((value) => {
+					this.untilText = value;
+					this.rule.until = parseDate(value) ?? undefined;
+					this.renderPreview();
+				});
+			});
 		}
 		if (this.end === 'count') {
 			new Setting(el).setName(t('modal.recurrence.times')).addText((text) => {
@@ -384,6 +380,22 @@ class RecurrenceModal extends Modal {
 			rule.month = start.m;
 			rule.day = start.d;
 		}
+	}
+
+	/**
+	 * A whole date is picked, not typed: `type="date"` is the one control both
+	 * platforms already have a calendar for — Obsidian's own date fields use it,
+	 * and on a phone it is the system picker rather than a keyboard.
+	 *
+	 * It accepts `YYYY-MM-DD` and nothing else, so the value it is shown is the
+	 * day alone. A hand-written rule that carried a time on its `from`/`until`
+	 * keeps it: the rule is only rewritten when the field actually changes.
+	 */
+	private asDatePicker(text: TextComponent, value: string): void {
+		text.inputEl.type = 'date';
+		text.inputEl.addClass('eb-date-input');
+		const date = parseDate(value);
+		text.setValue(date ? dayKey(date) : '');
 	}
 
 	private applyEnd(): void {
