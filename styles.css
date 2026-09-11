@@ -2103,6 +2103,7 @@ body.eb-dragging-card .eb-archive-drop {
 
 .eb-cal {
 	--eb-cal-chip-h: 20px;
+	--eb-cal-chip-gap: 1px;
 	--eb-cal-bar-h: 20px;
 	--eb-cal-daynum-h: 20px;
 	display: flex;
@@ -2229,45 +2230,53 @@ body.eb-dragging-card .eb-archive-drop {
 .eb-cal-chips {
 	display: flex;
 	flex-direction: column;
-	gap: 1px;
+	gap: var(--eb-cal-chip-gap);
 	min-height: 0;
 }
 
 .eb-cal-chip {
 	display: flex;
-	align-items: center;
+	/* The chip's row is its **first line**, not its whole box: a title may wrap
+	   (§3.1), and the mark and glyphs beside it belong to the line the title
+	   starts on. For a one-line chip this is exactly centring. */
+	align-items: flex-start;
 	gap: 4px;
-	height: var(--eb-cal-chip-h);
+	/* One row unless the title needs a second one and the cell could pay for it
+	   — the height follows the text, so a short title still draws one row. */
+	min-height: var(--eb-cal-chip-h);
+	max-height: calc(var(--eb-cal-chip-h) * var(--eb-cal-chip-lines, 1));
+	flex: 0 0 auto;
 	padding: 0 4px;
 	font-size: var(--font-ui-smaller, 0.8em);
 	line-height: var(--eb-cal-chip-h);
 	background: var(--background-secondary);
 	border-radius: var(--radius-s, 4px);
-	white-space: nowrap;
 	overflow: hidden;
 	cursor: pointer;
 }
 
+/* The title wraps within the lines the cell granted it and is cut off there,
+   with an ellipsis on the last one. `-webkit-line-clamp` is the only property
+   that ellipsizes a *wrapped* line; both spellings are set, and the box model
+   it needs is what the two `-webkit-` declarations are for. */
+.eb-cal-chip-text {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: var(--eb-cal-chip-lines, 1);
+	line-clamp: var(--eb-cal-chip-lines, 1);
+	flex: 1 1 auto;
+	min-width: 0;
+	/* A single unbroken word is still not allowed to widen the cell. */
+	overflow-wrap: anywhere;
+}
+
 /* A timespan in week mode is drawn as tall as it is long (calendar-view.md
    §3.3): one chip height per half hour, capped so one card cannot take the
-   whole day. The text stays on the first line, where the chip starts. */
+   whole day. Held at that height, not merely allowed it — the height is the
+   duration — and its title is free to fill the whole of it. */
 .eb-cal-chip.is-span {
-	flex: 0 0 auto;
 	height: calc(var(--eb-cal-chip-h) * var(--eb-cal-chip-units, 1));
-	align-items: flex-start;
-}
-
-/* Aligned to the top, a chip's row is its *first line*, not its whole box, so
-   everything beside the title has to be centred against that line rather than
-   against the top edge — otherwise the dot rides up as the chip grows. */
-.eb-cal-chip.is-span .eb-cal-dot {
-	margin-top: calc((var(--eb-cal-chip-h) - 8px) / 2);
-}
-
-.eb-cal-chip.is-span .eb-cal-chip-check,
-.eb-cal-chip.is-span .eb-cal-chip-repeat {
-	height: var(--eb-cal-chip-h);
-	align-items: center;
+	max-height: none;
 }
 
 /* The card's color as a dot at the head of a chip or a bar, rather than a
@@ -2284,6 +2293,18 @@ body.eb-dragging-card .eb-archive-drop {
 	background: var(--eb-card-color);
 }
 
+/* Centred against the first line rather than the top edge (see `.eb-cal-chip`);
+   a bar is one line tall and centres its own. */
+.eb-cal-chip > .eb-cal-dot {
+	margin-top: calc((var(--eb-cal-chip-h) - 8px) / 2);
+}
+
+.eb-cal-chip-check,
+.eb-cal-chip-repeat {
+	height: var(--eb-cal-chip-h);
+	align-items: center;
+}
+
 .eb-cal-chip.is-done .eb-cal-chip-text {
 	color: var(--text-muted);
 	text-decoration: line-through;
@@ -2298,6 +2319,8 @@ body.eb-dragging-card .eb-archive-drop {
 	flex: 0 0 auto;
 	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
+	/* `09:00–10:30` is one token, whatever the chip does with its title. */
+	white-space: nowrap;
 }
 
 .eb-cal-chip-check {

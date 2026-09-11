@@ -37,6 +37,7 @@ import type { Board, Card, ViewDef } from '../model/types';
 import { usableDateProperties } from '../model/views';
 import type { ExtraboardSettings } from '../settings';
 import { pickDateProperty } from '../ui/DatePropertyModal';
+import { chipUnits, planChips } from '../model/calendarChips';
 import { openDayModal } from '../ui/DayModal';
 import type { BoardApi } from './api';
 import { Icon } from './components/Icon';
@@ -69,35 +70,6 @@ const FALLBACK_CAPACITY = { month: 3, week: 8 };
  * the marks that replace it.
  */
 const COMPACT_GRID_WIDTH = 560;
-
-/**
- * How a timespan is drawn in **week** mode (§3.3): one chip height per half
- * hour, so a two-hour value is visibly twice a one-hour one. An imitation of
- * duration, not a time axis — the week grid has no hour ruler to hang one on,
- * and a cell that is one day tall cannot hold a whole day to scale.
- */
-const SPAN_UNIT_MINUTES = 30;
-/** Four hours of chip is as much as one cell can give a single card. */
-const MAX_SPAN_UNITS = 8;
-
-/**
- * The minutes a timespan covers, or 0 when the occurrence is not one — a single
- * day, whatever time it carries, has no duration to draw (`dates.parseTimespan`).
- */
-function durationOf(occurrence: Occurrence): number {
-	if (occurrence.length !== 1) return 0;
-	const from = occurrence.start.minutes;
-	const to = occurrence.end.minutes;
-	if (from === undefined || to === undefined || to <= from) return 0;
-	return to - from;
-}
-
-/** A chip's height in chip units: 1 for anything without a duration. */
-function chipUnits(occurrence: Occurrence): number {
-	const minutes = durationOf(occurrence);
-	if (!minutes) return 1;
-	return Math.max(1, Math.min(MAX_SPAN_UNITS, Math.round(minutes / SPAN_UNIT_MINUTES)));
-}
 
 type CalendarDef = Extract<ViewDef, { type: 'calendar' }>;
 
@@ -162,7 +134,11 @@ function useCellCapacity(ref: RefObject<HTMLElement>, mode: 'month' | 'week'): n
 			if (!(cell instanceof HTMLElement)) return;
 			const chip = readVar(root, '--eb-cal-chip-h', 20);
 			const head = readVar(root, '--eb-cal-daynum-h', 20);
-			const fits = Math.floor((cell.clientHeight - head) / chip);
+			// The gap between chips counts: a budget that ignores it is a row too
+			// generous by the time a cell is full, and a chip granted a second
+			// line would spend that row on text the cell then clips (§3.1).
+			const gap = readVar(root, '--eb-cal-chip-gap', 1);
+			const fits = Math.floor((cell.clientHeight - head + gap) / (chip + gap));
 			setCapacity(Math.max(1, fits));
 		};
 		measure();
@@ -270,8 +246,11 @@ interface ChipProps {
 	time?: number;
 	/** The hour a timespan ends at; drawn only where duration is (week mode). */
 	endTime?: number;
-	/** Chip heights this chip is drawn as; absent or 1 is an ordinary chip. */
+	/** Chip rows this chip is **held** at — a duration's height (§3.3); 0 or
+	 * absent leaves it as tall as its text needs. */
 	units?: number;
+	/** Lines of title it may wrap to; absent is one (§3.1). */
+	lines?: number;
 	/** Only needed when `time` is passed. */
 	opts?: DateTimeOpts;
 	/** From a repetition rule: one card showing up on many days (recurrence.md §3). */
@@ -291,6 +270,7 @@ function Chip({
 	time,
 	endTime,
 	units,
+	lines,
 	opts,
 	repeating,
 	sources,
@@ -305,6 +285,7 @@ function Chip({
 	const style = [
 		colorStyle(color, filled) ?? '',
 		span ? `--eb-cal-chip-units: ${String(units)}` : '',
+		lines !== undefined && lines > 1 ? `--eb-cal-chip-lines: ${String(lines)}` : '',
 	]
 		.filter(Boolean)
 		.join('; ');
@@ -468,7 +449,7 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	// By the clock, and the longer of two that start together first — a week
 	// cell reads top to bottom as the day runs (§3.3).
 	for (const list of byDay.values()) {
-		list.sort((a, b) => compareDates(a.start, b.start) || durationOf(b) - durationOf(a));
+		list.sort((a, b) => compareDates(a.start, b.start) || chipUnits(b) - chipUnits(a));
 	}
 
 	const marks = compact ? marksByDay(occurrences, days) : null;
@@ -882,26 +863,6 @@ function CompactDayCell({ board, day, index, dim, isToday, occurrences, onOpen, 
 	);
 }
 
-/** As many chips as the cell has rows, keeping one row for the `+N` when it clips. */
-function fitByCount(occurrences: Occurrence[], capacity: number): Occurrence[] {
-	return occurrences.length > capacity ? occurrences.slice(0, Math.max(0, capacity - 1)) : occurrences;
-}
-
-/** The same budget, spent in chip units so a tall chip costs what it takes. */
-function fitByHeight(occurrences: Occurrence[], capacity: number): Occurrence[] {
-	let used = 0;
-	const shown: Occurrence[] = [];
-	for (const occurrence of occurrences) {
-		const units = chipUnits(occurrence);
-		// The last row is kept for `+N` whenever anything is left behind.
-		const room = shown.length === occurrences.length - 1 ? capacity : capacity - 1;
-		if (used + units > room) break;
-		used += units;
-		shown.push(occurrence);
-	}
-	return shown;
-}
-
 function DayCell({
 	board,
 	day,
@@ -922,9 +883,9 @@ function DayCell({
 	const listRef = useRef<HTMLDivElement>(null);
 	useSortable(listRef, { group: 'eb-cal', sort: false, draggable: '.eb-cal-chip' }, onDrop);
 
-	// The budget is a height, not a count: a stretched chip spends as many chip
-	// rows as it is tall, so what is left over is what still fits (§3.3).
-	const shown = stretch ? fitByHeight(occurrences, capacity) : fitByCount(occurrences, capacity);
+	// A height rather than a count, and the rows the cell does not need become
+	// the second line of a title too long for one (`model/calendarChips.ts`).
+	const shown = planChips(occurrences, capacity, stretch);
 	const hidden = occurrences.length - shown.length;
 
 	return (
@@ -938,7 +899,7 @@ function DayCell({
 			<div class="eb-cal-daynum">{day.d}</div>
 			{lanes > 0 ? <div class="eb-cal-lane-space" style={`height: calc(${String(lanes)} * var(--eb-cal-bar-h))`} /> : null}
 			<div class="eb-cal-chips" ref={listRef} data-list={index}>
-				{shown.map((occurrence) => {
+				{shown.map(({ occurrence, units, lines }) => {
 					const card = cardOf(board, occurrence.ref);
 					if (!card) return null;
 					return (
@@ -950,7 +911,8 @@ function DayCell({
 							index={indexOf.get(occurrence) ?? 0}
 							time={occurrence.start.minutes}
 							endTime={stretch ? occurrence.end.minutes : undefined}
-							units={stretch ? chipUnits(occurrence) : undefined}
+							units={units}
+							lines={lines}
 							opts={dateTimeOpts}
 							repeating={occurrence.repeating}
 							sources={multi ? occurrence.sources : undefined}
