@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { currentLanguage, t } from '../../i18n';
 import { dateTimeFormat } from '../../i18n/intl';
 import { resolveWeekStart, weekdayName } from '../../i18n/dates';
@@ -43,13 +43,25 @@ interface Props {
 	api: BoardApi;
 	settings: ExtraboardSettings;
 	onCommit: (pv: PropertyValue | null) => void;
+	/** Where the editor leaves {@link DateEditorHandle} for its host. */
+	handleRef?: { current: DateEditorHandle | null };
+}
+
+/** What the editor's host can do to it from its own buttons. */
+export interface DateEditorHandle {
 	/**
-	 * Where the editor leaves the "save what is selected" action for its host's
-	 * **Done** button, or `null` when there is nothing pending to save. Closing
-	 * is a commit for the edits that have no other button of their own — a first
-	 * entry in an empty list, and one taken back out of the list to be changed.
+	 * Save what is selected, for the host's **Done** button — `null` when there
+	 * is nothing pending to save. Closing is a commit for the edits that have no
+	 * button of their own: a first entry in an empty list, and one taken back
+	 * out of the list to be changed.
 	 */
-	commitRef?: { current: (() => void) | null };
+	commit: (() => void) | null;
+	/**
+	 * Forget the entry taken out of the list for editing, so closing does not
+	 * put it back — for the host's **Remove**, which is taking the whole
+	 * property away and must not resurrect it.
+	 */
+	forget: () => void;
 }
 
 const initialDate = (type: DatePropertyValue['type'], pv: PropertyValue | undefined): CalDate => {
@@ -107,7 +119,7 @@ const withTime = (date: CalDate, value: string): CalDate => {
 	return { ...date, minutes: Number(match[1]) * 60 + Number(match[2]) };
 };
 
-export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, commitRef }: Props) {
+export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, handleRef }: Props) {
 	const [month, setMonth] = useState(() => initialDate(type, pv));
 	const [selection, setSelection] = useState<DateSelection | null>(() => initialSelection(type, pv));
 	const [time, setTime] = useState(() => initialTimes(pv).time);
@@ -115,11 +127,41 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 	// The list index an entry was taken out of, while it is being edited on the
 	// grid; it goes back where it was, not to the end of the list.
 	const [editing, setEditing] = useState<number | null>(null);
+	/**
+	 * The entry as it stood when it was taken out of the list, kept until
+	 * something writes it back. An edit that is never confirmed — the panel
+	 * closed, the modal dismissed, focus taken elsewhere — restores it
+	 * (2026-08-01-v0.3.1-date-editor.md §2.1): the list is where it lived, and leaving is not an
+	 * instruction to delete it.
+	 */
+	const takenOut = useRef<{ index: number; raw: string } | null>(null);
 	const lang = currentLanguage();
 	const firstDay = resolveWeekStart(settings.weekStart, lang);
 	const days = monthGrid(month, firstDay);
 	const allowRange = type !== 'datetime';
 	const list = pv?.type === 'date-list' ? pv.raw : [];
+	// What the unmount cleanup below has to work from: it runs after the last
+	// render, and must not close over the values of the first one.
+	const latest = useRef({ list, onCommit });
+	latest.current = { list, onCommit };
+	useEffect(
+		() => () => {
+			const taken = takenOut.current;
+			if (!taken) return;
+			takenOut.current = null;
+			const { list: current, onCommit: commit } = latest.current;
+			// Not inside the render that is unmounting this editor: the commit
+			// re-enters the board's own rendering.
+			queueMicrotask(() => {
+				commit({
+					name,
+					type: 'date-list',
+					raw: insertDateEntry(current, taken.index, taken.raw),
+				});
+			});
+		},
+		[],
+	);
 	// date-range never carries a time; date-list carries one only on a single-day
 	// entry. An absent `time` is **optional**, which is what the property editor
 	// has always shown for one (properties.md §time) — only `none` takes the
@@ -179,6 +221,8 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 	};
 
 	const clearPending = (): void => {
+		// Whatever called this has put the entry back itself.
+		takenOut.current = null;
 		setEditing(null);
 		setSelection(null);
 		setTime('');
@@ -211,6 +255,8 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 		onCommit(next.length ? { name, type: 'date-list', raw: next } : null);
 		// The slot the edited entry returns to moved up by one.
 		if (editing !== null && index < editing) setEditing(editing - 1);
+		const taken = takenOut.current;
+		if (taken && index < taken.index) takenOut.current = { ...taken, index: taken.index - 1 };
 	};
 
 	/**
@@ -238,6 +284,7 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 		if (!entry) return;
 		const rest = base.filter((_, itemIndex) => itemIndex !== at);
 		onCommit(rest.length ? { name, type: 'date-list', raw: rest } : null);
+		takenOut.current = { index: at, raw };
 		setEditing(at);
 		setSelection(entry.selection);
 		setTime(entry.time);
@@ -273,12 +320,19 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 	// that already holds entries keeps its explicit Add — there the selection is
 	// a new entry the user has not asked for yet; an empty list and an entry
 	// taken back out for editing have no other way to be written.
-	const canCommitOnClose =
+	const commitOnClose =
 		!!selection &&
 		!(showTime && timeRequired && !time) &&
 		endValid &&
 		(type !== 'date-list' || editing !== null || list.length === 0);
-	if (commitRef) commitRef.current = canCommitOnClose ? saveSelection : null;
+	if (handleRef) {
+		handleRef.current = {
+			commit: commitOnClose ? saveSelection : null,
+			forget: () => {
+				takenOut.current = null;
+			},
+		};
+	}
 
 	const monthTitle = dateTimeFormat(lang, { month: 'long', year: 'numeric' }).format(
 		new Date(month.y, month.m - 1, 1),

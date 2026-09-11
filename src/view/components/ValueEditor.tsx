@@ -14,7 +14,7 @@ import { typeLabels } from '../../ui/PropertyDefsEditor';
 import type { BoardApi } from '../api';
 import { safeColor } from './style';
 import { t } from '../../i18n';
-import { DateValueEditor } from './DateValueEditor';
+import { DateValueEditor, type DateEditorHandle } from './DateValueEditor';
 
 /** Types edited as one text field; the rest have a control of their own. */
 const TEXT_TYPES = new Set(['string']);
@@ -53,10 +53,12 @@ export interface EditorProps {
  */
 export function ValueEditor({ name, def, pv, api, settings, onCommit, onRemove, onClose }: EditorProps) {
 	const type = def?.type ?? 'raw';
-	// What the date editor leaves here for **Done** to run on its way out: the
-	// selection that has no button of its own to save it (2026-08-01-v0.3.1-date-editor.md §2.1).
-	const dateCommit = useRef<(() => void) | null>(null);
-	dateCommit.current = null;
+	// What the date editor leaves here for this panel's own buttons: **Done**
+	// saves a selection that has nothing else to save it, and **Remove** tells
+	// the editor to stop guarding the entry it took out of the list
+	// (2026-08-01-v0.3.1-date-editor.md §2.1).
+	const dateEditor = useRef<DateEditorHandle | null>(null);
+	dateEditor.current = null;
 	const current = pv ? formatValue(pv) : '';
 	const typeLabel = type === 'raw' ? t('propertyDefs.type.raw') : typeLabels()[type];
 
@@ -118,7 +120,7 @@ export function ValueEditor({ name, def, pv, api, settings, onCommit, onRemove, 
 					api={api}
 					settings={settings}
 					onCommit={onCommit}
-					commitRef={dateCommit}
+					handleRef={dateEditor}
 				/>
 			) : type === 'recurrence' ? (
 				// A rule is not something to type by hand (recurrence.md §4).
@@ -166,13 +168,20 @@ export function ValueEditor({ name, def, pv, api, settings, onCommit, onRemove, 
 			)}
 
 			<div class="eb-value-editor-actions">
-				<button type="button" class="mod-warning" onClick={onRemove}>
+				<button
+					type="button"
+					class="mod-warning"
+					onClick={() => {
+						dateEditor.current?.forget();
+						onRemove();
+					}}
+				>
 					{t('propertyBadges.remove')}
 				</button>
 				<button
 					type="button"
 					onClick={() => {
-						dateCommit.current?.();
+						dateEditor.current?.commit?.();
 						onClose();
 					}}
 				>
