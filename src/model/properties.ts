@@ -208,7 +208,8 @@ export function validatePropertyDefs(defs: PropertyDef[]): PropertyDiagnostic[] 
 			diags.push({ kind: 'timeWrongType', name: d.name });
 		}
 		// A range of times inside a value that carries none is nothing at all.
-		if (d.timespan !== undefined && (d.time === undefined || d.time === 'none')) {
+		// Absent `time` is `optional`, so only `none` is "carries none".
+		if (d.timespan !== undefined && d.time === 'none') {
 			diags.push({ kind: 'timespanNeedsTime', name: d.name });
 		}
 	}

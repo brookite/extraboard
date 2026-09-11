@@ -100,13 +100,12 @@ describe('validatePropertyDefs', () => {
 		]);
 		expect(diags.length).toBe(2);
 	});
-	it('flags a timespan setting on a property that carries no time', () => {
-		expect(validatePropertyDefs([{ name: 'due', type: 'datetime', timespan: false }])).toEqual([
-			{ kind: 'timespanNeedsTime', name: 'due' },
-		]);
+	it('flags a timespan setting only where the time itself is off', () => {
 		expect(
 			validatePropertyDefs([{ name: 'due', type: 'datetime', time: 'none', timespan: true }]),
 		).toEqual([{ kind: 'timespanNeedsTime', name: 'due' }]);
+		// An absent `time` is `optional`, so a timespan setting is meaningful.
+		expect(validatePropertyDefs([{ name: 'due', type: 'datetime', timespan: false }])).toEqual([]);
 	});
 	it('accepts a valid config', () => {
 		expect(validatePropertyDefs([

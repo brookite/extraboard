@@ -194,7 +194,7 @@ export class PropertyDefsEditor {
 
 		// Only where a time is actually offered, and on by default: a board that
 		// says nothing gets the richer value (properties.md §time).
-		if (def.time === undefined || def.time === 'none') return;
+		if (def.time === 'none') return;
 		const spanLabel = body.createEl('label', { cls: 'eb-pe-check' });
 		const allow = spanLabel.createEl('input', { type: 'checkbox' });
 		allow.checked = def.timespan !== false;

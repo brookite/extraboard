@@ -120,9 +120,11 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 	const days = monthGrid(month, firstDay);
 	const allowRange = type !== 'datetime';
 	const list = pv?.type === 'date-list' ? pv.raw : [];
-	// date-range never carries a time; date-list carries one only on a single-day entry.
-	const timeEnabled =
-		(type === 'datetime' || type === 'date-list') && def?.time !== undefined && def.time !== 'none';
+	// date-range never carries a time; date-list carries one only on a single-day
+	// entry. An absent `time` is **optional**, which is what the property editor
+	// has always shown for one (properties.md §time) — only `none` takes the
+	// clock away.
+	const timeEnabled = (type === 'datetime' || type === 'date-list') && def?.time !== 'none';
 	const timeRequired = def?.time === 'required';
 	const isSingleDay = !!selection && !selection.end;
 	const showTime = timeEnabled && (type !== 'date-list' || isSingleDay);
