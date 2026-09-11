@@ -19,6 +19,7 @@ import { ICONS, viewIcon } from '../util/constants';
 import type { FieldRef } from '../model/fieldValue';
 import { openFilterSortModal } from './FilterSortModal';
 import { t } from '../i18n';
+import { keyboardAwareModal } from './keyboardInset';
 
 export interface ViewsModalOptions {
 	api: BoardApi;
@@ -41,6 +42,7 @@ class ViewsModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.titleEl.setText(t('modal.views.title'));
 		this.modalEl.addClass('eb-views-modal');
 		this.render();
@@ -312,6 +314,7 @@ class ViewFormModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.titleEl.setText(this.options.title);
 		this.render();
 	}

@@ -14,6 +14,7 @@ import {
 	parseRecurrence,
 } from '../model/recurrence';
 import { t } from '../i18n';
+import { keyboardAwareModal } from './keyboardInset';
 
 // Display only — the stored phrase's own weekday/month names stay English file
 // syntax regardless of UI language (recurrence.md §1.1, §7).
@@ -106,6 +107,7 @@ class RecurrenceModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.titleEl.setText(t('modal.recurrence.titlePrefix', { name: this.options.name }));
 		this.modalEl.addClass('eb-recurrence-modal');
 		this.render();

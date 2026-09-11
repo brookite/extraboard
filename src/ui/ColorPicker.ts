@@ -10,6 +10,7 @@
 import { App, Modal } from 'obsidian';
 import { resolveColor, safeColor, withAlpha } from '../util/color';
 import { t } from '../i18n';
+import { keyboardAwareModal } from './keyboardInset';
 
 /** Preset palette: Obsidian's accent hues, soft variants, and neutrals. */
 const PALETTE: string[][] = [
@@ -104,6 +105,7 @@ class ColorPickerModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.titleEl.setText(this.options.title ?? t('colorPicker.defaultTitle'));
 		this.modalEl.addClass('eb-cp-modal');
 		const el = this.contentEl;

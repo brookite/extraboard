@@ -13,6 +13,7 @@ import type { ChecklistItem, ChecklistPath } from '../model/checklist';
 import { createEmbeddedEditor, type EmbeddedEditorHandle } from '../view/embeddedEditor';
 import { t } from '../i18n';
 import { showDropdownMenu } from '../util/menu';
+import { keyboardAwareModal } from './keyboardInset';
 
 export interface ChecklistModalOptions {
 	/** The card's display text, shown as the modal title. */
@@ -54,6 +55,7 @@ export class ChecklistModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.modalEl.addClass('eb-checklist-modal');
 		this.titleEl.setText(this.options.title || t('modal.checklist.title'));
 		this.countEl = this.titleEl.createSpan({ cls: 'eb-checklist-count' });

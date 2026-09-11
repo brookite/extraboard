@@ -3264,3 +3264,39 @@ body.is-mobile .eb-card-stack {
 	border-top: none;
 	border-radius: 0 0 6px 6px;
 }
+
+/* --- The software keyboard (mobile.md §7.2) ------------------------------- */
+
+/* The keyboard covers the page rather than shrinking it, so a modal laid out
+   against the whole screen keeps its footer — and often the row being typed
+   into — underneath it. `--keyboard-height` is Obsidian's own measurement;
+   `--eb-keyboard-height` is this plugin's `visualViewport` fallback for where
+   that is not set. Applied only while the keyboard is actually up, so a closed
+   one leaves every modal's sizing exactly as it was. */
+.is-mobile .eb-keyboard-aware.is-keyboard-open {
+	box-sizing: border-box;
+	padding-bottom: max(var(--keyboard-height, 0px), var(--eb-keyboard-height, 0px));
+}
+
+/* Above the keyboard the modal is short, so its content has to be the part
+   that scrolls — otherwise the box simply clips its own footer. */
+.is-mobile .eb-keyboard-aware.is-keyboard-open .modal {
+	display: flex;
+	flex-direction: column;
+	max-height: 100%;
+}
+
+.is-mobile .eb-keyboard-aware.is-keyboard-open .modal-content {
+	min-height: 0;
+	overflow-y: auto;
+}
+
+/* A panel that bounds itself against the *layout* viewport, which the keyboard
+   does not change, would keep its full height above a modal that no longer has
+   it. The modal's own scroller takes over instead. */
+.is-mobile .eb-keyboard-aware.is-keyboard-open .eb-checklist,
+.is-mobile .eb-keyboard-aware.is-keyboard-open .eb-archive-list,
+.is-mobile .eb-keyboard-aware.is-keyboard-open .eb-value-list,
+.is-mobile .eb-keyboard-aware.is-keyboard-open .eb-tag-picker-list {
+	max-height: none;
+}

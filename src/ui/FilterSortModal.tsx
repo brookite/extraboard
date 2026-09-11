@@ -28,6 +28,7 @@ import { GroupNode, groupOrdinals } from '../view/components/FilterTree';
 import { SortList } from '../view/components/SortList';
 import type { DropInfo } from '../view/useSortable';
 import { t } from '../i18n';
+import { keyboardAwareModal } from './keyboardInset';
 
 export interface FilterSortResult {
 	filter: FilterNode | null;
@@ -186,6 +187,7 @@ class FilterSortModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.modalEl.addClass('eb-filter-modal');
 		this.titleEl.setText(t('filter.title'));
 		const { board } = this.options;

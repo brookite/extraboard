@@ -9,6 +9,7 @@
 import { App, Modal, Setting } from 'obsidian';
 import { colorField } from './ColorPicker';
 import { t } from '../i18n';
+import { keyboardAwareModal } from './keyboardInset';
 
 export interface StackFields {
 	name: string;
@@ -52,6 +53,7 @@ class StackModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.titleEl.setText(this.options.title);
 		const el = this.contentEl;
 		el.empty();

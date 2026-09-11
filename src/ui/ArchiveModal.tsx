@@ -23,6 +23,7 @@ import { t } from '../i18n';
 import { dateTimeOptsFor, formatCalDate } from '../i18n/dates';
 import { parseDate } from '../model/dates';
 import { archiveOrder } from '../model/archive';
+import { keyboardAwareModal } from './keyboardInset';
 
 /**
  * The `%%at|…%%` stamp as the user's own date format (i18n-and-dates.md §2).
@@ -139,6 +140,7 @@ export class ArchiveModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.modalEl.addClass('eb-archive-modal');
 		this.render();
 	}

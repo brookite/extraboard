@@ -7,6 +7,7 @@
 
 import { App, Modal } from 'obsidian';
 import { render, type ComponentChild } from 'preact';
+import { keyboardAwareModal } from './keyboardInset';
 
 export interface PreactModalOptions {
 	/** The modal's heading. */
@@ -40,6 +41,7 @@ class PreactModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.modalEl.addClass('eb-preact-modal');
 		if (this.options.cls) this.modalEl.addClass(this.options.cls);
 		this.titleEl.setText(this.options.title);

@@ -9,6 +9,7 @@
 import { App, Modal } from 'obsidian';
 import type { OccurrenceSource } from '../model/calendar';
 import { t } from '../i18n';
+import { keyboardAwareModal } from './keyboardInset';
 
 export interface DatePropertyChoice {
 	source: OccurrenceSource;
@@ -52,6 +53,7 @@ class DatePropertyModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.modalEl.addClass('eb-date-property-modal');
 		this.titleEl.setText(this.options.title);
 		const el = this.contentEl;

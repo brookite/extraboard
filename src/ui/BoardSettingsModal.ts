@@ -12,6 +12,7 @@ import { FolderSuggest } from './FolderSuggest';
 import { cloneRules, type DateHighlightRule } from '../model/dateHighlights';
 import { kanbanView, listView } from '../model/views';
 import { t } from '../i18n';
+import { keyboardAwareModal } from './keyboardInset';
 
 interface TagRow {
 	tag: string;
@@ -58,6 +59,7 @@ export class BoardSettingsModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.titleEl.setText(this.options.title ?? t('modal.boardSettings.title'));
 		this.modalEl.addClass('eb-board-settings');
 		const { contentEl } = this;

@@ -21,6 +21,7 @@ import { safeColor } from '../view/components/style';
 import { currentLanguage, t } from '../i18n';
 import { dateTimeFormat } from '../i18n/intl';
 import { showDropdownMenu } from '../util/menu';
+import { keyboardAwareModal } from './keyboardInset';
 
 type CalendarDef = Extract<ViewDef, { type: 'calendar' }>;
 
@@ -281,6 +282,7 @@ class DayModal extends Modal {
 	}
 
 	override onOpen(): void {
+		keyboardAwareModal(this);
 		this.modalEl.addClass('eb-day-modal');
 		this.titleEl.setText(dayTitle(this.options.day));
 		// Every edit in a row goes through the board, which lives outside this
