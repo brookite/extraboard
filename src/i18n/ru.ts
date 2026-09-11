@@ -302,6 +302,8 @@ export const ru: DeepPartial<typeof en> = {
 		onNth: ' — {ordinal}: {weekday}',
 		onYearly: ' {day} {month}',
 		from: ' с {date}',
+		atTime: ' {time}',
+		atTimeRange: ' {from}–{to}',
 		until: ' до {date}',
 		timesOne: ' 1 раз',
 		timesFew: ' {n} раза',
@@ -414,6 +416,7 @@ export const ru: DeepPartial<typeof en> = {
 				needWeekday: 'Выберите хотя бы один день недели.',
 				endNotDate: 'Дата окончания не является датой (ГГГГ-ММ-ДД).',
 				endBeforeStart: 'Дата окончания раньше даты начала.',
+				endTimeBeforeStart: 'Время окончания требует времени начала в тот же день, раньше него.',
 				countTooSmall: 'Повторите хотя бы один раз.',
 			},
 			weekday: {

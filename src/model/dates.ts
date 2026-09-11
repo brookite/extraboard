@@ -141,10 +141,30 @@ export function formatSpan(span: DateSpan): string {
 	return `${formatDate(span.start)}${RANGE_SEPARATOR}${formatDate(span.end)}`;
 }
 
+/** `HH:mm` for a given minutes-since-midnight value. */
+export function formatMinutesClock(minutes: number): string {
+	return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+}
+
 /** `HH:mm` when the date carries a time, `''` when it does not. */
 export function formatClock(date: CalDate): string {
-	if (date.minutes === undefined) return '';
-	return `${pad(Math.floor(date.minutes / 60))}:${pad(date.minutes % 60)}`;
+	return date.minutes === undefined ? '' : formatMinutesClock(date.minutes);
+}
+
+/** Parse `HH:mm` into minutes since midnight; `null` when it is not that. */
+export function parseMinutesClock(text: string): number | null {
+	const match = /^(\d{1,2}):(\d{2})$/.exec(text.trim());
+	if (!match) return null;
+	const hours = Number(match[1]);
+	const mins = Number(match[2]);
+	if (hours > 23 || mins > 59) return null;
+	return hours * 60 + mins;
+}
+
+/** Set a date's time-of-day from an `HH:mm` field; unchanged when it doesn't match. */
+export function withClock(date: CalDate, value: string): CalDate {
+	const minutes = parseMinutesClock(value);
+	return minutes === null ? date : { ...date, minutes };
 }
 
 /** Parse one date; `null` when the text is not one (§1.1 — never an error). */

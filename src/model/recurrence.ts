@@ -8,11 +8,14 @@
 
 import {
 	CalDate,
+	DateSpan,
 	addDays,
 	compareDates,
 	daysInMonth,
 	formatDate,
+	formatMinutesClock,
 	parseDate,
+	parseMinutesClock,
 	toOrdinal,
 	weekday,
 } from './dates';
@@ -35,6 +38,12 @@ export interface Recurrence {
 	day?: number;
 	/** `from` — the series anchor; absent means "resolve it" (§1.2). */
 	start?: CalDate;
+	/**
+	 * The anchor's own same-day end time, minutes since midnight — every
+	 * occurrence then spans `start.minutes` to `endMinutes`, same as a plain
+	 * `datetime` timespan (§time). Requires `start.minutes`.
+	 */
+	endMinutes?: number;
 	/** `until`, inclusive. */
 	until?: CalDate;
 	/** `for N times`, counted from the first occurrence. */
@@ -183,6 +192,25 @@ function parseOn(text: string, freq: Freq, rule: Recurrence): boolean {
 }
 
 /**
+ * `from`'s value: a date, optionally with a time, and — only then — an
+ * optional same-day end time (`2026-07-27 09:00-09:30`) for the anchor's own
+ * timespan. The end is rejected rather than clamped when it does not follow
+ * a start time on the same day (§1.1 — never guess at a broken value).
+ */
+function parseStartClause(text: string): { start: CalDate; endMinutes?: number } | null {
+	const match = /^(.+?)-(\d{1,2}:\d{2})$/.exec(text.trim());
+	if (!match) {
+		const start = parseDate(text);
+		return start ? { start } : null;
+	}
+	const start = parseDate(match[1]!.trim());
+	if (!start || start.minutes === undefined) return null;
+	const endMinutes = parseMinutesClock(match[2]!);
+	if (endMinutes === null || endMinutes <= start.minutes) return null;
+	return { start, endMinutes };
+}
+
+/**
  * Parse a phrase into a rule, or `null` when it is not one. An unparseable
  * value is never an error: the card keeps its text and reads as having no rule
  * (§1.1).
@@ -207,9 +235,10 @@ export function parseRecurrence(text: string): Recurrence | null {
 
 	const from = parts.get('from');
 	if (from !== undefined) {
-		const start = parseDate(from);
-		if (!start) return null;
-		rule.start = start;
+		const parsed = parseStartClause(from);
+		if (!parsed) return null;
+		rule.start = parsed.start;
+		if (parsed.endMinutes !== undefined) rule.endMinutes = parsed.endMinutes;
 	}
 
 	const until = parts.get('until');
@@ -251,7 +280,10 @@ export function formatRecurrence(rule: Recurrence): string {
 		out += ` on ${MONTH_NAMES[rule.month - 1] ?? 'Jan'} ${String(rule.day)}`;
 	}
 
-	if (rule.start) out += ` from ${formatDate(rule.start)}`;
+	if (rule.start) {
+		out += ` from ${formatDate(rule.start)}`;
+		if (rule.endMinutes !== undefined) out += `-${formatMinutesClock(rule.endMinutes)}`;
+	}
 	if (rule.until) out += ` until ${formatDate(rule.until)}`;
 	else if (rule.count !== undefined) {
 		out += ` for ${String(rule.count)} ${rule.count === 1 ? 'time' : 'times'}`;
@@ -375,9 +407,17 @@ function withTime(date: CalDate, anchor: CalDate): CalDate {
 	return anchor.minutes === undefined ? date : { ...date, minutes: anchor.minutes };
 }
 
+/** One occurrence: the anchor's time (if any), stretched to `endMinutes` when the rule has one. */
+function occurrenceSpan(date: CalDate, anchor: CalDate, endMinutes: number | undefined): DateSpan {
+	const start = withTime(date, anchor);
+	if (endMinutes === undefined || start.minutes === undefined) return { start, end: start };
+	return { start, end: { ...start, minutes: endMinutes } };
+}
+
 /**
  * Occurrences in `[from, to]`, ascending. `anchor` is the resolved series start
- * (`rule.start` when it has one — see §1.2 for the rest).
+ * (`rule.start` when it has one — see §1.2 for the rest). Each span is one day
+ * unless `rule.endMinutes` gives it a same-day end time too (§time).
  */
 export function expandRecurrence(
 	rule: Recurrence,
@@ -385,9 +425,9 @@ export function expandRecurrence(
 	from: CalDate,
 	to: CalDate,
 	limit = EXPANSION_CAP,
-): CalDate[] {
+): DateSpan[] {
 	const start = rule.start ?? anchor;
-	const out: CalDate[] = [];
+	const out: DateSpan[] = [];
 	if (compareDates(from, to) > 0) return out;
 
 	// A `count` has to be honoured from the first occurrence, so the walk starts
@@ -418,7 +458,7 @@ export function expandRecurrence(
 			produced++;
 			if (day < toOrdinal(from)) continue;
 			if (day > toOrdinal(to)) return out;
-			out.push(withTime(date, start));
+			out.push(occurrenceSpan(date, start, rule.endMinutes));
 			if (out.length >= limit) return out;
 		}
 	}
@@ -434,5 +474,5 @@ export function nextOccurrence(
 ): CalDate | null {
 	const from = addDays(after, 1);
 	const to = { y: from.y + horizonYears, m: from.m, d: from.d };
-	return expandRecurrence(rule, anchor, from, to, 1)[0] ?? null;
+	return expandRecurrence(rule, anchor, from, to, 1)[0]?.start ?? null;
 }

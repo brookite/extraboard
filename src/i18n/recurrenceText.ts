@@ -11,7 +11,7 @@
 // an adjective to agree with a noun it sometimes cannot.
 
 import type { Recurrence } from '../model/recurrence';
-import { formatCalDate, type DateTimeOpts } from './dates';
+import { formatCalDate, formatCalSpan, formatTimePart, type DateTimeOpts } from './dates';
 import { t } from './index';
 import { pluralRules } from './intl';
 
@@ -224,7 +224,24 @@ export function describeRecurrence(
 	}
 
 	if (!compact && rule.start) {
-		out += t('recurrenceText.from', { date: formatCalDate(rule.start, opts) });
+		// A same-day end time reads as the two clocks together (`4 Aug 09:00–09:30`),
+		// same as a plain `datetime` timespan — `rule.start` alone would drop it.
+		const date =
+			rule.endMinutes !== undefined
+				? formatCalSpan({ start: rule.start, end: { ...rule.start, minutes: rule.endMinutes } }, opts)
+				: formatCalDate(rule.start, opts);
+		out += t('recurrenceText.from', { date });
+	} else if (compact && rule.start?.minutes !== undefined) {
+		// The date is the longest clause and stays out of the badge (it's still in
+		// the tooltip's full sentence above), but a bare time is short enough to
+		// earn its place on the chip too.
+		out +=
+			rule.endMinutes !== undefined
+				? t('recurrenceText.atTimeRange', {
+						from: formatTimePart(rule.start.minutes, opts),
+						to: formatTimePart(rule.endMinutes, opts),
+					})
+				: t('recurrenceText.atTime', { time: formatTimePart(rule.start.minutes, opts) });
 	}
 	if (rule.until) {
 		if (!compact) out += t('recurrenceText.until', { date: formatCalDate(rule.until, opts) });

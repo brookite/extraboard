@@ -27,7 +27,7 @@ const rule = (text: string): Recurrence => {
 
 const days = (text: string, from: string, to: string, limit?: number): string[] => {
 	const r = rule(text);
-	return expandRecurrence(r, r.start ?? d(from), d(from), d(to), limit).map(formatDate);
+	return expandRecurrence(r, r.start ?? d(from), d(from), d(to), limit).map((span) => formatDate(span.start));
 };
 
 describe('recurrence: grammar (§1.1)', () => {
@@ -83,6 +83,7 @@ describe('recurrence: grammar (§1.1)', () => {
 			'every year on Jul 4 until 2030-01-01',
 			'every 3 days from 2026-07-27 09:30 for 10 times',
 			'every day from 2026-07-27 for 1 time',
+			'every day from 2026-07-27 09:00-09:30',
 		]) {
 			expect(formatRecurrence(rule(text))).toBe(text);
 		}
@@ -99,6 +100,8 @@ describe('recurrence: grammar (§1.1)', () => {
 			'every week from not-a-date',
 			'every day until 2026-01-01 for 3 times',
 			'2026-07-28',
+			'every day from 2026-07-27 09:30-09:00',
+			'every day from 2026-07-27-09:00',
 		]) {
 			expect(parseRecurrence(text)).toBeNull();
 		}
@@ -134,10 +137,19 @@ describe('recurrence: expansion (§2.1)', () => {
 	it('keeps the anchor time on every occurrence', () => {
 		const r = rule('every week from 2026-07-27 09:30');
 		const out = expandRecurrence(r, d('2026-07-27'), d('2026-07-27'), d('2026-08-10'));
-		expect(out.map(formatDate)).toEqual([
+		expect(out.map((span) => formatDate(span.start))).toEqual([
 			'2026-07-27 09:30',
 			'2026-08-03 09:30',
 			'2026-08-10 09:30',
+		]);
+	});
+
+	it('stretches every occurrence to the same-day end time (§time)', () => {
+		const r = rule('every week from 2026-07-27 09:00-09:30');
+		const out = expandRecurrence(r, d('2026-07-27'), d('2026-07-27'), d('2026-08-03'));
+		expect(out).toEqual([
+			{ start: { y: 2026, m: 7, d: 27, minutes: 540 }, end: { y: 2026, m: 7, d: 27, minutes: 570 } },
+			{ start: { y: 2026, m: 8, d: 3, minutes: 540 }, end: { y: 2026, m: 8, d: 3, minutes: 570 } },
 		]);
 	});
 
@@ -267,6 +279,16 @@ describe('recurrence: on the calendar (§3)', () => {
 			'2026-07-27',
 		]);
 		expect(occurrences.every((o) => o.repeating)).toBe(true);
+	});
+
+	it('places a same-day timespan rule with a real end, not `end === start` (§time)', () => {
+		const b = board('- Standup @{repeat|every day from 2026-07-06 09:00-09:15}');
+		const { occurrences } = placeCards(b, ['repeat'], july);
+		expect(occurrences[0]).toMatchObject({
+			start: { y: 2026, m: 7, d: 6, minutes: 540 },
+			end: { y: 2026, m: 7, d: 6, minutes: 555 },
+			hasTime: true,
+		});
 	});
 
 	it('a rule with no hit in the window is still dated, not tray material', () => {

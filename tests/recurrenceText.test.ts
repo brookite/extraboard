@@ -32,6 +32,16 @@ describe('describeRecurrence: frequency + interval', () => {
 		expect(describeRecurrence(rule, opts('ru'))).toBe('каждые 3 дня с 2026-07-27');
 	});
 
+	it('reads a same-day end time as the two clocks together, not a repeated date', () => {
+		const rule: Recurrence = {
+			freq: 'day',
+			interval: 1,
+			start: { y: 2026, m: 7, d: 27, minutes: 540 },
+			endMinutes: 570,
+		};
+		expect(describeRecurrence(rule, opts('en'))).toBe('every day from 2026-07-27 09:00–09:30');
+	});
+
 	it('weekly with a weekday list, Monday-first regardless of input order', () => {
 		const rule: Recurrence = { freq: 'week', interval: 1, weekdays: [5, 1, 3] };
 		expect(describeRecurrence(rule, opts('en'))).toBe('every week on Mon, Wed, Fri');
@@ -186,6 +196,20 @@ describe('describeRecurrence: compact form', () => {
 		};
 		expect(describeRecurrence(rule, opts('ru'), compact)).toBe('нед. в Вт');
 		expect(describeRecurrence(rule, opts('ru'))).toBe('каждую неделю в Вт с 2026-07-28');
+	});
+
+	it('keeps the time and the same-day end time — too short to drop like the date', () => {
+		const timed: Recurrence = {
+			freq: 'day',
+			interval: 1,
+			start: { y: 2026, m: 7, d: 28, minutes: 540 },
+		};
+		expect(describeRecurrence(timed, opts('en'), compact)).toBe('day 09:00');
+		expect(describeRecurrence(timed, opts('ru'), compact)).toBe('день 09:00');
+
+		const ranged: Recurrence = { ...timed, endMinutes: 570 };
+		expect(describeRecurrence(ranged, opts('en'), compact)).toBe('day 09:00–09:30');
+		expect(describeRecurrence(ranged, opts('ru'), compact)).toBe('день 09:00–09:30');
 	});
 
 	it('drops the end date too, but keeps a count', () => {

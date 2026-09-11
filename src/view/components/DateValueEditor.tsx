@@ -15,6 +15,7 @@ import {
 	sameDay,
 	stripTime,
 	today,
+	withClock,
 	type CalDate,
 } from '../../model/dates';
 import {
@@ -114,12 +115,6 @@ const isTaken = (day: CalDate, list: string[]): boolean =>
 		);
 	});
 
-const withTime = (date: CalDate, value: string): CalDate => {
-	const match = /^(\d{2}):(\d{2})$/.exec(value);
-	if (!match) return date;
-	return { ...date, minutes: Number(match[1]) * 60 + Number(match[2]) };
-};
-
 export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, handleRef }: Props) {
 	const [month, setMonth] = useState(() => initialDate(type, pv));
 	const [selection, setSelection] = useState<DateSelection | null>(() => initialSelection(type, pv));
@@ -193,9 +188,9 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 	const rawForDay = (day: CalDate): string | null => {
 		if (timeRequired && !time) return null;
 		if (!endValid) return null;
-		const start = withTime(day, time);
+		const start = withClock(day, time);
 		if (!spanEnabled || !time || !endTime) return formatDate(start);
-		return formatSpan({ start, end: withTime(day, endTime) });
+		return formatSpan({ start, end: withClock(day, endTime) });
 	};
 
 	/** The selection as the text one `date-list` entry would be written with. */

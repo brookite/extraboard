@@ -5,7 +5,21 @@
 // produces. That preview is the thing that makes a rule checkable.
 
 import { App, Modal, Setting, TextComponent } from 'obsidian';
-import { CalDate, dayKey, formatDate, parseDate, stripTime, today, weekday } from '../model/dates';
+import {
+	CalDate,
+	DateSpan,
+	dayKey,
+	daysBetween,
+	formatClock,
+	formatDate,
+	formatMinutesClock,
+	parseDate,
+	parseMinutesClock,
+	stripTime,
+	today,
+	weekday,
+	withClock,
+} from '../model/dates';
 import {
 	Freq,
 	Recurrence,
@@ -71,6 +85,13 @@ function monthLabels(): string[] {
 	];
 }
 
+/** One preview occurrence: a plain date, or `date HH:mm–HH:mm` when it spans a same-day range. */
+function formatOccurrence(span: DateSpan): string {
+	return span.end.minutes !== span.start.minutes
+		? `${formatDate(span.start)}–${formatClock(span.end)}`
+		: formatDate(span.start);
+}
+
 type End = 'never' | 'until' | 'count';
 
 /** What a rule is edited from: its current phrase, and where a new one starts. */
@@ -99,6 +120,8 @@ class RecurrenceModal extends Modal {
 	private rule: Recurrence;
 	private end: End;
 	private startText: string;
+	private startTimeText: string;
+	private endTimeText: string;
 	private untilText: string;
 	private resolved = false;
 
@@ -117,7 +140,10 @@ class RecurrenceModal extends Modal {
 		const parsed = parseRecurrence(options.value);
 		this.rule = parsed ?? { freq: 'week', interval: 1, weekdays: [weekday(anchor)], start: anchor };
 		this.end = this.rule.until ? 'until' : this.rule.count !== undefined ? 'count' : 'never';
-		this.startText = this.rule.start ? formatDate(this.rule.start) : formatDate(anchor);
+		const start = this.rule.start ?? anchor;
+		this.startText = dayKey(start);
+		this.startTimeText = formatClock(start);
+		this.endTimeText = this.rule.endMinutes !== undefined ? formatMinutesClock(this.rule.endMinutes) : '';
 		this.untilText = this.rule.until ? formatDate(this.rule.until) : '';
 	}
 
@@ -172,11 +198,31 @@ class RecurrenceModal extends Modal {
 		if (rule.freq === 'month') this.renderMonthly(el);
 		if (rule.freq === 'year') this.renderYearly(el);
 
-		new Setting(el).setName(t('modal.recurrence.starts')).addText((text) => {
+		const starts = new Setting(el).setName(t('modal.recurrence.starts'));
+		starts.addText((text) => {
 			this.asDatePicker(text, this.startText);
 			text.onChange((value) => {
 				this.startText = value;
-				this.rule.start = parseDate(value) ?? undefined;
+				this.applyStart();
+				this.renderPreview();
+			});
+		});
+		starts.addText((text) => {
+			this.asTimePicker(text, this.startTimeText);
+			text.onChange((value) => {
+				this.startTimeText = value;
+				this.applyStart();
+				this.renderPreview();
+			});
+		});
+		// A range is optional and same-day only (§time): a second clock, exactly
+		// like a plain `datetime` value's own end time.
+		starts.controlEl.createSpan({ cls: 'eb-recurrence-time-sep', text: '–' });
+		starts.addText((text) => {
+			this.asTimePicker(text, this.endTimeText);
+			text.onChange((value) => {
+				this.endTimeText = value;
+				this.applyStart();
 				this.renderPreview();
 			});
 		});
@@ -361,7 +407,7 @@ class RecurrenceModal extends Modal {
 		el.createDiv({
 			cls: 'eb-recurrence-next',
 			text: next.length
-				? t('modal.recurrence.next', { days: next.map(formatDate).join(', ') })
+				? t('modal.recurrence.next', { days: next.map(formatOccurrence).join(', ') })
 				: t('modal.recurrence.noDays'),
 		});
 	}
@@ -370,12 +416,23 @@ class RecurrenceModal extends Modal {
 	private problem(): string | null {
 		const rule = this.rule;
 		if (!rule.start) return t('modal.recurrence.problem.startNotDate');
+		// An end time is only meaningful next to a start time on the same day;
+		// dropping it silently (as `applyStart` does for the rule) would hide
+		// a value the user can still see sitting in the field.
+		const endMinutes = parseMinutesClock(this.endTimeText);
+		if (endMinutes !== null) {
+			const startMinutes = rule.start.minutes;
+			if (startMinutes === undefined || endMinutes <= startMinutes) {
+				return t('modal.recurrence.problem.endTimeBeforeStart');
+			}
+		}
 		if (rule.interval < 1) return t('modal.recurrence.problem.intervalTooSmall');
 		if (rule.freq === 'week' && rule.weekdays && rule.weekdays.length === 0) {
 			return t('modal.recurrence.problem.needWeekday');
 		}
 		if (this.end === 'until' && !rule.until) return t('modal.recurrence.problem.endNotDate');
-		if (rule.until && rule.start && formatDate(rule.until) < formatDate(rule.start)) {
+		// A day-only bound: the start's own time of day never puts its own day past it.
+		if (rule.until && rule.start && daysBetween(rule.until, rule.start) < 0) {
 			return t('modal.recurrence.problem.endBeforeStart');
 		}
 		if (this.end === 'count' && (rule.count ?? 0) < 1) return t('modal.recurrence.problem.countTooSmall');
@@ -413,6 +470,38 @@ class RecurrenceModal extends Modal {
 		text.inputEl.addClass('eb-date-input');
 		const date = parseDate(value);
 		text.setValue(date ? dayKey(date) : '');
+	}
+
+	/**
+	 * The event's own time of day, next to the date it starts on — the same
+	 * `type="time"` control the card's date editor already offers
+	 * (`DateValueEditor.tsx`). Empty means the series has no time, same as a
+	 * plain `datetime` value.
+	 */
+	private asTimePicker(text: TextComponent, value: string): void {
+		text.inputEl.type = 'time';
+		text.inputEl.addClass('eb-recurrence-time');
+		text.setValue(value);
+	}
+
+	/**
+	 * Recombine the start day, its time and its optional end time into the
+	 * rule's anchor. An end time that does not follow a start time on the same
+	 * day is left out here — `problem()` is what tells the user why.
+	 */
+	private applyStart(): void {
+		const date = parseDate(this.startText);
+		if (!date) {
+			this.rule.start = undefined;
+			delete this.rule.endMinutes;
+			return;
+		}
+		const start = withClock(date, this.startTimeText);
+		this.rule.start = start;
+		delete this.rule.endMinutes;
+		if (start.minutes === undefined) return;
+		const endMinutes = parseMinutesClock(this.endTimeText);
+		if (endMinutes !== null && endMinutes > start.minutes) this.rule.endMinutes = endMinutes;
 	}
 
 	private applyEnd(): void {

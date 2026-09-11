@@ -305,6 +305,9 @@ export const en = {
 		onNth: ' on the {ordinal} {weekday}',
 		onYearly: ' on {month} {day}',
 		from: ' from {date}',
+		// The badge's own bare time — no date, unlike `from` (recurrence.md §5).
+		atTime: ' {time}',
+		atTimeRange: ' {from}–{to}',
 		until: ' until {date}',
 		timesOne: ' for 1 time',
 		timesFew: ' for {n} times',
@@ -417,6 +420,7 @@ export const en = {
 				needWeekday: 'Choose at least one weekday.',
 				endNotDate: 'The end date is not a date (YYYY-MM-DD).',
 				endBeforeStart: 'The end date is before the start date.',
+				endTimeBeforeStart: 'The end time needs a start time on the same day, earlier than it.',
 				countTooSmall: 'Repeat at least once.',
 			},
 			weekday: {

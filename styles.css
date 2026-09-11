@@ -1344,7 +1344,11 @@ body.eb-dragging-card
 	justify-content: space-between;
 }
 
-.eb-date-time input[type='time'] {
+/* Obsidian themes `input[type="date"]` (its own property editor uses it) but
+   never `type="time"`, so a bare one renders as the raw OS control — wherever
+   a time picker appears (here, and the repetition rule's Starts field) it
+   gets the same look as every other themed input. */
+input[type='time'] {
 	padding: 4px 8px;
 	font-family: inherit;
 	font-size: inherit;
@@ -1354,11 +1358,11 @@ body.eb-dragging-card
 	border-radius: var(--radius-s, 6px);
 }
 
-.eb-date-time input[type='time']:hover {
+input[type='time']:hover {
 	border-color: var(--background-modifier-border-hover);
 }
 
-.eb-date-time input[type='time']:focus {
+input[type='time']:focus {
 	border-color: var(--background-modifier-border-focus, var(--interactive-accent));
 }
 
@@ -2643,6 +2647,18 @@ body.is-mobile .eb-panel-modal .eb-date-day {
 	width: auto;
 	max-width: 100%;
 	font-family: inherit;
+}
+
+/* Its own sizing next to the date field — a clock never needs the room a
+   full YYYY-MM-DD does. */
+.eb-recurrence-time {
+	width: 7em;
+	max-width: 100%;
+}
+
+/* The dash between the anchor's start and end clocks — a separator, not data. */
+.eb-recurrence-time-sep {
+	color: var(--text-muted);
 }
 
 .eb-weekday-row {

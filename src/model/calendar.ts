@@ -217,13 +217,13 @@ export function placeCards(board: Board, properties: string[], window?: Window):
 					if (!anchor) return;
 					understood++;
 					if (!window) return;
-					for (const day of expandRecurrence(rule, anchor, window.from, window.to)) {
+					for (const occ of expandRecurrence(rule, anchor, window.from, window.to)) {
 						occurrences.push({
 							ref,
 							sources: [source],
-							start: day,
-							end: day,
-							hasTime: day.minutes !== undefined,
+							start: occ.start,
+							end: occ.end,
+							hasTime: occ.start.minutes !== undefined,
 							length: 1,
 							repeating: true,
 						});
