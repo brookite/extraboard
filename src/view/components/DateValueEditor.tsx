@@ -303,12 +303,17 @@ export function DateValueEditor({ name, type, def, pv, api, settings, onCommit, 
 	};
 
 	const addRecurrence = async (): Promise<void> => {
+		// A rule is built around the day the calendar has selected — the first one
+		// of a range — so the form opens on that weekday and start date rather
+		// than on today. Read before the pending entry is written back, which
+		// clears the selection.
+		const start = selection ? stripTime(selection.start) : undefined;
 		const base = listWithPending();
 		if (base.length > list.length) {
 			onCommit({ name, type: 'date-list', raw: base });
 			clearPending();
 		}
-		const raw = await editRecurrence(api.app, { name, value: '' });
+		const raw = await editRecurrence(api.app, { name, value: '', start });
 		if (!raw) return;
 		onCommit({ name, type: 'date-list', raw: [...base, raw] });
 	};

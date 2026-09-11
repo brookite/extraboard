@@ -5,7 +5,7 @@
 // produces. That preview is the thing that makes a rule checkable.
 
 import { App, Modal, Setting, TextComponent } from 'obsidian';
-import { CalDate, dayKey, formatDate, parseDate, today, weekday } from '../model/dates';
+import { CalDate, dayKey, formatDate, parseDate, stripTime, today, weekday } from '../model/dates';
 import {
 	Freq,
 	Recurrence,
@@ -73,12 +73,23 @@ function monthLabels(): string[] {
 
 type End = 'never' | 'until' | 'count';
 
+/** What a rule is edited from: its current phrase, and where a new one starts. */
+export interface RecurrenceOptions {
+	name: string;
+	value: string;
+	/**
+	 * The day a rule with nothing to parse is anchored at — the one selected on
+	 * the calendar the form was opened from. Defaults to today.
+	 */
+	start?: CalDate;
+}
+
 /**
  * Edit a rule. Resolves to the canonical phrase, `''` when the rule was
  * cleared, or `null` when the dialog was dismissed — the shape the color picker
  * already uses.
  */
-export function editRecurrence(app: App, options: { name: string; value: string }): Promise<string | null> {
+export function editRecurrence(app: App, options: RecurrenceOptions): Promise<string | null> {
 	return new Promise((resolve) => {
 		new RecurrenceModal(app, options, resolve).open();
 	});
@@ -93,16 +104,20 @@ class RecurrenceModal extends Modal {
 
 	constructor(
 		app: App,
-		private readonly options: { name: string; value: string },
+		private readonly options: RecurrenceOptions,
 		private readonly done: (value: string | null) => void,
 	) {
 		super(app);
+		// The day a new rule is built around: what the calendar had selected when
+		// the form was opened, or today. Its weekday, month day and month are what
+		// every frequency then starts from (`setFreq`).
+		const anchor = stripTime(options.start ?? today());
 		// An unparseable value is not thrown away silently: the form opens on a
-		// weekly rule anchored today, and the old text stays until the user saves.
+		// weekly rule anchored there, and the old text stays until the user saves.
 		const parsed = parseRecurrence(options.value);
-		this.rule = parsed ?? { freq: 'week', interval: 1, weekdays: [weekday(today())], start: today() };
+		this.rule = parsed ?? { freq: 'week', interval: 1, weekdays: [weekday(anchor)], start: anchor };
 		this.end = this.rule.until ? 'until' : this.rule.count !== undefined ? 'count' : 'never';
-		this.startText = this.rule.start ? formatDate(this.rule.start) : formatDate(today());
+		this.startText = this.rule.start ? formatDate(this.rule.start) : formatDate(anchor);
 		this.untilText = this.rule.until ? formatDate(this.rule.until) : '';
 	}
 
