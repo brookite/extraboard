@@ -977,6 +977,30 @@ export function archiveCard(board: Board, ref: ItemRef, opts: ArchiveOpts): Boar
 	);
 }
 
+/**
+ * Archive **every card in one stack** in one edit, in document order, as a block
+ * at the top of the archive — so their relative order survives (archive.md
+ * §5.2a). The stack itself stays, and so do its dividers: what the user asked
+ * for is an empty column, not one less column. An untitled card leaves the
+ * board without entering the archive (§5.1).
+ */
+export function archiveStackCards(board: Board, index: number, opts: ArchiveOpts): Board {
+	const stack = board.stacks[index];
+	if (!stack) return board;
+	const cards = stack.items.filter((item) => item.kind === 'card');
+	if (!cards.length) return board;
+
+	const lines = archiveLines(cards, stack, board.config, opts);
+	const next = withItems(
+		board,
+		index,
+		stack.items.filter((item) => item.kind !== 'card'),
+	);
+	return lines.length
+		? { ...next, archive: prependToArchive(next.archive, lines, opts.limit) }
+		: next;
+}
+
 /** Cards whose own task marker is `x`/`X` — the only notion of "done" (§5.2). */
 export function countCompletedCards(board: Board): number {
 	let count = 0;
@@ -1057,8 +1081,12 @@ export function restoreCard(board: Board, index: number, at: InsertPos = null): 
 
 	const rest = cards.slice();
 	rest.splice(index, 1);
-	let next = withArchivedCards(board, rest);
+	return placeRestored(withArchivedCards(board, rest), entry, at);
+}
 
+/** One archived card back onto the board; the archive is the caller's to write. */
+function placeRestored(board: Board, entry: ArchivedCard, at: InsertPos): Board {
+	let next = board;
 	let target = restoreTargetIndex(next, entry);
 	if (target === -1) {
 		next = addStack(next, entry.from ?? 'Restored');
@@ -1072,6 +1100,32 @@ export function restoreCard(board: Board, index: number, at: InsertPos = null): 
 		card,
 	});
 	return withItems(next, target, items);
+}
+
+/**
+ * Put **every** archived card back on the board (§5.3a) and empty the archive.
+ * Each card follows the same rules restoring one does, so `at` is asked per
+ * target stack — the caller resolves the entry position against the very stack
+ * the op picks (kanban-view.md §6.7).
+ *
+ * Entries are restored **oldest first** (the archive's document end), so the
+ * most recently archived card ends up nearest the stacks' entry position,
+ * whichever end that is.
+ */
+export function restoreAllArchived(
+	board: Board,
+	at: (stack: Stack | undefined) => InsertPos = () => null,
+): Board {
+	const cards = archivedCards(board);
+	if (!cards.length) return board;
+	// The archive is parsed and rewritten **once**, not once per card: the whole
+	// point of the action is that an archive of any size is one edit (§4).
+	let next = withArchivedCards(board, []);
+	for (let i = cards.length - 1; i >= 0; i--) {
+		const entry = cards[i]!;
+		next = placeRestored(next, entry, at(restoreTarget(next, entry)));
+	}
+	return next;
 }
 
 /** Destroy one archived card (§5.4). Confirmed by the modal, not here. */

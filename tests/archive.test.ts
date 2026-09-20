@@ -214,6 +214,35 @@ describe('ops: archiving', () => {
 		expect(gone.archive).toBeUndefined();
 	});
 
+	it('empties one stack into the archive, keeping the stack and its dividers', () => {
+		const b = ops.archiveStackCards(
+			board(
+				[FM, '## To do', '', '- First', '', '### Group', '', '- Second', '', '## Doing', ''].join('\n'),
+			),
+			0,
+			{ at: '2026-07-28 14:30' },
+		);
+		expect(b.stacks).toHaveLength(2);
+		expect(b.stacks[0]!.name).toBe('To do');
+		expect(b.stacks[0]!.items.map((i) => i.kind)).toEqual(['divider']);
+		expect(ops.archivedCards(b).map((c) => [c.card.title, c.from, c.at])).toEqual([
+			['First', 'To do', '2026-07-28 14:30'],
+			['Second', 'To do', '2026-07-28 14:30'],
+		]);
+	});
+
+	it('archives a stack\'s cards whatever their state, untitled ones aside', () => {
+		const b = ops.archiveStackCards(board([FM, '## To do', '', '- [ ] Open', '- ', ''].join('\n')), 0, {});
+		expect(ops.cardCount(b.stacks[0]!)).toBe(0);
+		expect(ops.archivedCards(b).map((c) => c.card.title)).toEqual(['Open']);
+	});
+
+	it('is a no-op on a stack with no cards and on an index nobody has', () => {
+		const b = board([FM, '## To do', '', '### Group', '', '## Doing', '', '- Card', ''].join('\n'));
+		expect(ops.archiveStackCards(b, 0, {})).toBe(b);
+		expect(ops.archiveStackCards(b, 9, {})).toBe(b);
+	});
+
 	it('archives the cards of a deleted stack', () => {
 		const b = ops.deleteStack(board(), 1, {});
 		expect(b.stacks).toHaveLength(1);
@@ -264,6 +293,63 @@ describe('ops: restoring and destroying', () => {
 			0,
 		);
 		expect(b.stacks[0]!.name).toBe('Restored');
+	});
+
+	it('restores every archived card at once, each into its own origin', () => {
+		const b = ops.restoreAllArchived(archived());
+		expect(ops.archivedCards(b)).toHaveLength(0);
+		expect(b.stacks.map((s) => s.items.map((i) => (i.kind === 'card' ? i.card.title : '—')))).toEqual([
+			['Open card', 'Finished card'],
+			['Also finished'],
+		]);
+		// The section stays behind, empty, as clearing it leaves it.
+		expect(b.archive).toBeDefined();
+	});
+
+	it('honours the entry position the caller resolves per target stack', () => {
+		const b = ops.restoreAllArchived(archived(), () => 0);
+		expect(b.stacks[0]!.items.map((i) => (i.kind === 'card' ? i.card.title : '—'))).toEqual([
+			'Finished card',
+			'Open card',
+		]);
+	});
+
+	it('restores oldest first, so the newest card lands nearest the entry end', () => {
+		const b = ops.restoreAllArchived(
+			board(
+				[
+					FM,
+					'## To do',
+					'',
+					'## Archive %%archive%%',
+					'',
+					'- Newest %%from|To do%%',
+					'- Oldest %%from|To do%%',
+					'',
+				].join('\n'),
+			),
+		);
+		expect(b.stacks[0]!.items.map((i) => (i.kind === 'card' ? i.card.title : '—'))).toEqual([
+			'Oldest',
+			'Newest',
+		]);
+	});
+
+	it('creates the stacks it needs and is a no-op on an empty archive', () => {
+		const b = ops.restoreAllArchived(
+			board([FM, '## Archive %%archive%%', '', '- One %%from|Ideas%%', '- Orphan', ''].join('\n')),
+		);
+		// The orphan comes last in the file, so it is restored first and creates
+		// the stack; "One" then finds no "Ideas" and falls back to it (§5.3).
+		expect(b.stacks.map((s) => s.name)).toEqual(['Restored']);
+		expect(b.stacks[0]!.items.map((i) => (i.kind === 'card' ? i.card.title : '—'))).toEqual([
+			'Orphan',
+			'One',
+		]);
+		const plain = board();
+		expect(ops.restoreAllArchived(plain)).toBe(plain);
+		const cleared = ops.clearArchive(archived());
+		expect(ops.restoreAllArchived(cleared)).toBe(cleared);
 	});
 
 	it('deletes one entry and clears the rest, keeping the section', () => {

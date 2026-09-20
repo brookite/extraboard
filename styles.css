@@ -1181,6 +1181,14 @@ body.eb-dragging-card
 	text-overflow: ellipsis;
 }
 
+/* A tag the board settings give a color to is drawn as the chip the card will
+   show, so the rows listed first read as the board's own tags. */
+.eb-tag-picker-name.is-colored {
+	padding: 0 6px;
+	border-radius: var(--radius-s, 4px);
+	line-height: 1.5;
+}
+
 .eb-tag-picker-foot {
 	display: flex;
 	align-items: center;
@@ -1960,10 +1968,14 @@ body.eb-dragging-card .eb-archive-drop {
 .eb-archive-toolbar {
 	display: flex;
 	justify-content: flex-end;
+	gap: 4px;
 	padding-bottom: 8px;
 }
 
-.eb-archive-sort {
+/* "Restore all" sits beside the order button and reads as its twin: both act on
+   the list as a whole, not on a row (archive.md §6). */
+.eb-archive-sort,
+.eb-archive-restore-all {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
@@ -1975,12 +1987,14 @@ body.eb-dragging-card .eb-archive-drop {
 	cursor: pointer;
 }
 
-.eb-archive-sort:hover {
+.eb-archive-sort:hover,
+.eb-archive-restore-all:hover {
 	color: var(--text-normal);
 	background: var(--background-modifier-hover);
 }
 
-.eb-archive-sort .svg-icon {
+.eb-archive-sort .svg-icon,
+.eb-archive-restore-all .svg-icon {
 	width: 15px;
 	height: 15px;
 }

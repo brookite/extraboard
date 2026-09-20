@@ -281,6 +281,22 @@ export function SectionGroup(props: SectionProps) {
 		);
 	};
 
+	/** The board's own "Archive all cards", offered where the stack is (§4.5). */
+	const archiveAllCards = async (): Promise<void> => {
+		if (stackIndex === null || !stack) return;
+		const count = ops.cardCount(stack);
+		if (!count) return;
+		const ok = await api.confirm(
+			t('stack.archiveAll'),
+			count === 1
+				? t('stack.archiveAllConfirmMessageOne', { name: stack.name })
+				: t('stack.archiveAllConfirmMessageMany', { name: stack.name, count }),
+			t('stack.archiveAllCta'),
+		);
+		if (!ok) return;
+		api.update((b) => ops.archiveStackCards(b, stackIndex, archiveOpts(settings)));
+	};
+
 	/** The Kanban board's own deletion, offered where the stack is (§4.5). */
 	const deleteStack = async (): Promise<void> => {
 		if (stackIndex === null || !stack) return;
@@ -342,6 +358,14 @@ export function SectionGroup(props: SectionProps) {
 					.onClick(() => {
 						void editParameters();
 					}),
+			);
+			menu.addItem((item) =>
+				item
+					.setTitle(t('stack.archiveAll'))
+					.setIcon('archive')
+					.setDisabled(!stack || ops.cardCount(stack) === 0)
+					.setWarning(true)
+					.onClick(() => void archiveAllCards()),
 			);
 			menu.addItem((item) =>
 				item

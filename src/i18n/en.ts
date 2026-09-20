@@ -106,6 +106,12 @@ export const en = {
 		addNamedDivider: 'Add named divider',
 		insertLeft: 'Insert stack left',
 		insertRight: 'Insert stack right',
+		archiveAll: 'Archive all cards',
+		archiveAllCta: 'Archive',
+		archiveAllConfirmMessageOne:
+			'The 1 card in "{name}" moves to the archive, where it can be restored. The stack stays.',
+		archiveAllConfirmMessageMany:
+			'All {count} cards in "{name}" move to the archive, where they can be restored. The stack stays.',
 		deleteStack: 'Delete stack',
 		deleteConfirmMessageOne:
 			'"{name}" contains 1 card. Deleting the stack moves it to the archive, where it can be restored.',
@@ -476,6 +482,10 @@ export const en = {
 			unknownTime: 'Undated',
 			sortNewestFirst: 'Newest first',
 			sortOldestFirst: 'Oldest first',
+			restoreAll: 'Restore all',
+			restoreAllConfirmMessageOne: '1 archived card goes back on the board.',
+			restoreAllConfirmMessageMany:
+				'{count} archived cards go back on the board, each into the stack it came from.',
 			clearArchive: 'Clear archive',
 			close: 'Close',
 			delete: 'Delete',

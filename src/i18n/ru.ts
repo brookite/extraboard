@@ -107,6 +107,12 @@ export const ru: DeepPartial<typeof en> = {
 		addNamedDivider: 'Добавить именованный разделитель',
 		insertLeft: 'Вставить стопку слева',
 		insertRight: 'Вставить стопку справа',
+		archiveAll: 'Архивировать все карточки',
+		archiveAllCta: 'Архивировать',
+		archiveAllConfirmMessageOne:
+			'Единственная карточка из «{name}» переместится в архив, откуда её можно восстановить. Стопка останется.',
+		archiveAllConfirmMessageMany:
+			'Все карточки из «{name}» ({count}) переместятся в архив, откуда их можно восстановить. Стопка останется.',
 		deleteStack: 'Удалить стопку',
 		deleteConfirmMessageOne:
 			'«{name}» содержит 1 карточку. При удалении стопки она переместится в архив, откуда её можно восстановить.',
@@ -472,6 +478,10 @@ export const ru: DeepPartial<typeof en> = {
 			unknownTime: 'Без даты',
 			sortNewestFirst: 'Сначала новые',
 			sortOldestFirst: 'Сначала старые',
+			restoreAll: 'Восстановить все',
+			restoreAllConfirmMessageOne: '1 карточка вернётся из архива на доску.',
+			restoreAllConfirmMessageMany:
+				'Карточки из архива ({count}) вернутся на доску — каждая в ту стопку, из которой была отправлена.',
 			clearArchive: 'Очистить архив',
 			close: 'Закрыть',
 			delete: 'Удалить',

@@ -49,6 +49,33 @@ export function toggleTag(text: string, tag: string): string {
 }
 
 /**
+ * The tags the board's settings give a **color** to, sorted. Registering a color
+ * is a declaration that the tag is one of the board's own, whether or not a card
+ * wears it yet — which is why these lead the picker (§3.1.1).
+ */
+export function coloredTags(board: Board): string[] {
+	return Object.keys(board.config.tagColors).sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * The tag picker's candidates, in the order it offers them
+ * (card-content-and-checklists.md §3.1.1): the board's **colored** tags first,
+ * then the board's remaining tags, then the vault's — each tag kept once, at
+ * its first appearance. `vault` is already ordered most-used first by its
+ * caller, and that order is preserved.
+ */
+export function tagCandidates(board: Board | null, vault: string[]): string[] {
+	const out: string[] = [];
+	const seen = new Set<string>();
+	for (const tag of [...(board ? coloredTags(board) : []), ...(board ? boardTags(board) : []), ...vault]) {
+		if (seen.has(tag)) continue;
+		seen.add(tag);
+		out.push(tag);
+	}
+	return out;
+}
+
+/**
  * Every tag this board already knows: the ones its cards carry plus the ones
  * its settings give a color to (a color is a declaration of intent, even when
  * no card wears the tag yet). Sorted, because the list is a menu.

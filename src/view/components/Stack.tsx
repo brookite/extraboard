@@ -116,6 +116,23 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 		api.update((b) => ops.addStack(b, fields.name, at, fields.completes, fields.accent));
 	};
 
+	/** Empty the stack into the archive; the column itself stays (archive.md
+	 * §5.2a). Irreversible it is not, but it takes every card off the board at
+	 * once, so it confirms like the deletion below. */
+	const archiveAllCards = async (): Promise<void> => {
+		const count = ops.cardCount(stack);
+		if (!count) return;
+		const ok = await api.confirm(
+			t('stack.archiveAll'),
+			count === 1
+				? t('stack.archiveAllConfirmMessageOne', { name: stack.name })
+				: t('stack.archiveAllConfirmMessageMany', { name: stack.name, count }),
+			t('stack.archiveAllCta'),
+		);
+		if (!ok) return;
+		api.update((b) => ops.archiveStackCards(b, index, archiveOpts(settings)));
+	};
+
 	const deleteStack = async (): Promise<void> => {
 		const count = ops.cardCount(stack);
 		if (count > 0) {
@@ -188,6 +205,14 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 				}),
 			);
 			menu.addSeparator();
+			menu.addItem((item) =>
+			item
+				.setTitle(t('stack.archiveAll'))
+				.setIcon('archive')
+				.setDisabled(ops.cardCount(stack) === 0)
+				.setWarning(true)
+				.onClick(() => void archiveAllCards()),
+			);
 			menu.addItem((item) =>
 			item
 				.setTitle(t('stack.deleteStack'))

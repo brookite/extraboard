@@ -186,6 +186,18 @@ export class ArchiveModal extends Modal {
 								: t('modal.archive.sortOldestFirst')}
 						</span>
 					</button>
+					{/* Beside the order, because both act on the list as a whole; it
+					    confirms because it empties the archive onto the board (§5.3a). */}
+					<button
+						type="button"
+						class="eb-archive-restore-all"
+						onClick={() => {
+							void this.confirmRestoreAll(cards.length);
+						}}
+					>
+						<Icon name="archive-restore" />
+						<span>{t('modal.archive.restoreAll')}</span>
+					</button>
 				</div>
 				<div class="eb-archive-list">
 					{order.map((index) => (
@@ -241,6 +253,25 @@ export class ArchiveModal extends Modal {
 		);
 		if (!ok) return;
 		this.api.update((b) => ops.deleteArchived(b, index));
+		this.render();
+	}
+
+	/** Every card back on the board at once (§5.3a); the modal stays open on the
+	 * archive it just emptied. */
+	private async confirmRestoreAll(count: number): Promise<void> {
+		const ok = await this.api.confirm(
+			t('modal.archive.restoreAll'),
+			count === 1
+				? t('modal.archive.restoreAllConfirmMessageOne')
+				: t('modal.archive.restoreAllConfirmMessageMany', { count }),
+			t('modal.archive.restoreAll'),
+		);
+		if (!ok) return;
+		// The entry position is resolved against the stack the op itself picks for
+		// each card, exactly as a single restore does (§6.7).
+		this.api.update((b) =>
+			ops.restoreAllArchived(b, (stack) => cardEntryPos(stack, b.config, this.settings)),
+		);
 		this.render();
 	}
 

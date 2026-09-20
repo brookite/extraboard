@@ -5,9 +5,11 @@ import { describe, it, expect } from 'vitest';
 import {
 	addTag,
 	boardTags,
+	coloredTags,
 	hasTag,
 	isTagName,
 	removeTag,
+	tagCandidates,
 	tagsInText,
 	toggleTag,
 } from '../src/model/tags';
@@ -105,5 +107,23 @@ describe('boardTags', () => {
 	it('offers the cards’ tags and the colored ones, sorted and deduped', () => {
 		const board = boardFromBody('## Todo\n\n- One #beta #alpha\n- Two #alpha\n');
 		expect(boardTags(board)).toEqual(['alpha', 'beta', 'released']);
+	});
+});
+
+describe('tagCandidates', () => {
+	const board = boardFromBody('## Todo\n\n- One #beta #alpha\n');
+
+	it('lists the tags the board gives a color to first', () => {
+		expect(coloredTags(board)).toEqual(['released']);
+		expect(tagCandidates(board, ['vaulted', 'alpha'])).toEqual([
+			'released',
+			'alpha',
+			'beta',
+			'vaulted',
+		]);
+	});
+
+	it('keeps each tag once, at its first appearance, and the vault’s own order', () => {
+		expect(tagCandidates(null, ['often', 'rarely', 'often'])).toEqual(['often', 'rarely']);
 	});
 });

@@ -8,11 +8,12 @@
 import { Platform } from 'obsidian';
 import type { RefObject } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { boardTags, isTagName, tagsInText, toggleTag } from '../../model/tags';
+import { isTagName, tagCandidates, tagsInText, toggleTag } from '../../model/tags';
 import type { BoardApi } from '../api';
 import type { CardField } from '../CardEditor';
 import { vaultTags } from '../../util/vaultTags';
 import { Icon } from './Icon';
+import { styleFor } from './style';
 import { t } from '../../i18n';
 
 /**
@@ -43,13 +44,11 @@ export function TagPicker({ field, api, onClose }: Props) {
 	}, []);
 
 	// Read once per picker: the vault index is a large object to walk, and
-	// neither list changes while one picker is open.
-	const candidates = useMemo(() => {
-		const board = api.getBoard();
-		const own = board ? boardTags(board) : [];
-		const seen = new Set(own);
-		return [...own, ...vaultTags(api.app).filter((tag) => !seen.has(tag))];
-	}, [api]);
+	// neither list changes while one picker is open. The board's own tags come
+	// first, its **colored** ones ahead of those (model/tags.ts).
+	const board = useMemo(() => api.getBoard(), [api]);
+	const candidates = useMemo(() => tagCandidates(board, vaultTags(api.app)), [api, board]);
+	const colors = board?.config.tagColors ?? {};
 
 	const current = tagsInText(text);
 	// A tag the card wears that neither the board nor the vault index knows yet
@@ -115,7 +114,14 @@ export function TagPicker({ field, api, onClose }: Props) {
 							onClick={() => toggle(tag)}
 						>
 							<Icon name={on ? 'check' : 'tag'} class="eb-button-icon" />
-							<span class="eb-tag-picker-name">#{tag}</span>
+							{/* A tag the board gives a color to wears it here too, so the
+							    ones listed first are visibly the board's own. */}
+							<span
+								class={`eb-tag-picker-name${colors[tag] ? ' is-colored' : ''}`}
+								style={styleFor(colors[tag]?.bg, colors[tag]?.fg)}
+							>
+								#{tag}
+							</span>
 						</button>
 					);
 				})}
