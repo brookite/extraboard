@@ -160,6 +160,7 @@ class ViewsModal extends Modal {
 				// One date property is not a choice, so it is made for the user.
 				dateProperties: dates.length === 1 && dates[0] ? [dates[0].name] : [],
 				mode: 'month',
+				weekNumbers: false,
 				controls: 'dynamic',
 				groupBy: 'section',
 			},
@@ -184,6 +185,7 @@ class ViewsModal extends Modal {
 				type: view.type,
 				dateProperties: view.type === 'calendar' ? [...view.dateProperties] : [],
 				mode: view.type === 'calendar' ? view.mode : 'month',
+				weekNumbers: view.type === 'calendar' && !!view.weekNumbers,
 				controls: view.type === 'list' ? view.controls : 'dynamic',
 				groupBy: view.type === 'list' ? view.groupBy : 'section',
 			},
@@ -199,6 +201,7 @@ class ViewsModal extends Modal {
 					...(fields.type === 'calendar' && {
 						dateProperties: fields.dateProperties,
 						mode: fields.mode,
+						weekNumbers: fields.weekNumbers,
 					}),
 					...(fields.type === 'list' && { controls: fields.controls, groupBy: fields.groupBy }),
 				}),
@@ -266,6 +269,8 @@ interface ViewFields {
 	/** Calendar only: the properties the grid is computed from (views.md §4.3). */
 	dateProperties: string[];
 	mode: CalendarMode;
+	/** Calendar only (calendar-view.md §3.5). */
+	weekNumbers: boolean;
 	/** List only (list-view.md §3.4). */
 	controls: ListControls;
 	/** List only: what the rows are gathered into (list-view.md §1.0). */
@@ -281,7 +286,13 @@ function sortFieldName(field: FieldRef): string {
 function newViewOf(fields: ViewFields): ops.NewView {
 	const name = fields.name || defaultViewName(fields.type);
 	if (fields.type === 'calendar') {
-		return { name, type: 'calendar', dateProperties: fields.dateProperties, mode: fields.mode };
+		return {
+			name,
+			type: 'calendar',
+			dateProperties: fields.dateProperties,
+			mode: fields.mode,
+			...(fields.weekNumbers && { weekNumbers: true }),
+		};
 	}
 	if (fields.type !== 'list') return { name, type: 'kanban' };
 	return { name, type: 'list', controls: fields.controls, groupBy: fields.groupBy };
@@ -482,6 +493,15 @@ class ViewFormModal extends Modal {
 						this.fields.mode = value as CalendarMode;
 					}),
 			);
+
+			new Setting(el)
+				.setName(t('modal.views.weekNumbers'))
+				.setDesc(t('modal.views.weekNumbersDesc'))
+				.addToggle((toggle) =>
+					toggle.setValue(this.fields.weekNumbers).onChange((value) => {
+						this.fields.weekNumbers = value;
+					}),
+				);
 		}
 
 		const buttons = el.createDiv({ cls: 'modal-button-container' });

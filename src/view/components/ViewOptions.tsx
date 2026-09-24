@@ -204,6 +204,11 @@ export function ViewOptions({ board, view, api, trigger, onClose }: Props) {
 							</button>
 						))}
 					</div>
+					<Row
+						label={t('modal.views.weekNumbers')}
+						checked={!!view.weekNumbers}
+						onChange={(value) => api.update((b) => ops.updateView(b, view.id, { weekNumbers: value }))}
+					/>
 				</>
 			) : null}
 

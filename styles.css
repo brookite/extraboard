@@ -2148,6 +2148,7 @@ body.eb-dragging-card .eb-archive-drop {
 	--eb-cal-chip-gap: 1px;
 	--eb-cal-bar-h: 20px;
 	--eb-cal-daynum-h: 20px;
+	--eb-cal-weeknum-w: 22px;
 	display: flex;
 	flex-direction: column;
 	height: 100%;
@@ -2225,13 +2226,62 @@ body.eb-dragging-card .eb-archive-drop {
 	background: var(--interactive-accent);
 }
 
+.eb-cal-body {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
 .eb-cal-grid {
 	display: flex;
 	flex-direction: column;
 	flex: 1;
+	min-width: 0;
 	min-height: 0;
 	border-top: 1px solid var(--background-modifier-border);
 	border-left: 1px solid var(--background-modifier-border);
+}
+
+/* Week numbers (§3.5): a gutter left of the grid and outside its lines, one
+   number per row, level with the row's day numbers. The 1px top padding stands
+   for the grid's top border, so the gutter's rows split the same height the
+   grid's do. The weekday header is shifted by the same width. */
+.eb-cal.has-weeknums .eb-cal-weekdays {
+	padding-left: var(--eb-cal-weeknum-w);
+}
+
+.eb-cal-weeknums {
+	display: flex;
+	flex-direction: column;
+	flex: 0 0 var(--eb-cal-weeknum-w);
+	padding-top: 1px;
+}
+
+.eb-cal-weeknum {
+	flex: 1;
+	min-height: 0;
+	padding: 2px 4px 0 0;
+	line-height: var(--eb-cal-daynum-h);
+	font-size: var(--font-ui-smaller, 0.8em);
+	font-variant-numeric: tabular-nums;
+	color: var(--text-faint);
+	text-align: right;
+}
+
+/* A phone's month has no width to spare; two digits still fit. */
+.eb-cal.is-narrow {
+	--eb-cal-weeknum-w: 18px;
+}
+
+.eb-cal.is-narrow .eb-cal-weeknum {
+	padding-right: 3px;
+}
+
+.eb-cal-title-week {
+	margin-left: 0.5em;
+	font-weight: var(--font-normal, 400);
+	color: var(--text-muted);
+	text-transform: none;
 }
 
 .eb-cal-row {

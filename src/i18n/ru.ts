@@ -182,6 +182,7 @@ export const ru: DeepPartial<typeof en> = {
 		previous: 'Назад',
 		next: 'Вперёд',
 		today: 'Сегодня',
+		weekNumber: 'Неделя {n}',
 	},
 	filter: {
 		title: 'Фильтры и сортировка',
@@ -381,6 +382,8 @@ export const ru: DeepPartial<typeof en> = {
 				month: 'Месяц',
 				week: 'Неделя',
 			},
+			weekNumbers: 'Номера недель',
+			weekNumbersDesc: 'Нумеровать недели слева от сетки месяца и в заголовке недели.',
 			describeCalendar: 'Календарь · {prop} · {mode}',
 			missingProperty: ' — нет свойства',
 		},

@@ -17,6 +17,7 @@ import {
 	startOfWeek,
 	toOrdinal,
 	weekday,
+	weekNumber,
 } from '../src/model/dates';
 import {
 	clearOccurrence,
@@ -124,6 +125,32 @@ describe('dates: arithmetic (§1.2)', () => {
 		expect(weekday({ y: 2026, m: 7, d: 26 })).toBe(0);
 		expect(startOfWeek({ y: 2026, m: 7, d: 26 }, 1)).toEqual({ y: 2026, m: 7, d: 20 });
 		expect(startOfWeek({ y: 2026, m: 7, d: 26 }, 0)).toEqual({ y: 2026, m: 7, d: 26 });
+	});
+
+	it('numbers a Monday week by ISO 8601 (§3.5)', () => {
+		const iso = (y: number, m: number, d: number): number => weekNumber({ y, m, d }, 1);
+		expect(iso(2026, 9, 24)).toBe(39);
+		// 1 Jan 2026 is a Thursday: its week, begun in December, is week 1.
+		expect(iso(2025, 12, 29)).toBe(1);
+		expect(iso(2026, 1, 4)).toBe(1);
+		expect(iso(2026, 1, 5)).toBe(2);
+		// A 53-week year, and a January that still belongs to it.
+		expect(iso(2020, 12, 31)).toBe(53);
+		expect(iso(2021, 1, 3)).toBe(53);
+		expect(iso(2021, 1, 4)).toBe(1);
+		// Any day of a week answers for the whole week.
+		expect(iso(2026, 9, 21)).toBe(iso(2026, 9, 27));
+	});
+
+	it('numbers any other week from the one holding 1 January (§3.5)', () => {
+		const sun = (y: number, m: number, d: number): number => weekNumber({ y, m, d }, 0);
+		expect(sun(2025, 12, 28)).toBe(1);
+		expect(sun(2026, 1, 3)).toBe(1);
+		expect(sun(2026, 1, 4)).toBe(2);
+		expect(sun(2026, 9, 24)).toBe(39);
+		expect(sun(2022, 12, 25)).toBe(53);
+		expect(weekNumber({ y: 2026, m: 1, d: 1 }, 6)).toBe(1);
+		expect(weekNumber({ y: 2026, m: 1, d: 3 }, 6)).toBe(2);
 	});
 
 	it('sorts a timed value after a plain one on the same day', () => {

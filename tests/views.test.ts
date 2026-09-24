@@ -43,6 +43,22 @@ describe('views: parsing', () => {
 		expect(activeViewOf(board.config).name).toBe('Due dates');
 	});
 
+	it('reads weekNumbers only as true, and writes it only when on (calendar-view.md §3.5)', () => {
+		const views = (weekNumbers: unknown) => [
+			{ id: 'v1', name: 'Due', type: 'calendar', dateProperties: ['due'], mode: 'month', weekNumbers },
+		];
+		const on = parse({ views: views(true), ...DATE_PROPS });
+		expect(on.config.views[0]).toMatchObject({ weekNumbers: true });
+		expect(parse({ views: views('yes'), ...DATE_PROPS }).config.views[0]).not.toHaveProperty('weekNumbers');
+		expect(serializeBoard(on)).toContain('"weekNumbers":true');
+
+		const off = ops.updateView(on, 'v1', { weekNumbers: false });
+		expect(off.config.views[0]).not.toHaveProperty('weekNumbers');
+		expect(serializeBoard(off)).not.toContain('weekNumbers');
+		expect(ops.updateView(off, 'v1', { weekNumbers: false })).toBe(off);
+		expect(ops.updateView(off, 'v1', { weekNumbers: true }).config.views[0]).toMatchObject({ weekNumbers: true });
+	});
+
 	it('falls back to the first view when activeView is unknown or absent', () => {
 		const views = [{ id: 'v1', name: 'Board', type: 'kanban' }];
 		expect(activeViewOf(parse({ activeView: 'nope', views }).config).id).toBe('v1');

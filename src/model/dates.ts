@@ -91,6 +91,22 @@ export function startOfWeek(date: CalDate, firstDay: number): CalDate {
 	return addDays(stripTime(date), -shift);
 }
 
+/**
+ * The number of the week `date` falls in, for a grid whose weeks begin on
+ * `firstDay` (calendar-view.md §3.5). A Monday week is numbered by ISO 8601 —
+ * week 1 holds the year's first Thursday, so a year can have 53 and early
+ * January can belong to the year before. Any other first day numbers the North
+ * American way: week 1 is the one holding 1 January.
+ */
+export function weekNumber(date: CalDate, firstDay: number): number {
+	const start = startOfWeek(date, firstDay);
+	const week1 =
+		firstDay === 1
+			? startOfWeek({ y: addDays(start, 3).y, m: 1, d: 4 }, 1)
+			: startOfWeek({ y: addDays(start, 6).y, m: 1, d: 1 }, firstDay);
+	return Math.floor(daysBetween(start, week1) / 7) + 1;
+}
+
 export function startOfMonth(date: CalDate): CalDate {
 	return { y: date.y, m: date.m, d: 1 };
 }

@@ -411,6 +411,7 @@ export function toViewDef(v: unknown, id: string): ViewDef | null {
 		type,
 		dateProperties,
 		mode: toCalendarMode(v.mode),
+		...(v.weekNumbers === true && { weekNumbers: true }),
 		...(display && { display }),
 	};
 }

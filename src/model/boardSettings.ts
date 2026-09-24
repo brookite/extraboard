@@ -203,6 +203,7 @@ function viewToPlain(v: ViewDef): Record<string, unknown> {
 			// from a board opened by an older Obsidian (views.md §4.3).
 			dateProperty: v.dateProperties[0] ?? '',
 			mode: v.mode,
+			...(v.weekNumbers && { weekNumbers: true }),
 		};
 	}
 	if (v.type !== 'list') {

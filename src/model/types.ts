@@ -81,6 +81,8 @@ export type ViewDef =
 			 */
 			dateProperties: string[];
 			mode: CalendarMode;
+			/** Number the weeks beside the grid (calendar-view.md §3.5); absent = off. */
+			weekNumbers?: boolean;
 	  })
 	| (ViewCommon & {
 			type: 'list';

@@ -1211,6 +1211,7 @@ export function updateView(
 		/** Replaces the calendar's whole list; an empty one is ignored. */
 		dateProperties?: string[];
 		mode?: CalendarMode;
+		weekNumbers?: boolean;
 		controls?: ListControls;
 		groupBy?: ListGroupBy;
 	},
@@ -1229,6 +1230,11 @@ export function updateView(
 			next = { ...next, dateProperties: properties };
 		}
 		if (patch.mode && patch.mode !== next.mode) next = { ...next, mode: patch.mode };
+		// Off is written by leaving the key out, so the default never reaches the file.
+		if (patch.weekNumbers !== undefined && patch.weekNumbers !== (next.weekNumbers ?? false)) {
+			const { weekNumbers: _dropped, ...rest } = next;
+			next = patch.weekNumbers ? { ...rest, weekNumbers: true } : rest;
+		}
 	}
 	if (next.type === 'list' && patch.controls && patch.controls !== next.controls) {
 		next = { ...next, controls: patch.controls };

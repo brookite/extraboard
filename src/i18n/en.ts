@@ -181,6 +181,7 @@ export const en = {
 		previous: 'Previous',
 		next: 'Next',
 		today: 'Today',
+		weekNumber: 'Week {n}',
 	},
 	// The condition builder and the sort list (filters-and-sorting.md §4, §6).
 	filter: {
@@ -385,6 +386,8 @@ export const en = {
 				month: 'Month',
 				week: 'Week',
 			},
+			weekNumbers: 'Week numbers',
+			weekNumbersDesc: 'Number each week beside the month grid, and in the title of a week.',
 			describeCalendar: 'Calendar · {prop} · {mode}',
 			missingProperty: ' — missing property',
 		},

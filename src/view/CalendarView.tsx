@@ -30,6 +30,7 @@ import {
 	startOfMonth,
 	startOfWeek,
 	today,
+	weekNumber,
 } from '../model/dates';
 import * as ops from '../model/ops';
 import { unlinkedTitle } from '../model/link';
@@ -571,6 +572,8 @@ export function CalendarView({ board, view, api, settings }: Props) {
 		});
 	};
 
+	const weekGutter = !!view.weekNumbers && view.mode === 'month';
+
 	const step = (delta: number): void => {
 		setAnchor(view.mode === 'month' ? addMonths(anchor, delta) : addDays(anchor, delta * 7));
 	};
@@ -581,7 +584,7 @@ export function CalendarView({ board, view, api, settings }: Props) {
 	};
 
 	return (
-		<div class={`eb-cal${narrow ? ' is-narrow' : ''}`}>
+		<div class={`eb-cal${narrow ? ' is-narrow' : ''}${weekGutter ? ' has-weeknums' : ''}`}>
 			<div class="eb-cal-head">
 				<div class="eb-cal-nav">
 					<button type="button" aria-label={t('calendar.previous')} onClick={() => step(-1)}>
@@ -594,7 +597,15 @@ export function CalendarView({ board, view, api, settings }: Props) {
 						<Icon name="chevron-right" />
 					</button>
 				</div>
-				<div class="eb-cal-title">{periodLabel(anchor, view.mode, start)}</div>
+				<div class="eb-cal-title">
+					{periodLabel(anchor, view.mode, start)}
+					{/* A week has one number, so it rides in the title (§3.5). */}
+					{view.weekNumbers && view.mode === 'week' ? (
+						<span class="eb-cal-title-week">
+							{`· ${t('calendar.weekNumber', { n: String(weekNumber(start, first)) })}`}
+						</span>
+					) : null}
+				</div>
 				<div class="eb-cal-modes">
 					<button
 						type="button"
@@ -627,38 +638,54 @@ export function CalendarView({ board, view, api, settings }: Props) {
 				})}
 			</div>
 
-			<div class={`eb-cal-grid is-${view.mode}${compact ? ' is-compact' : ''}`} ref={gridRef}>
-				{Array.from({ length: rows }, (_, row) => {
-					const rowStart = days[row * 7]!;
-					// A compact row has no bar overlay, so it needs neither the lane
-					// layout nor the chip budget the lanes eat into.
-					const segments = compact ? [] : layoutRow(occurrences, indexOf, rowStart);
-					const lanes = segments.reduce((max, s) => Math.max(max, s.lane + 1), 0);
-					return (
-						<WeekRow
-							key={dayKey(rowStart)}
-							board={board}
-							days={days.slice(row * 7, row * 7 + 7)}
-							offset={row * 7}
-							anchorMonth={anchor.m}
-							showOutside={view.mode === 'month'}
-							today={now}
-							byDay={marks ?? byDay}
-							indexOf={indexOf}
-							segments={segments}
-							lanes={lanes}
-							capacity={Math.max(1, capacity - lanes)}
-							compact={compact}
-							stretch={stretch}
-							fill={settings.fillCalendarEvents}
-							multi={multi}
-							rowStartIndex={row * 7}
-							dateTimeOpts={dateTimeOpts}
-							onOpenDay={openDay}
-							onDrop={onDrop}
-						/>
-					);
-				})}
+			<div class="eb-cal-body">
+				{/* Month mode numbers its rows in a gutter outside the grid's lines, so
+				    the cells, their measuring and their bars are untouched (§3.5). */}
+				{weekGutter ? (
+					<div class="eb-cal-weeknums" aria-hidden="true">
+						{Array.from({ length: rows }, (_, row) => {
+							const n = String(weekNumber(days[row * 7]!, first));
+							return (
+								<div class="eb-cal-weeknum" key={row} title={t('calendar.weekNumber', { n })}>
+									{n}
+								</div>
+							);
+						})}
+					</div>
+				) : null}
+				<div class={`eb-cal-grid is-${view.mode}${compact ? ' is-compact' : ''}`} ref={gridRef}>
+					{Array.from({ length: rows }, (_, row) => {
+						const rowStart = days[row * 7]!;
+						// A compact row has no bar overlay, so it needs neither the lane
+						// layout nor the chip budget the lanes eat into.
+						const segments = compact ? [] : layoutRow(occurrences, indexOf, rowStart);
+						const lanes = segments.reduce((max, s) => Math.max(max, s.lane + 1), 0);
+						return (
+							<WeekRow
+								key={dayKey(rowStart)}
+								board={board}
+								days={days.slice(row * 7, row * 7 + 7)}
+								offset={row * 7}
+								anchorMonth={anchor.m}
+								showOutside={view.mode === 'month'}
+								today={now}
+								byDay={marks ?? byDay}
+								indexOf={indexOf}
+								segments={segments}
+								lanes={lanes}
+								capacity={Math.max(1, capacity - lanes)}
+								compact={compact}
+								stretch={stretch}
+								fill={settings.fillCalendarEvents}
+								multi={multi}
+								rowStartIndex={row * 7}
+								dateTimeOpts={dateTimeOpts}
+								onOpenDay={openDay}
+								onDrop={onDrop}
+							/>
+						);
+					})}
+				</div>
 			</div>
 
 			<Tray
