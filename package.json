@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-extraboard",
-	"version": "0.5.4",
+	"version": "0.6.0",
 	"description": "Markdown-backed Kanban and calendar boards for Obsidian, mobile-friendly.",
 	"main": "main.js",
 	"type": "module",

@@ -30,6 +30,7 @@ with its own file format, not a fork.
   board can open as a list instead of a board.
 - **A calendar can read several date properties at once** — a card with a start
   and a due date shows on both days, and once where they fall on the same one.
+  Today is highlighted, and week numbers can be shown per view.
 - **Filters and sorting for a list:** a condition builder with AND / OR / NOT
   groups over any property plus the card's own text, tags, checkbox and linked
   note, and as many sort keys as you like, each with its own direction.
@@ -48,13 +49,16 @@ with its own file format, not a fork.
 - **Date highlighting:** ordered rules color a date badge as its date approaches
   or after it has passed; a board can override the plugin-wide list.
 - **Nested checklists** on a card with automatic `N/M` progress, shown as a ring,
-  a fraction or a percentage.
+  a fraction or a percentage. Items render their Markdown and links; a
+  checklist copies to the clipboard as a numbered list or clears in one step.
 - **A note per card:** link a card to its own note, created on demand in a folder
   you choose, with hover previews and Obsidian's rename handling.
 - **Archive** section in the same file: archived cards remember the stack they
   came from and can be restored or deleted from the archive view.
 - **Stacks and dividers that mean something:** a stack can mark the cards
-  entering it as done, and a named divider can color the cards in its group.
+  entering it as done, and a named divider can color the cards in its group,
+  gathers the plain dividers below it, drags its whole group at once, and adds
+  a card right under itself.
 - **Tags** with per-board colors; selecting one searches the vault for it. While
   editing a card, a tag button opens a searchable picker over the board's and
   the vault's tags — add, remove, or create one without leaving the card.
@@ -68,7 +72,7 @@ with its own file format, not a fork.
 ## Status
 
 **Post-MVP active development.** The full feature set above is implemented and
-manually verified on desktop and mobile. The current version is **0.5.4**;
+manually verified on desktop and mobile. The current version is **0.6.0**;
 packaging and draft GitHub Releases are automated.
 
 ## Development
