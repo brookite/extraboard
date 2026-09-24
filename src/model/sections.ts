@@ -4,9 +4,13 @@
 // A section *is* a divider: `### name` gathered across every stack (one
 // section), `---` standing alone (one section per divider), and everything
 // before a stack's first divider (the sectionless group, one per board).
+//
+// A named divider outranks an unnamed one (list-view.md §1.5): its group runs
+// on to the next named divider, so a `---` below a `### name` subdivides that
+// section instead of opening one of its own.
 
 import type { ItemRef } from './ops';
-import type { Board, ListGroupBy, Stack } from './types';
+import type { Board, Divider, ListGroupBy, Stack } from './types';
 
 /**
  * What identifies a section. `named` merges across stacks and is the only kind
@@ -29,7 +33,9 @@ export interface Section {
 	key: SectionKey;
 	/** The user's label: the divider name, or `''` for the two nameless kinds. */
 	name: string;
-	/** Every divider behind this section, in board order; empty for `none`. */
+	/** Every divider behind this section, in board order; empty for `none`. A
+	 * named section lists the dividers carrying its name, not the `---` nested
+	 * inside it (§1.5). */
 	dividers: ItemRef[];
 	/** Every card in it, in board order (stack by stack, top to bottom). */
 	cards: ItemRef[];
@@ -50,6 +56,24 @@ export function sameKey(a: SectionKey, b: SectionKey): boolean {
 /** The divider name as a section is keyed by it: trimmed, case kept. */
 export function sectionName(name: string | undefined): string {
 	return (name ?? '').trim();
+}
+
+/** A divider that names a section; only it outranks a `---` (§1.5). */
+export function isNamedDivider(divider: Divider): boolean {
+	return sectionName(divider.name) !== '';
+}
+
+/**
+ * Index of the nearest named divider above `index` in the stack, looking past
+ * any `---` in between, or -1 when there is none — the divider whose group the
+ * item belongs to (§1.5).
+ */
+export function namedDividerAbove(stack: Stack, index: number): number {
+	for (let i = index - 1; i >= 0; i--) {
+		const entry = stack.items[i];
+		if (entry?.kind === 'divider' && isNamedDivider(entry.divider)) return i;
+	}
+	return -1;
 }
 
 /**
@@ -89,6 +113,9 @@ export function sectionsOf(board: Board): Section[] {
 				return;
 			}
 			const name = sectionName(entry.divider.name);
+			// A `---` inside a named section subdivides it (§1.5): its cards stay in
+			// the section. Only one above every named divider stands alone.
+			if (!name && current.key.kind === 'named') return;
 			if (!name) {
 				current = {
 					key: { kind: 'anon', ref },
@@ -147,17 +174,22 @@ export function sectionOrder(board: Board): string[] {
 		.map((section) => section.name);
 }
 
-/** The section a card belongs to, by walking back to the divider above it. */
+/**
+ * The section a card belongs to, by walking back to the divider above it: the
+ * nearest named one, past any `---` (§1.5), else the nearest `---`, else none.
+ */
 export function sectionOf(board: Board, ref: ItemRef): SectionKey {
 	const stack = board.stacks[ref.stack];
 	if (!stack) return { kind: 'none' };
+	let anon: ItemRef | null = null;
 	for (let i = ref.item - 1; i >= 0; i--) {
 		const entry = stack.items[i];
 		if (entry?.kind !== 'divider') continue;
 		const name = sectionName(entry.divider.name);
-		return name ? { kind: 'named', name } : { kind: 'anon', ref: { stack: ref.stack, item: i } };
+		if (name) return { kind: 'named', name };
+		anon ??= { stack: ref.stack, item: i };
 	}
-	return { kind: 'none' };
+	return anon ? { kind: 'anon', ref: anon } : { kind: 'none' };
 }
 
 /** Index of the divider named `name` in this stack, or -1 when it has none. */
@@ -170,11 +202,19 @@ export function dividerIndex(stack: Stack, name: string): number {
 /**
  * The half-open range of items a group covers: the items after the divider at
  * `at` (or from the top for the head group, `at === null`) up to the next
- * divider or the end of the stack. The divider itself is **not** in the range.
+ * divider of at least its rank, or the end of the stack. A named divider's
+ * group runs on to the next **named** one, taking every `---` in between with
+ * it (§1.5); the head group and a `---`'s own run end at any divider. The
+ * divider itself is **not** in the range.
  */
 export function groupRange(stack: Stack, at: number | null): { start: number; end: number } {
 	const start = at === null ? 0 : at + 1;
+	const head = at === null ? undefined : stack.items[at];
+	const named = head?.kind === 'divider' && isNamedDivider(head.divider);
 	let end = start;
-	while (end < stack.items.length && stack.items[end]?.kind !== 'divider') end++;
+	for (; end < stack.items.length; end++) {
+		const entry = stack.items[end];
+		if (entry?.kind === 'divider' && (!named || isNamedDivider(entry.divider))) break;
+	}
 	return { start, end };
 }

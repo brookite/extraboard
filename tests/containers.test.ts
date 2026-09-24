@@ -176,6 +176,19 @@ describe('divider colors', () => {
 		expect(ops.groupColor(stack, 3)).toBeUndefined();
 	});
 
+	it('reaches past a `---` to the next named divider (list-view.md §1.5)', () => {
+		const b = parseBoard(
+			[FM, '## S', '', '---', '', '- before', '', '### A %%color|red%%', '', '- a', '', '---', '', '- nested', '', '### B', '', '- b', ''].join('\n'),
+		);
+		const stack = b.stacks[0]!;
+		// A `---` above every named divider still colors nothing.
+		expect(ops.groupColor(stack, 1)).toBeUndefined();
+		expect(ops.groupColor(stack, 3)).toBe('red');
+		expect(ops.groupColor(stack, 5)).toBe('red');
+		// The next named divider ends the band, colored or not.
+		expect(ops.groupColor(stack, 7)).toBeUndefined();
+	});
+
 	it('inherits nothing before the first divider', () => {
 		const b = ops.addCard(board(), 0, 'Loose', 0);
 		expect(ops.groupColor(b.stacks[0]!, 0)).toBeUndefined();

@@ -11,6 +11,7 @@ import { useRef, useState } from 'preact/hooks';
 import { datePropertyType, occurrencesOn, placeCards, setCardDay } from '../model/calendar';
 import { CalDate, compareDates } from '../model/dates';
 import * as ops from '../model/ops';
+import { groupRange, namedDividerAbove } from '../model/sections';
 import type { Board, PropertyValue, ViewDef, ViewDisplay } from '../model/types';
 import { usableDateProperties } from '../model/views';
 import { cardEntryPos, type ExtraboardSettings } from '../settings';
@@ -58,14 +59,12 @@ function dayTitle(day: CalDate | null): string {
 function dividerOf(board: Board, ref: ops.ItemRef): { index: number; name: string; color?: string } | null {
 	const stack = board.stacks[ref.stack];
 	if (!stack) return null;
-	for (let i = ref.item - 1; i >= 0; i--) {
-		const entry = stack.items[i];
-		if (entry?.kind !== 'divider') continue;
-		// An unnamed divider carries nothing to show, but it still ends the group
-		// above it — the card belongs to no *named* group.
-		return entry.divider.name ? { index: i, name: entry.divider.name, color: entry.divider.color } : null;
-	}
-	return null;
+	// A `---` does not end a named group: the card under it still belongs to the
+	// named divider above (list-view.md §1.5).
+	const i = namedDividerAbove(stack, ref.item);
+	const entry = stack.items[i];
+	if (entry?.kind !== 'divider' || !entry.divider.name) return null;
+	return { index: i, name: entry.divider.name, color: entry.divider.color };
 }
 
 /** Named dividers of a stack, as the badge's menu offers them. */
@@ -82,10 +81,7 @@ function namedDividers(board: Board, stackIndex: number): { index: number; name:
 /** Index just past the group that starts at `dividerIndex` (or the head group). */
 function endOfGroup(board: Board, stackIndex: number, dividerIndex: number | null): number {
 	const stack = board.stacks[stackIndex];
-	if (!stack) return 0;
-	let i = dividerIndex === null ? 0 : dividerIndex + 1;
-	while (i < stack.items.length && stack.items[i]?.kind !== 'divider') i++;
-	return i;
+	return stack ? groupRange(stack, dividerIndex).end : 0;
 }
 
 interface RowProps {

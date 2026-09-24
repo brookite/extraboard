@@ -13,7 +13,7 @@ import { Menu } from 'obsidian';
 import { useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import { sameKey, sectionsOf, type Section, type SectionKey } from '../../model/sections';
-import { isStackBoundary } from '../../model/sectionView';
+import { isNestedRule, isStackBoundary } from '../../model/sectionView';
 import type { Board, BoardConfig, SectionState, ViewDisplay } from '../../model/types';
 import { archiveOpts, type ExtraboardSettings } from '../../settings';
 import { editStack } from '../../ui/StackModal';
@@ -159,7 +159,10 @@ function sectionsInStack(board: Board, stackIndex: number): SectionKey[] {
 	return stack.items.map((entry, item) => {
 		if (entry.kind === 'divider') {
 			const name = entry.divider.name?.trim();
-			current = name ? { kind: 'named', name } : { kind: 'anon', ref: { stack: stackIndex, item } };
+			// A `---` inside a named section subdivides it and leaves the rows in it
+			// (list-view.md §1.5).
+			if (name) current = { kind: 'named', name };
+			else if (current.kind !== 'named') current = { kind: 'anon', ref: { stack: stackIndex, item } };
 		}
 		return current;
 	});
@@ -585,19 +588,31 @@ export function SectionGroup(props: SectionProps) {
 							{rowBadge(ref)}
 						</div>
 					);
+					const out = [row];
+					// A `---` nested in a named section is drawn where it falls between
+					// the rows, as the Kanban column draws it (§1.5).
+					if (named && isNestedRule(board, rows, i, ordered)) {
+						out.unshift(
+							<div
+								class="eb-list-nested-rule"
+								key={`rule-${String(ref.stack)}-${String(ref.item)}`}
+								aria-hidden="true"
+							/>,
+						);
+					}
 					// Only meaningful when the groups are sections: there a drag between
 					// rows of different stacks cannot carry the card across, while a
 					// stack group's rows are all in one stack already.
-					if (byStack || !isStackBoundary(rows, i, ordered)) return [row];
-					return [
+					if (byStack || !isStackBoundary(rows, i, ordered)) return out;
+					out.unshift(
 						<div
 							class="eb-list-stack-boundary"
 							key={`boundary-${String(ref.stack)}-${String(ref.item)}`}
 							title={t('list.stackBoundary')}
 							aria-hidden="true"
 						/>,
-						row,
-					];
+					);
+					return out;
 				})}
 			</div>
 

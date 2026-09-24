@@ -7,7 +7,7 @@
 // and must not depend on `ops`.
 
 import type { ItemRef } from './ops';
-import { sectionsOf, type Section } from './sections';
+import { isNamedDivider, sectionsOf, type Section } from './sections';
 import type { Board, Card } from './types';
 
 function cardAt(board: Board, ref: ItemRef): Card | undefined {
@@ -41,4 +41,24 @@ export function sectionMoveTargets(board: Board, _ref: ItemRef): Section[] {
 export function isStackBoundary(rows: ItemRef[], index: number, ordered: boolean): boolean {
 	if (!ordered || index <= 0) return false;
 	return rows[index - 1]?.stack !== rows[index]?.stack;
+}
+
+/**
+ * True when a `---` nested in a named section falls between `rows[index - 1]`
+ * and `rows[index]` — or above `rows[index]` when it is the first row of its
+ * stack there (list-view.md §1.5). Only meaningful in document order, and only
+ * for a named section's rows. The walk back stops at the previous row of the
+ * same stack, so a whole section costs one pass over its items.
+ */
+export function isNestedRule(board: Board, rows: ItemRef[], index: number, ordered: boolean): boolean {
+	const ref = rows[index];
+	const stack = ref && board.stacks[ref.stack];
+	if (!ordered || !ref || !stack) return false;
+	const prev = rows[index - 1];
+	const stop = prev && prev.stack === ref.stack && prev.item < ref.item ? prev.item : -1;
+	for (let i = ref.item - 1; i > stop; i--) {
+		const entry = stack.items[i];
+		if (entry?.kind === 'divider') return !isNamedDivider(entry.divider);
+	}
+	return false;
 }

@@ -15,6 +15,8 @@ import { formatValue, normalizeDateList, parseValue } from './properties';
 import {
 	dividerIndex,
 	groupRange,
+	isNamedDivider,
+	namedDividerAbove,
 	sectionName,
 	sectionOf,
 	sectionOrder,
@@ -575,16 +577,15 @@ export function setDividerColor(board: Board, ref: ItemRef, color: string): Boar
 }
 
 /**
- * The color a card at `index` inherits: the nearest divider above it in the
- * stack, if that one carries a color. A card before the first divider, or under
- * an uncolored one, inherits nothing (§4.1).
+ * The color a card at `index` inherits: the nearest **named** divider above it
+ * in the stack, looking past any `---` in between, if that one carries a color
+ * (§4.1). A card above every named divider, or under an uncolored one, inherits
+ * nothing.
  */
 export function groupColor(stack: Stack, index: number): string | undefined {
-	for (let i = index - 1; i >= 0; i--) {
-		const entry = stack.items[i];
-		if (entry?.kind === 'divider') return entry.divider.color;
-	}
-	return undefined;
+	const at = namedDividerAbove(stack, index);
+	const entry = at === -1 ? undefined : stack.items[at];
+	return entry?.kind === 'divider' ? entry.divider.color : undefined;
 }
 
 export function setDividerCollapsed(board: Board, ref: ItemRef, collapsed: boolean): Board {
@@ -685,7 +686,9 @@ export function addSection(board: Board, name: string, atTop = false): Board {
 	const first = board.stacks[0];
 	if (!normalized || !first || sectionOrder(board).includes(normalized)) return board;
 	if (!atTop) return addDivider(board, 0, normalized);
-	const lead = first.items.findIndex((item) => item.kind === 'divider');
+	// Before the first *named* divider, not the first divider: a new heading above
+	// a stack-level `---` would swallow that anonymous section (§1.5).
+	const lead = first.items.findIndex((item) => item.kind === 'divider' && isNamedDivider(item.divider));
 	return addDivider(board, 0, normalized, lead === -1 ? null : lead);
 }
 
@@ -1476,18 +1479,41 @@ export function cardCount(stack: Stack): number {
 }
 
 /**
- * Items hidden because they follow a collapsed divider. A collapsed divider
- * hides everything up to the next divider or the end of the stack.
+ * Items hidden because they follow a collapsed divider. A collapsed named
+ * divider hides everything up to the next named divider — any `---` inside its
+ * group included, with its cards; a collapsed `---` hides its cards up to the
+ * next divider of either kind (list-view.md §1.5). Either runs to the end of the
+ * stack when nothing closes it.
  */
 export function hiddenItems(stack: Stack): Set<number> {
 	const hidden = new Set<number>();
-	let collapsed = false;
+	let namedCollapsed = false;
+	let plainCollapsed = false;
 	stack.items.forEach((entry, i) => {
 		if (entry.kind === 'divider') {
-			collapsed = entry.divider.collapsed;
+			if (isNamedDivider(entry.divider)) {
+				namedCollapsed = entry.divider.collapsed;
+				plainCollapsed = false;
+				return;
+			}
+			if (namedCollapsed) hidden.add(i);
+			plainCollapsed = entry.divider.collapsed;
 			return;
 		}
-		if (collapsed) hidden.add(i);
+		if (namedCollapsed || plainCollapsed) hidden.add(i);
 	});
 	return hidden;
+}
+
+/**
+ * How many **cards** the divider at `index` hides, given `hiddenItems`: the run
+ * of hidden items right after it, where a nested `---` swallowed by a collapsed
+ * named divider is not a card and does not count.
+ */
+export function hiddenCardsAfter(stack: Stack, hidden: Set<number>, index: number): number {
+	let count = 0;
+	for (let i = index + 1; hidden.has(i); i++) {
+		if (stack.items[i]?.kind === 'card') count++;
+	}
+	return count;
 }

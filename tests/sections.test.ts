@@ -15,7 +15,7 @@ import {
 	stateKeyOf,
 	type Section,
 } from '../src/model/sections';
-import { isStackBoundary, sectionMoveTargets, tagsOf } from '../src/model/sectionView';
+import { isNestedRule, isStackBoundary, sectionMoveTargets, tagsOf } from '../src/model/sectionView';
 import { filterCards } from '../src/model/filter';
 import { sortCards } from '../src/model/sort';
 import type { Board, Card } from '../src/model/types';
@@ -47,13 +47,13 @@ const BOARD = [
 	'',
 	'- Loose B',
 	'',
-	'### Review',
-	'',
-	'- R2 @{due|2026-07-30}',
-	'',
 	'---',
 	'',
 	'- Anon card',
+	'',
+	'### Review',
+	'',
+	'- R2 @{due|2026-07-30}',
 	'',
 	'## Done',
 	'',
@@ -94,7 +94,7 @@ describe('sections: grouping by stack', () => {
 		const b = board();
 		const groups = stackGroupsOf(b);
 		expect(titles(b, groups[0]!)).toEqual(['Loose A', 'B1', 'B2', 'R1']);
-		expect(titles(b, groups[1]!)).toEqual(['Loose B', 'R2', 'Anon card']);
+		expect(titles(b, groups[1]!)).toEqual(['Loose B', 'Anon card', 'R2']);
 		expect(titles(b, groups[2]!)).toEqual(['B3']);
 	});
 
@@ -221,12 +221,70 @@ describe('sections: grouping', () => {
 	});
 });
 
+describe('sections: a `---` inside a named section (§1.5)', () => {
+	// Items of S: 0 ---, 1 top, 2 ### A, 3 a1, 4 ---, 5 n1, 6 ---, 7 n2, 8 ### B, 9 b.
+	const NESTED = [
+		FM,
+		'## S',
+		'',
+		'---',
+		'',
+		'- top',
+		'',
+		'### A',
+		'',
+		'- a1',
+		'',
+		'---',
+		'',
+		'- n1',
+		'',
+		'---',
+		'',
+		'- n2',
+		'',
+		'### B',
+		'',
+		'- b',
+		'',
+	].join('\n');
+	const nested = (): Board => parseBoard(NESTED);
+
+	it('keeps its cards in the named section, and only a leading `---` apart', () => {
+		const b = nested();
+		expect(sectionsOf(b).map((s) => s.key.kind)).toEqual(['none', 'anon', 'named', 'named']);
+		expect(titles(b, named(b, 'A'))).toEqual(['a1', 'n1', 'n2']);
+		// The section's dividers are the ones carrying its name.
+		expect(named(b, 'A').dividers).toEqual([{ stack: 0, item: 2 }]);
+		expect(sectionOf(b, { stack: 0, item: 7 })).toEqual({ kind: 'named', name: 'A' });
+		expect(sectionOf(b, { stack: 0, item: 1 })).toEqual({ kind: 'anon', ref: { stack: 0, item: 0 } });
+	});
+
+	it('gives a named group every `---` up to the next named divider', () => {
+		const stack = nested().stacks[0]!;
+		expect(groupRange(stack, 2)).toEqual({ start: 3, end: 8 });
+		// A `---` and the head group still end at any divider.
+		expect(groupRange(stack, 4)).toEqual({ start: 5, end: 6 });
+		expect(groupRange(stack, 0)).toEqual({ start: 1, end: 2 });
+		expect(groupRange(stack, null)).toEqual({ start: 0, end: 0 });
+	});
+
+	it('draws the nested rule between rows in document order only', () => {
+		const b = nested();
+		const rows = named(b, 'A').cards;
+		expect(rows.map((_, i) => isNestedRule(b, rows, i, true))).toEqual([false, true, true]);
+		expect(rows.map((_, i) => isNestedRule(b, rows, i, false))).toEqual([false, false, false]);
+		// Filtered down to n2 alone, the rule still sits above it.
+		expect(isNestedRule(b, [rows[2]!], 0, true)).toBe(true);
+	});
+});
+
 describe('sections: addressing', () => {
 	it('names the section a card belongs to', () => {
 		const b = board();
 		expect(sectionOf(b, { stack: 0, item: 0 })).toEqual({ kind: 'none' });
 		expect(sectionOf(b, { stack: 0, item: 2 })).toEqual({ kind: 'named', name: 'Backlog' });
-		expect(sectionOf(b, { stack: 1, item: 4 })).toEqual({ kind: 'anon', ref: { stack: 1, item: 3 } });
+		expect(sectionOf(b, { stack: 1, item: 2 })).toEqual({ kind: 'anon', ref: { stack: 1, item: 1 } });
 	});
 
 	it('compares keys by kind, name and position', () => {
@@ -267,7 +325,7 @@ describe('sections: addressing', () => {
 	it('never offers anonymous sections, including inside their own stack', () => {
 		const b = board();
 		const fromOtherStack = sectionMoveTargets(b, { stack: 0, item: 2 });
-		const fromAnonymousStack = sectionMoveTargets(b, { stack: 1, item: 4 });
+		const fromAnonymousStack = sectionMoveTargets(b, { stack: 1, item: 2 });
 		expect(fromOtherStack.some((section) => section.key.kind === 'anon')).toBe(false);
 		expect(fromAnonymousStack.some((section) => section.key.kind === 'anon')).toBe(false);
 	});

@@ -3274,6 +3274,22 @@ body.is-mobile .eb-add-stack-button {
 	border-top: 1px dashed var(--background-modifier-border);
 }
 
+/* A `---` nested in a named section (list-view.md §1.5): a quieter, inset rule
+   than the stack boundary, since the rows on both sides are in one group. */
+.eb-list-nested-rule {
+	height: 9px;
+	margin-inline: 12px;
+	display: flex;
+	align-items: center;
+	cursor: default;
+}
+
+.eb-list-nested-rule::before {
+	content: '';
+	flex: 1;
+	border-top: 1px dotted var(--background-modifier-border);
+}
+
 /* While a row is being dragged, every other-stack row across the whole list
    is shown as what it is: a drop never changes a card's stack, wherever it
    lands (§4.3), so these are not valid targets for that move. */

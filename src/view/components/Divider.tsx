@@ -23,9 +23,12 @@ interface Props {
 	/** Insert a blank card right under the divider at `index` and open it; stable,
 	 * like every other prop here. */
 	onAddCard: (index: number) => void;
+	/** For a `---`: the color of the named group it sits in, which its rule wears
+	 * so the group reads as one band across it (list-view.md §1.5). */
+	inheritedColor?: string;
 }
 
-function DividerRowInner({ divider, stackIndex, index, api, hiddenCount, onAddCard }: Props) {
+function DividerRowInner({ divider, stackIndex, index, api, hiddenCount, onAddCard, inheritedColor }: Props) {
 	const [editing, setEditing] = useState(false);
 	// A rename in flight belongs to this position, not to this divider — an
 	// external reload can put another one here (view/reload.ts).
@@ -34,7 +37,7 @@ function DividerRowInner({ divider, stackIndex, index, api, hiddenCount, onAddCa
 	const named = divider.name !== undefined;
 	const toggleLabel = divider.collapsed ? t('divider.expand') : t('divider.collapse');
 
-	const color = safeColor(divider.color);
+	const color = safeColor(divider.color) ?? (named ? null : safeColor(inheritedColor));
 
 	const setCollapsed = (collapsed: boolean): void =>
 		api.update((b) => ops.setDividerCollapsed(b, ref, collapsed));

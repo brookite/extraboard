@@ -30,13 +30,6 @@ interface Props {
 	display?: ViewDisplay;
 }
 
-/** How many consecutive items right after `index` are hidden by that divider. */
-function countHiddenAfter(hidden: Set<number>, index: number): number {
-	let count = 0;
-	while (hidden.has(index + 1 + count)) count++;
-	return count;
-}
-
 function StackColumnInner({ stack, index, config, api, settings, display }: Props) {
 	const [renaming, setRenaming] = useState(false);
 	// Set right after a fresh card is inserted, so that card's tile opens itself
@@ -349,7 +342,8 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 							stackIndex={index}
 							index={i}
 							api={api}
-							hiddenCount={countHiddenAfter(hidden, i)}
+							hiddenCount={ops.hiddenCardsAfter(stack, hidden, i)}
+							inheritedColor={item.divider.name === undefined ? ops.groupColor(stack, i) : undefined}
 							onAddCard={addCardUnder}
 						/>
 					),

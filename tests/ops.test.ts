@@ -216,6 +216,42 @@ describe('ops: queries', () => {
 		expect([...ops.hiddenItems(b.stacks[1]!)]).toEqual([1]);
 		expect([...ops.hiddenItems(b.stacks[0]!)]).toEqual([]);
 	});
+
+	it('hides a nested `---` with its named group, and a `---` only its own run (list-view.md §1.5)', () => {
+		const stack = (named: boolean, plain: boolean) =>
+			parseBoard(
+				[
+					FM,
+					'## S',
+					'',
+					`### A${named ? ' %%collapsed%%' : ''}`,
+					'',
+					'- a',
+					'',
+					plain ? '--- %%collapsed%%' : '---',
+					'',
+					'- n1',
+					'- n2',
+					'',
+					'### B',
+					'',
+					'- b',
+					'',
+				].join('\n'),
+			).stacks[0]!;
+		// Items: 0 ### A, 1 a, 2 ---, 3 n1, 4 n2, 5 ### B, 6 b.
+		const named = stack(true, false);
+		const hidden = ops.hiddenItems(named);
+		expect([...hidden]).toEqual([1, 2, 3, 4]);
+		// The count is cards only: the swallowed `---` is not one.
+		expect(ops.hiddenCardsAfter(named, hidden, 0)).toBe(3);
+		const plain = stack(false, true);
+		const plainHidden = ops.hiddenItems(plain);
+		expect([...plainHidden]).toEqual([3, 4]);
+		expect(ops.hiddenCardsAfter(plain, plainHidden, 2)).toBe(2);
+		// Collapsed inside a collapsed group, the `---` is simply hidden with it.
+		expect([...ops.hiddenItems(stack(true, true))]).toEqual([1, 2, 3, 4]);
+	});
 });
 
 describe('ops: layout normalization', () => {
