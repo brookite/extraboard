@@ -6,13 +6,14 @@
 // comes back, so closing the modal is not a commit and dismissing it undoes
 // nothing.
 
-import { App, Component, Keymap, Modal, setIcon } from 'obsidian';
+import { App, Component, Keymap, Modal, Notice, setIcon } from 'obsidian';
 import Sortable from 'sortablejs';
 import * as cl from '../model/checklist';
 import type { ChecklistItem, ChecklistPath } from '../model/checklist';
 import { createEmbeddedEditor, type EmbeddedEditorHandle } from '../view/embeddedEditor';
 import { renderInlineMarkdown } from '../view/inlineMarkdown';
 import { openLinkText } from '../view/links';
+import { confirmDestructive } from '../view/api';
 import { t } from '../i18n';
 import { showDropdownMenu } from '../util/menu';
 import { keyboardAwareModal } from './keyboardInset';
@@ -39,6 +40,8 @@ function readPath(el: Element | null): ChecklistPath | null {
 export class ChecklistModal extends Modal {
 	private listEl!: HTMLElement;
 	private countEl!: HTMLElement;
+	private copyButton!: HTMLButtonElement;
+	private clearButton!: HTMLButtonElement;
 	private sortable: Sortable | null = null;
 	/** Row to focus after the next render. */
 	private focusPath: ChecklistPath | null = null;
@@ -73,7 +76,9 @@ export class ChecklistModal extends Modal {
 		this.enableDrag();
 
 		const footer = this.contentEl.createDiv({ cls: 'eb-checklist-footer' });
-		const add = footer.createEl('button', { cls: 'mod-cta', text: t('modal.checklist.addItem') });
+		const add = footer.createEl('button', { cls: 'mod-cta eb-checklist-add', attr: { type: 'button' } });
+		setIcon(add.createSpan({ cls: 'eb-checklist-button-icon' }), 'plus');
+		add.createSpan({ text: t('modal.checklist.addItem') });
 		add.addEventListener('click', () => {
 			// Commit first: `change` → `render` tears the open row's editor down
 			// without saving, and a click here must not race that teardown away.
@@ -85,7 +90,60 @@ export class ChecklistModal extends Modal {
 			});
 		});
 
+		// Whole-list actions, apart from "Add item" (§4.3).
+		const actions = footer.createDiv({ cls: 'eb-checklist-actions' });
+		this.copyButton = this.actionButton(actions, 'copy', t('modal.checklist.copy'));
+		this.copyButton.addEventListener('click', () => {
+			void this.copyToClipboard();
+		});
+		this.clearButton = this.actionButton(actions, 'trash-2', t('modal.checklist.clear'));
+		this.clearButton.addClass('mod-warning');
+		this.clearButton.addEventListener('click', () => {
+			void this.confirmClear();
+		});
+
 		this.render();
+	}
+
+	/** An icon-only button; the label is its tooltip and accessible name. */
+	private actionButton(parent: HTMLElement, icon: string, label: string): HTMLButtonElement {
+		const button = parent.createEl('button', {
+			cls: 'eb-checklist-action',
+			attr: { type: 'button', 'aria-label': label },
+		});
+		setIcon(button, icon);
+		return button;
+	}
+
+	/** The whole checklist as a numbered list; what the open row holds counts. */
+	private async copyToClipboard(): Promise<void> {
+		this.closeEditor(true);
+		const text = cl.toNumberedList(this.options.items());
+		if (!text) return;
+		try {
+			await navigator.clipboard.writeText(text);
+			new Notice(t('notice.checklistCopied'));
+		} catch {
+			new Notice(t('notice.checklistCopyFailed'));
+		}
+	}
+
+	/** Emptying the checklist removes every row at once, so it asks first. */
+	private async confirmClear(): Promise<void> {
+		this.closeEditor(true);
+		const { total } = cl.progress(this.options.items());
+		if (!total) return;
+		const ok = await confirmDestructive(
+			this.app,
+			t('modal.checklist.clearConfirmTitle'),
+			total === 1
+				? t('modal.checklist.clearConfirmMessageOne')
+				: t('modal.checklist.clearConfirmMessageMany', { count: total }),
+			t('modal.checklist.clear'),
+		);
+		if (!ok) return;
+		this.focusPath = null;
+		this.change(() => []);
 	}
 
 	override onClose(): void {
@@ -124,11 +182,9 @@ export class ChecklistModal extends Modal {
 		this.rowsOwner = new Component();
 		this.rowsOwner.load();
 		this.rebuilding = false;
-		const items = this.options.items();
-		const { done, total } = cl.progress(items);
-		this.countEl.setText(total ? `  ${String(done)}/${String(total)}` : '');
+		this.refreshCount();
 
-		const rows = cl.flatten(items);
+		const rows = cl.flatten(this.options.items());
 		if (!rows.length) {
 			this.listEl.createDiv({ cls: 'eb-checklist-empty', text: t('modal.checklist.empty') });
 		}
@@ -381,9 +437,13 @@ export class ChecklistModal extends Modal {
 		this.refreshCount();
 	}
 
+	/** The header's `N/M` and whether the whole-list actions have anything to act on. */
 	private refreshCount(): void {
-		const { done, total } = cl.progress(this.options.items());
+		const items = this.options.items();
+		const { done, total } = cl.progress(items);
 		this.countEl.setText(total ? `  ${String(done)}/${String(total)}` : '');
+		this.copyButton.disabled = !total;
+		this.clearButton.disabled = !total;
 	}
 
 	// --- drag & drop ------------------------------------------------------

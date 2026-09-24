@@ -1597,8 +1597,45 @@ input[type='time']:focus {
 
 .eb-checklist-footer {
 	display: flex;
-	justify-content: flex-start;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
 	margin-top: 10px;
+}
+
+.eb-checklist-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.eb-checklist-button-icon {
+	display: inline-flex;
+}
+
+.eb-checklist-button-icon .svg-icon,
+.eb-checklist-action .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+/* Whole-list actions: icon-only copy and clear, in the far corner from "Add item". */
+.eb-checklist-actions {
+	display: flex;
+	gap: 8px;
+}
+
+.eb-checklist-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding-inline: 10px;
+}
+
+.eb-checklist-action:disabled {
+	opacity: 0.5;
+	cursor: default;
 }
 
 .eb-stack-name-editor {

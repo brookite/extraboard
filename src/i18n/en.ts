@@ -511,6 +511,11 @@ export const en = {
 			indent: 'Indent',
 			outdent: 'Outdent',
 			deleteItem: 'Delete item',
+			copy: 'Copy to clipboard',
+			clear: 'Clear checklist',
+			clearConfirmTitle: 'Clear checklist',
+			clearConfirmMessageOne: 'The only item of this checklist will be deleted.',
+			clearConfirmMessageMany: 'All {count} items of this checklist will be deleted.',
 		},
 		boardSettings: {
 			defaultView: {
@@ -583,6 +588,8 @@ export const en = {
 		badNoteFolder: 'Extraboard: could not use the folder "{folder}".',
 		createNoteFailed: 'Extraboard: could not create the note.',
 		editDiscarded: 'The board file changed elsewhere — the unsaved card edit was discarded.',
+		checklistCopied: 'Checklist copied to the clipboard.',
+		checklistCopyFailed: 'Could not copy the checklist to the clipboard.',
 	},
 	settings: {
 		language: {

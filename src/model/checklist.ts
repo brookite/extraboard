@@ -92,6 +92,23 @@ export function serializeChecklist(items: ChecklistItem[], depth = 1): string[] 
 	return out;
 }
 
+/**
+ * The checklist as a Markdown numbered list, for the clipboard (§4.3): one tab
+ * per level, numbering restarting under every parent, no done markers. Rows
+ * with no text are skipped the way closing the modal drops them.
+ */
+export function toNumberedList(items: ChecklistItem[]): string {
+	const lines: string[] = [];
+	const walk = (list: ChecklistItem[], depth: number): void => {
+		list.forEach((item, i) => {
+			lines.push(`${'\t'.repeat(depth)}${String(i + 1)}. ${item.text}`);
+			walk(item.children, depth + 1);
+		});
+	};
+	walk(pruneEmpty(items), 0);
+	return lines.join('\n');
+}
+
 /** `N/M` over every item at every level (§4.2). */
 export function progress(items: ChecklistItem[]): { done: number; total: number } {
 	let done = 0;

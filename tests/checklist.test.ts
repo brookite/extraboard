@@ -106,6 +106,31 @@ describe('checklist: progress', () => {
 	});
 });
 
+describe('checklist: numbered list for the clipboard (§4.3)', () => {
+	it('numbers every level from 1, one tab per level, without done markers', () => {
+		const items = cl.splitChecklist([
+			'\t- [x] First [[Note]]',
+			'\t\t- [ ] a',
+			'\t\t\t- [/] deep',
+			'\t\t- [X] b',
+			'\t- [ ] Second',
+		]).checklist;
+		expect(cl.toNumberedList(items)).toBe(
+			['1. First [[Note]]', '\t1. a', '\t\t1. deep', '\t2. b', '2. Second'].join('\n'),
+		);
+	});
+
+	it('skips unfilled rows and renumbers around them', () => {
+		const items = cl.splitChecklist(['\t- [ ] a', '\t- [ ]', '\t- [ ] b']).checklist;
+		expect(cl.toNumberedList(items)).toBe('1. a\n2. b');
+	});
+
+	it('is empty for an empty checklist', () => {
+		expect(cl.toNumberedList([])).toBe('');
+		expect(cl.toNumberedList(cl.splitChecklist(['\t- [ ]']).checklist)).toBe('');
+	});
+});
+
 describe('checklist: tree helpers', () => {
 	const tree = (): ChecklistItem[] =>
 		cl.splitChecklist(['\t- [ ] a', '\t\t- [ ] a1', '\t- [ ] b', '\t- [ ] c']).checklist;

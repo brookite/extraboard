@@ -508,6 +508,11 @@ export const ru: DeepPartial<typeof en> = {
 			indent: 'Увеличить отступ',
 			outdent: 'Уменьшить отступ',
 			deleteItem: 'Удалить пункт',
+			copy: 'Скопировать в буфер обмена',
+			clear: 'Очистить чек-лист',
+			clearConfirmTitle: 'Очистить чек-лист',
+			clearConfirmMessageOne: 'Единственный пункт этого чек-листа будет удалён.',
+			clearConfirmMessageMany: 'Все пункты этого чек-листа будут удалены (всего: {count}).',
 		},
 		boardSettings: {
 			defaultView: {
@@ -580,6 +585,8 @@ export const ru: DeepPartial<typeof en> = {
 		badNoteFolder: 'Extraboard: не удалось использовать папку «{folder}».',
 		createNoteFailed: 'Extraboard: не удалось создать заметку.',
 		editDiscarded: 'Файл доски изменился извне — несохранённая правка карточки отброшена.',
+		checklistCopied: 'Чек-лист скопирован в буфер обмена.',
+		checklistCopyFailed: 'Не удалось скопировать чек-лист в буфер обмена.',
 	},
 	settings: {
 		language: {
