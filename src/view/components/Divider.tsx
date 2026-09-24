@@ -10,6 +10,7 @@ import { safeColor } from './style';
 import { t } from '../../i18n';
 import { showDropdownMenu } from '../../util/menu';
 import { isDoubleTap } from '../../util/gesture';
+import { isDragging } from '../useSortable';
 
 /** Identity-stable props, so the memo below holds across an unrelated edit
  * (m10-perf.md §2) — the divider object, never the board. */
@@ -51,6 +52,9 @@ function DividerRowInner({ divider, stackIndex, index, api, hiddenCount, onAddCa
 	// second, so the undo is exact even if the re-render has not landed yet.
 	const tap = useRef({ at: 0, collapsed: false });
 	const onLabelClick = (): void => {
+		// A group is dragged by this row (kanban-view.md §6.4a): the click a mouse
+		// drag ends with must not collapse it.
+		if (isDragging()) return;
 		const now = Date.now();
 		if (isDoubleTap(tap.current.at, now)) {
 			tap.current.at = 0;

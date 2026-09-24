@@ -372,6 +372,8 @@ body:not(.is-mobile) .eb-board {
    A new nested component must be added here, not patched around. */
 .eb-stack,
 .eb-stack-body,
+.eb-group,
+.eb-item-list,
 .eb-list,
 .eb-section,
 .eb-section-body,
@@ -567,9 +569,71 @@ body:not(.is-mobile) .eb-board {
 	overflow-y: auto;
 }
 
+/* A stack's items come in runs (kanban-view.md §6.4a): the sectionless head,
+   then one block per named divider — its row, then its own card list — so a
+   group can be dragged whole. Each list lays out exactly as the body did. */
+.eb-item-list,
+.eb-group {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+/* An empty head takes no room, and neither does its gap… */
+.eb-item-list.is-head:empty {
+	margin-bottom: -8px;
+}
+
+/* …until a card is in flight: then an empty head or an empty open group is a
+   strip a card can be dropped into. A collapsed group is not a target at all —
+   a card dropped there would vanish from view. */
+body.eb-dragging-card .eb-item-list.is-head:empty,
+body.eb-dragging-card .eb-group:not(.is-collapsed) > .eb-item-list:empty {
+	min-height: 16px;
+	margin-bottom: 0;
+}
+
+.eb-group.is-collapsed > .eb-item-list {
+	display: none;
+}
+
+/* The floating copy of a dragged group is its header and first two items, then
+   a fade and the count of what it leaves out — a whole group under a finger
+   would cover the board. The copy lives on <body>, so nothing here may depend
+   on an ancestor. */
+.eb-group.eb-drag-item {
+	height: auto !important;
+	/* Sortable dims its copy to 0.8 inline; over the faded placeholder of the
+	   same group that reads as two groups on top of each other. */
+	opacity: 1 !important;
+	padding: 6px 8px 8px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.18));
+}
+
+.eb-group.eb-drag-item > .eb-item-list > :nth-child(n + 3) {
+	display: none;
+}
+
+.eb-group.eb-drag-item[data-rest] > .eb-item-list {
+	-webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+	mask-image: linear-gradient(to bottom, #000 55%, transparent);
+}
+
+.eb-group.eb-drag-item[data-rest]::after {
+	content: '+' attr(data-rest);
+	margin-top: -4px;
+	text-align: center;
+	font-size: var(--font-smaller, 0.8em);
+	font-weight: var(--font-semibold, 600);
+	color: var(--text-muted);
+}
+
 /* A collapsed stack keeps an empty Sortable list mounted as a drop layer.
-   It covers the whole spine only while a card is in flight, so the stack's
-   regular click targets remain untouched at every other time. */
+   It covers the whole spine only while a card or a group is in flight, so the
+   stack's regular click targets remain untouched at every other time. */
 .eb-stack.is-collapsed .eb-stack-body {
 	position: absolute;
 	inset: 0;
@@ -582,25 +646,38 @@ body:not(.is-mobile) .eb-board {
 	transition: transform 140ms ease-out;
 }
 
-body.eb-dragging-card .eb-stack.is-collapsed .eb-stack-body {
+body.eb-dragging-card .eb-stack.is-collapsed .eb-stack-body,
+body.eb-dragging-group .eb-stack.is-collapsed .eb-stack-body {
 	pointer-events: auto;
+}
+
+/* The head list fills the layer, so a card lands in it from anywhere. */
+.eb-stack.is-collapsed .eb-item-list.is-head {
+	position: absolute;
+	inset: 0;
+	margin: 0;
 }
 
 /* Sortable inserts the original card into the destination while it hovers.
    Lift the whole visible stack, then counter-translate its full-spine drop
    layer with the same timing so the hit area stays still at the edges. */
-body.eb-dragging-card .eb-stack.is-collapsed:has(.eb-stack-body > .eb-card) {
+body.eb-dragging-card .eb-stack.is-collapsed:has(.eb-item-list > .eb-card),
+body.eb-dragging-group .eb-stack.is-collapsed:has(.eb-stack-body > .eb-group) {
 	transform: translateY(-4px);
 	box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.18));
 }
 
 body.eb-dragging-card
-	.eb-stack.is-collapsed:has(.eb-stack-body > .eb-card)
+	.eb-stack.is-collapsed:has(.eb-item-list > .eb-card)
+	.eb-stack-body,
+body.eb-dragging-group
+	.eb-stack.is-collapsed:has(.eb-stack-body > .eb-group)
 	.eb-stack-body {
 	transform: translateY(4px);
 }
 
-.eb-stack.is-collapsed .eb-stack-body > .eb-item {
+.eb-stack.is-collapsed .eb-item-list > .eb-item,
+.eb-stack.is-collapsed .eb-stack-body > .eb-group {
 	opacity: 0;
 }
 
@@ -610,9 +687,13 @@ body.eb-dragging-card
 		transition: none;
 	}
 
-	body.eb-dragging-card .eb-stack.is-collapsed:has(.eb-stack-body > .eb-card),
+	body.eb-dragging-card .eb-stack.is-collapsed:has(.eb-item-list > .eb-card),
 	body.eb-dragging-card
-		.eb-stack.is-collapsed:has(.eb-stack-body > .eb-card)
+		.eb-stack.is-collapsed:has(.eb-item-list > .eb-card)
+		.eb-stack-body,
+	body.eb-dragging-group .eb-stack.is-collapsed:has(.eb-stack-body > .eb-group),
+	body.eb-dragging-group
+		.eb-stack.is-collapsed:has(.eb-stack-body > .eb-group)
 		.eb-stack-body {
 		transform: none;
 	}

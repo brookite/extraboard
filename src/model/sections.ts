@@ -218,3 +218,29 @@ export function groupRange(stack: Stack, at: number | null): { start: number; en
 	}
 	return { start, end };
 }
+
+/** One run of a stack as the board draws it: `at` is the named divider heading
+ * it (`null` for the sectionless head), `[start, end)` the items under it. */
+export interface StackRun {
+	at: number | null;
+	start: number;
+	end: number;
+}
+
+/**
+ * A stack cut into the runs the board drags as wholes (kanban-view.md §6.4a):
+ * the sectionless head — always first, possibly empty — then one run per named
+ * divider, each holding its nested `---` (§1.5).
+ */
+export function stackRuns(stack: Stack): StackRun[] {
+	const runs: StackRun[] = [];
+	let at: number | null = null;
+	for (let i = 0; i <= stack.items.length; i++) {
+		const entry = stack.items[i];
+		const named = entry?.kind === 'divider' && isNamedDivider(entry.divider);
+		if (i < stack.items.length && !named) continue;
+		runs.push({ at, start: at === null ? 0 : at + 1, end: i });
+		at = i;
+	}
+	return runs;
+}

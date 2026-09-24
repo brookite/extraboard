@@ -1,5 +1,7 @@
+import type { ComponentChildren } from 'preact';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
+import { stackRuns, type StackRun } from '../../model/sections';
 import type { BoardConfig, Stack, ViewDisplay } from '../../model/types';
 import { archiveOpts, cardDropPos, cardEntryPos, type ExtraboardSettings } from '../../settings';
 import { editStack } from '../../ui/StackModal';
@@ -7,7 +9,7 @@ import type { BoardApi } from '../api';
 import { memo } from '../memo';
 import { useCloseOnReload } from '../reload';
 import { revealStack } from '../revealStack';
-import { useSortable } from '../useSortable';
+import { useSortable, type DropInfo } from '../useSortable';
 import { CardTile } from './Card';
 import { DividerRow } from './Divider';
 import { Icon, IconButton } from './Icon';
@@ -30,6 +32,47 @@ interface Props {
 	display?: ViewDisplay;
 }
 
+/** Items a dragged group still shows under its header (kanban-view.md §6.4a). */
+const PREVIEW_ITEMS = 2;
+
+/**
+ * The cards a dragged group's preview leaves out — everything but its first
+ * `PREVIEW_ITEMS` drawn items — for the "+N" at its foot. A collapsed group
+ * shows its own hidden count on the header instead.
+ */
+function restAfterPreview(stack: Stack, run: StackRun, hidden: Set<number>): number {
+	let drawn = 0;
+	let rest = 0;
+	for (let i = run.start; i < run.end; i++) {
+		const card = stack.items[i]?.kind === 'card';
+		if (!hidden.has(i) && drawn < PREVIEW_ITEMS) drawn++;
+		else if (card) rest++;
+	}
+	return rest;
+}
+
+interface ItemListProps {
+	stackIndex: number;
+	/** Where this run ends in the stack, so a drop past its last item lands
+	 * there and not at the stack's end. */
+	end: number;
+	/** The sectionless head, which stays first (§6.4a). */
+	head?: boolean;
+	onDrop: (drop: DropInfo) => void;
+	children?: ComponentChildren;
+}
+
+/** One run's cards and `---` rows, as their own Sortable list. */
+function ItemList({ stackIndex, end, head, onDrop, children }: ItemListProps) {
+	const ref = useRef<HTMLDivElement>(null);
+	useSortable(ref, { group: 'eb-items', draggable: '.eb-item' }, onDrop);
+	return (
+		<div class={`eb-item-list${head ? ' is-head' : ''}`} ref={ref} data-list={stackIndex} data-end={end}>
+			{children}
+		</div>
+	);
+}
+
 function StackColumnInner({ stack, index, config, api, settings, display }: Props) {
 	const [renaming, setRenaming] = useState(false);
 	// Set right after a fresh card is inserted, so that card's tile opens itself
@@ -45,7 +88,7 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 	const bodyRef = useRef<HTMLDivElement>(null);
 	const rootRef = useRef<HTMLDivElement>(null);
 
-	useSortable(bodyRef, { group: 'eb-items', draggable: '.eb-item' }, (drop) => {
+	const onItemDrop = (drop: DropInfo): void => {
 		const from = { stack: drop.fromList, item: drop.fromIndex };
 		// Dropping a card on the archive target is not a move (archive.md §5.5).
 		if (drop.toArchive) {
@@ -60,7 +103,24 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 					: drop.before;
 			return ops.moveItem(b, from, drop.toList, before);
 		});
-	});
+	};
+
+	// A named divider carries its whole group (kanban-view.md §6.4a), picked up by
+	// its own row — never by a nested `---`, which is an item of the group.
+	useSortable(
+		bodyRef,
+		{
+			group: 'eb-groups',
+			draggable: '.eb-group',
+			handle: '.eb-group > .eb-divider-row',
+			// The sectionless head stays first: no group is shown above it.
+			onMove: (evt) => !(evt.related.classList.contains('is-head') && !evt.willInsertAfter),
+		},
+		(drop) => {
+			const from = { stack: drop.fromList, item: drop.fromIndex };
+			api.update((b) => ops.moveGroup(b, from, drop.toList, drop.before));
+		},
+	);
 
 	const collapsed = stack.collapsed;
 	// The stack's own outline (§6.1); guarded here, like every stored color.
@@ -231,6 +291,42 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 		});
 	};
 
+	/** One item of the stack, by index: a card, or a divider row. */
+	const renderItem = (i: number) => {
+		const item = stack.items[i];
+		if (!item || hidden.has(i)) return null;
+		return item.kind === 'card' ? (
+			<CardTile
+				key={i}
+				card={item.card}
+				stackIndex={index}
+				index={i}
+				config={config}
+				groupColor={ops.groupColor(stack, i)}
+				api={api}
+				settings={settings}
+				forceEdit={
+					pendingNewCard === 'entry'
+						? i === (entryPos === 0 ? 0 : stack.items.length - 1)
+						: pendingNewCard === i
+				}
+				onForceEditConsumed={clearPendingNewCard}
+				display={display}
+			/>
+		) : (
+			<DividerRow
+				key={i}
+				divider={item.divider}
+				stackIndex={index}
+				index={i}
+				api={api}
+				hiddenCount={ops.hiddenCardsAfter(stack, hidden, i)}
+				inheritedColor={item.divider.name === undefined ? ops.groupColor(stack, i) : undefined}
+				onAddCard={addCardUnder}
+			/>
+		);
+	};
+
 	return (
 		<div
 			class={`eb-stack${collapsed ? ' is-collapsed' : ''}${accent ? ' is-accented' : ''}`}
@@ -311,43 +407,44 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 				</div>
 			)}
 
-			{/* Keep the list mounted while collapsed: Sortable can only accept a
-			    card into a destination that existed when the drag began. CSS turns
-			    this empty list into a full-spine drop layer during a card drag. */}
+			{/* Keep the lists mounted while collapsed: Sortable can only accept a
+			    card or a group into a destination that existed when the drag
+			    began. CSS turns the empty body into a full-spine drop layer while
+			    either is in flight. */}
 			<div class="eb-stack-body" ref={bodyRef} data-list={index}>
-				{!collapsed &&
-					stack.items.map((item, i) =>
-						hidden.has(i) ? null : item.kind === 'card' ? (
-						<CardTile
-							key={i}
-							card={item.card}
-							stackIndex={index}
-							index={i}
-							config={config}
-							groupColor={ops.groupColor(stack, i)}
-							api={api}
-							settings={settings}
-							forceEdit={
-								pendingNewCard === 'entry'
-									? i === (entryPos === 0 ? 0 : stack.items.length - 1)
-									: pendingNewCard === i
-							}
-							onForceEditConsumed={clearPendingNewCard}
-							display={display}
-						/>
-					) : (
-						<DividerRow
-							key={i}
-							divider={item.divider}
-							stackIndex={index}
-							index={i}
-							api={api}
-							hiddenCount={ops.hiddenCardsAfter(stack, hidden, i)}
-							inheritedColor={item.divider.name === undefined ? ops.groupColor(stack, i) : undefined}
-							onAddCard={addCardUnder}
-						/>
-					),
-					)}
+				{collapsed ? (
+					<ItemList key="head" stackIndex={index} end={stack.items.length} head onDrop={onItemDrop} />
+				) : (
+					stackRuns(stack).map((run, ordinal) => {
+						const items = [];
+						for (let i = run.start; i < run.end; i++) items.push(renderItem(i));
+						if (run.at === null) {
+							return (
+								<ItemList key="head" stackIndex={index} end={run.end} head onDrop={onItemDrop}>
+									{items}
+								</ItemList>
+							);
+						}
+						const header = stack.items[run.at];
+						const groupCollapsed = header?.kind === 'divider' && header.divider.collapsed;
+						const rest = groupCollapsed ? 0 : restAfterPreview(stack, run, hidden);
+						// Keyed by position among the groups, like items by index: an
+						// edit above must not remount every group below it.
+						return (
+							<div
+								key={`group-${String(ordinal)}`}
+								class={`eb-group${groupCollapsed ? ' is-collapsed' : ''}`}
+								data-index={run.at}
+								data-rest={rest > 0 ? rest : undefined}
+							>
+								{renderItem(run.at)}
+								<ItemList stackIndex={index} end={run.end} onDrop={onItemDrop}>
+									{items}
+								</ItemList>
+							</div>
+						);
+					})
+				)}
 			</div>
 		</div>
 	);

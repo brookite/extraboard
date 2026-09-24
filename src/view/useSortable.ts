@@ -19,7 +19,9 @@ export interface DropInfo {
 	toList: number;
 	/** `data-index` of the dragged element. */
 	fromIndex: number;
-	/** `data-index` of the item it was dropped in front of; `null` = at the end. */
+	/** `data-index` of the item it was dropped in front of; `null` = at the end.
+	 * A list that is only one run of its stack says where that run ends with
+	 * `data-end`, which a drop past its last item reads instead. */
 	before: number | null;
 	/** The item was dropped on a `data-archive` zone, not on a list (archive.md §5.5). */
 	toArchive: boolean;
@@ -39,11 +41,15 @@ export function isDragging(): boolean {
  * Sortable is holding.
  */
 const DRAGGING_CARD = 'eb-dragging-card';
+/** The same for a named divider's whole group (kanban-view.md §6.4a). */
+const DRAGGING_GROUP = 'eb-dragging-group';
 
 function markDrag(item: HTMLElement, on: boolean): void {
 	const body = item.ownerDocument.body;
 	if (on && item.classList.contains('eb-card')) body.addClass(DRAGGING_CARD);
 	else body.removeClass(DRAGGING_CARD);
+	if (on && item.classList.contains('eb-group')) body.addClass(DRAGGING_GROUP);
+	else body.removeClass(DRAGGING_GROUP);
 }
 
 /**
@@ -73,7 +79,7 @@ function markStackDrag(item: HTMLElement, on: boolean): void {
 	}
 }
 
-function readIndex(el: Element | null, attr: 'index' | 'list'): number | null {
+function readIndex(el: Element | null, attr: 'index' | 'list' | 'end'): number | null {
 	if (!(el instanceof HTMLElement)) return null;
 	const raw = el.dataset[attr];
 	if (raw === undefined) return null;
@@ -106,13 +112,30 @@ function readDrop(evt: Sortable.SortableEvent): DropInfo | null {
 			break;
 		}
 	}
+	before ??= readIndex(evt.to, 'end');
 	return { fromList, toList, fromIndex, before, toArchive: false };
 }
 
-/** Undo Sortable's DOM move so Preact's tree matches the document again. */
-function revert(evt: Sortable.SortableEvent): void {
+/** Where the dragged node sat when the drag began. */
+interface Origin {
+	parent: Node;
+	next: Node | null;
+}
+
+/**
+ * Undo Sortable's DOM move so Preact's tree matches the document again. The
+ * node goes back in front of the sibling it had at the start: Sortable's
+ * `oldIndex` counts draggable siblings only, so it is off wherever a list also
+ * holds something that does not move — the board's sectionless head in front
+ * of a stack's groups.
+ */
+function revert(evt: Sortable.SortableEvent, origin: Origin | null): void {
 	const { item, from, oldIndex } = evt;
 	item.remove();
+	if (origin && (origin.next === null || origin.next.parentNode === origin.parent)) {
+		origin.parent.insertBefore(item, origin.next);
+		return;
+	}
 	const anchor = oldIndex === undefined ? null : (from.children[oldIndex] ?? null);
 	from.insertBefore(item, anchor);
 }
@@ -124,6 +147,7 @@ export function useSortable(
 ): void {
 	const latest = useRef(onDrop);
 	latest.current = onDrop;
+	const origin = useRef<Origin | null>(null);
 
 	useLayoutEffect(() => {
 		const el = ref.current;
@@ -168,6 +192,9 @@ export function useSortable(
 			scroll: false,
 			...options,
 			onStart: (evt) => {
+				origin.current = evt.item.parentNode
+					? { parent: evt.item.parentNode, next: evt.item.nextSibling }
+					: null;
 				dragging = true;
 				markDrag(evt.item, true);
 				markStackDrag(evt.item, true);
@@ -182,7 +209,8 @@ export function useSortable(
 				markDrag(evt.item, false);
 				markStackDrag(evt.item, false);
 				const info = readDrop(evt);
-				revert(evt);
+				revert(evt, origin.current);
+				origin.current = null;
 				if (info) latest.current(info);
 			},
 		});

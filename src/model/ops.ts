@@ -663,6 +663,62 @@ export function moveItem(board: Board, from: ItemRef, toStack: number, before: I
 	return { ...board, stacks };
 }
 
+/**
+ * Move a **named** divider together with its whole group — every card and
+ * nested `---` up to the next named divider (list-view.md §1.5) — the board's
+ * group drag (kanban-view.md §6.4a). `before` is the item the group lands in
+ * front of, read off the pre-move board like `moveItem`'s, or `null` for the
+ * end of the stack.
+ *
+ * A group only ever lands **between** groups: a `before` inside another group,
+ * or among the stack's sectionless cards, snaps forward to the next named
+ * divider, so the move can never split a group or swallow loose cards. Cards
+ * entering a completing stack are completed, each exactly as a dragged card
+ * would be (stack-completion-and-divider-colors.md §3.2); a move within the
+ * stack completes nothing.
+ */
+export function moveGroup(board: Board, from: ItemRef, toStack: number, before: InsertPos): Board {
+	const source = board.stacks[from.stack];
+	const dest = board.stacks[toStack];
+	const head = source?.items[from.item];
+	if (!source || !dest || head?.kind !== 'divider' || !isNamedDivider(head.divider)) return board;
+
+	const { end } = groupRange(source, from.item);
+	const group = source.items.slice(from.item, end);
+	let target: StackItem | undefined;
+	for (let i = before ?? dest.items.length; i < dest.items.length; i++) {
+		const entry = dest.items[i];
+		if (entry?.kind === 'divider' && isNamedDivider(entry.divider)) {
+			target = entry;
+			break;
+		}
+	}
+	// In front of itself: nowhere to go. (Inside itself snaps past its own end,
+	// which is where it already is — the identity check below catches that.)
+	if (target === head) return board;
+
+	if (from.stack === toStack) {
+		const items = source.items.slice();
+		items.splice(from.item, group.length);
+		items.splice(resolveIndex(items, target), 0, ...group);
+		if (items.every((item, i) => item === source.items[i])) return board;
+		return withItems(board, toStack, items);
+	}
+
+	const sourceItems = source.items.slice();
+	sourceItems.splice(from.item, group.length);
+	const entering = group.map(
+		(item): StackItem => (item.kind === 'card' ? { kind: 'card', card: enteringCard(item.card, dest) } : item),
+	);
+	const destItems = dest.items.slice();
+	destItems.splice(resolveIndex(destItems, target), 0, ...entering);
+
+	const stacks = board.stacks.slice();
+	stacks[from.stack] = normalizeStack({ ...source, items: sourceItems });
+	stacks[toStack] = normalizeStack({ ...dest, items: destItems });
+	return { ...board, stacks };
+}
+
 // --- sections ---------------------------------------------------------------
 //
 // The list view's edits (list-view.md §4). A "section" is a divider read across
