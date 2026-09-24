@@ -52,10 +52,8 @@ export function resolveColor(value: string | undefined, host: HTMLElement): Reso
 		};
 	}
 
-	const probe = host.ownerDocument.createElement('span');
-	probe.className = 'eb-color-probe';
+	const probe = host.createSpan({ cls: 'eb-color-probe' });
 	probe.style.color = safe;
-	host.appendChild(probe);
 	const computed = getComputedStyle(probe).color;
 	probe.remove();
 
