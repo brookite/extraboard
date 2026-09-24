@@ -614,11 +614,17 @@ export function CalendarView({ board, view, api, settings }: Props) {
 			</div>
 
 			<div class="eb-cal-weekdays">
-				{weekdayNames(first).map((name) => (
-					<div class="eb-cal-weekday" key={name}>
-						{name}
-					</div>
-				))}
+				{weekdayNames(first).map((name, i) => {
+					// Week mode shows one date per column, so its header can name
+					// today's; a month column is five or six dates (§3).
+					const isToday = view.mode === 'week' && sameDay(days[i]!, now);
+					return (
+						<div class={`eb-cal-weekday${isToday ? ' is-today' : ''}`} key={name}>
+							{isToday && <span class="eb-cal-today-dot" aria-hidden="true" />}
+							{name}
+						</div>
+					);
+				})}
 			</div>
 
 			<div class={`eb-cal-grid is-${view.mode}${compact ? ' is-compact' : ''}`} ref={gridRef}>
