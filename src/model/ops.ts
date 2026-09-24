@@ -264,6 +264,17 @@ export function addCard(board: Board, stackIndex: number, text: string, at: Inse
 }
 
 /**
+ * Add a card at the head of a divider's group — right under the divider — the
+ * divider menu's **Add card** (kanban-view.md §6.3). A collapsed divider is
+ * opened first, since the card is about to be edited in place. Goes through
+ * `addCard`, so a completing stack completes it.
+ */
+export function addCardUnderDivider(board: Board, ref: ItemRef, text: string): Board {
+	if (board.stacks[ref.stack]?.items[ref.item]?.kind !== 'divider') return board;
+	return addCard(setDividerCollapsed(board, ref, false), ref.stack, text, ref.item + 1);
+}
+
+/**
  * The card as it enters `stack`: completed when the stack completes what lands
  * in it, unchanged otherwise. Every path that puts a card into a stack goes
  * through here, so drag, "Move to", the composer and restore agree
@@ -660,14 +671,22 @@ export function moveItem(board: Board, from: ItemRef, toStack: number, before: I
 // Kanban side sees nothing unusual in the file.
 
 /**
- * Add an empty named section from the list view. Its one physical divider is
- * appended to the first stack, after every card; other stacks receive their
- * divider only when a card enters the section there.
+ * Add an empty named section from the list view (§4.0). Its one physical
+ * divider goes into the first stack; other stacks receive their divider only
+ * when a card enters the section there.
+ *
+ * `atTop` makes it the **first** section: the divider lands before the first
+ * stack's first divider, so the stack's sectionless cards stay sectionless and
+ * the first stack — which settles the order (§1.2) — reads it first. Otherwise
+ * it is appended after every card, the last section.
  */
-export function addSection(board: Board, name: string): Board {
+export function addSection(board: Board, name: string, atTop = false): Board {
 	const normalized = sectionName(name);
-	if (!normalized || !board.stacks.length || sectionOrder(board).includes(normalized)) return board;
-	return addDivider(board, 0, normalized);
+	const first = board.stacks[0];
+	if (!normalized || !first || sectionOrder(board).includes(normalized)) return board;
+	if (!atTop) return addDivider(board, 0, normalized);
+	const lead = first.items.findIndex((item) => item.kind === 'divider');
+	return addDivider(board, 0, normalized, lead === -1 ? null : lead);
 }
 
 /**
@@ -1151,7 +1170,7 @@ export function clearArchive(board: Board): Board {
  *
  * Existing cards are deliberately left alone: a value that no longer validates
  * under the new definition keeps its text until the user edits that card
- * (kanban-view.md §5.4).
+ * (kanban-view.md §6.3).
  */
 export function setBoardConfig(board: Board, config: BoardConfig): Board {
 	return { ...board, config };
@@ -1430,7 +1449,7 @@ export function moveView(board: Board, id: string, before: InsertPos): Board {
 /**
  * Card values that would no longer validate under `config` — i.e. the tokens a
  * future re-read of the file would drop. Used to warn before board settings are
- * changed; nothing is rewritten (kanban-view.md §5.4).
+ * changed; nothing is rewritten (kanban-view.md §6.3).
  */
 export function invalidatedValues(
 	board: Board,

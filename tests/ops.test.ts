@@ -172,6 +172,26 @@ describe('ops: stacks and dividers', () => {
 		expect(text(b)).toContain('- Second card\n\n### Later\n\n---\n\n## Doing');
 	});
 
+	it('adds a divider at the top of a stack, above its cards (§6.7)', () => {
+		const next = ops.addDivider(board(), 0, 'Now', 0);
+		expect(text(next).startsWith('## To do\n\n### Now\n\n- First card #work')).toBe(true);
+	});
+
+	it('adds a card right under a divider, opening a collapsed one (§6.3)', () => {
+		const collapsed = ops.setDividerCollapsed(board(), { stack: 1, item: 0 }, true);
+		const next = ops.addCardUnderDivider(collapsed, { stack: 1, item: 0 }, 'New');
+		expect(text(next)).toContain('## Doing\n\n### Group\n\n- New\n- Grouped card');
+		const b = board();
+		// Not a divider: nothing to add under.
+		expect(ops.addCardUnderDivider(b, { stack: 0, item: 0 }, 'x')).toBe(b);
+	});
+
+	it('completes a card added under a divider in a completing stack', () => {
+		const b = parseBoard([FM, '## Done %%completes%%', '', '---', '', '- [x] Old', ''].join('\n'));
+		const next = ops.addCardUnderDivider(b, { stack: 0, item: 0 }, 'New');
+		expect(text(next)).toContain('---\n\n- [x] New\n- [x] Old');
+	});
+
 	it('renames a divider and toggles its collapse', () => {
 		let b = ops.renameDivider(board(), { stack: 1, item: 0 }, 'Renamed');
 		b = ops.setDividerCollapsed(b, { stack: 1, item: 0 }, true);

@@ -177,6 +177,18 @@ describe('sections: adding a card', () => {
 		expect(titlesOf(top, 0).slice(0, 3)).toEqual(['Loose C', 'Loose A', '### Backlog']);
 	});
 
+	it('adds to the start of a named or anonymous section on request (§4.4)', () => {
+		const top = ops.addCardToSectionAt(board(), 0, named('Backlog'), 'B0', true);
+		expect(titlesOf(intact(top.board), 0)).toEqual(['Loose A', '### Backlog', 'B0', 'B1', 'B2', '### Review', 'R1']);
+		expect(top.ref).toEqual({ stack: 0, item: 2 });
+		// A divider created on the way in is followed by the card either way.
+		const fresh = intact(ops.addCardToSection(board(), 1, named('Backlog'), 'B5', true));
+		expect(titlesOf(fresh, 1).slice(0, 3)).toEqual(['Loose B', '### Backlog', 'B5']);
+		const anon = sectionsOf(board()).find((s) => s.key.kind === 'anon')!.key;
+		const anonTop = intact(ops.addCardToSection(board(), 1, anon, 'Anon 0', true));
+		expect(titlesOf(anonTop, 1).slice(-3)).toEqual(['### ---', 'Anon 0', 'Anon card']);
+	});
+
 	it('adds to an anonymous section by its divider', () => {
 		const anon = sectionsOf(board()).find((s) => s.key.kind === 'anon')!.key;
 		const next = intact(ops.addCardToSection(board(), 1, anon, 'Anon 2'));
@@ -240,6 +252,25 @@ describe('sections: adding an empty named section', () => {
 		]);
 		expect(titlesOf(next, 1)).not.toContain('### New section');
 		expect(titlesOf(next, 2)).not.toContain('### New section');
+	});
+
+	it('makes it the first section on request, after the sectionless cards (§4.0)', () => {
+		const next = intact(ops.addSection(board(), 'New section', true));
+		expect(titlesOf(next, 0)).toEqual([
+			'Loose A',
+			'### New section',
+			'### Backlog',
+			'B1',
+			'B2',
+			'### Review',
+			'R1',
+		]);
+		expect(sectionOrder(next)[0]).toBe('New section');
+		// A first stack without dividers has nothing to precede: the end is its start.
+		const plain = parseBoard([FM, '## S', '', '- loose', '', '## T', '', '### Old', '', '- o', ''].join('\n'));
+		const added = intact(ops.addSection(plain, 'New', true));
+		expect(titlesOf(added, 0)).toEqual(['loose', '### New']);
+		expect(sectionOrder(added)).toEqual(['New', 'Old']);
 	});
 
 	it('trims the name and refuses an empty, existing, or stackless section', () => {

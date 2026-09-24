@@ -20,9 +20,12 @@ interface Props {
 	api: BoardApi;
 	/** Cards this divider is currently hiding (0 when expanded). */
 	hiddenCount: number;
+	/** Insert a blank card right under the divider at `index` and open it; stable,
+	 * like every other prop here. */
+	onAddCard: (index: number) => void;
 }
 
-function DividerRowInner({ divider, stackIndex, index, api, hiddenCount }: Props) {
+function DividerRowInner({ divider, stackIndex, index, api, hiddenCount, onAddCard }: Props) {
 	const [editing, setEditing] = useState(false);
 	// A rename in flight belongs to this position, not to this divider — an
 	// external reload can put another one here (view/reload.ts).
@@ -69,6 +72,15 @@ function DividerRowInner({ divider, stackIndex, index, api, hiddenCount }: Props
 
 	const openMenu = (event: MouseEvent): void => {
 		showDropdownMenu(event, (menu) => {
+			// The head of this group, not the stack's entry end: the menu was opened
+			// on the divider, so the card belongs under it (kanban-view.md §6.3).
+			menu.addItem((item) =>
+			item
+				.setTitle(t('stack.addCard'))
+				.setIcon('plus')
+				.onClick(() => onAddCard(index)),
+			);
+			menu.addSeparator();
 			menu.addItem((item) =>
 			item
 				.setTitle(toggleLabel)

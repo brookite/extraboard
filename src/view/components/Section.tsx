@@ -47,8 +47,11 @@ export interface SectionProps {
 	composerSection: SectionKey;
 	onComposerSection: (key: SectionKey) => void;
 	onState: (patch: Partial<SectionState>) => void;
-	/** Create an empty card in this group, where its composer points (§4.2). */
-	onAddCard: () => void;
+	/**
+	 * Create an empty card in this group, where its composer points (§4.2) —
+	 * at the group's usual entry end, or at its start when `atTop` (§4.4).
+	 */
+	onAddCard: (atTop?: boolean) => void;
 	/**
 	 * That card, for as long as it is the newest one: its tile opens the inline
 	 * editor, and the row is drawn even when the filter would hide it. The list
@@ -244,9 +247,9 @@ export function SectionGroup(props: SectionProps) {
 	 * because the card it creates has to be visible even when the group's
 	 * filter would hide it.
 	 */
-	const addCard = (): void => {
+	const addCard = (atTop?: boolean): void => {
 		setCollapsed(false);
-		onAddCard();
+		onAddCard(atTop);
 	};
 
 	const label = sectionKeyLabel(board, key);
@@ -322,7 +325,9 @@ export function SectionGroup(props: SectionProps) {
 			item
 				.setTitle(t('stack.addCard'))
 				.setIcon('plus')
-				.onClick(addCard),
+				// The menu sits at the group's head, so its card does too (§4.4);
+				// the composer at the foot keeps the usual end.
+				.onClick(() => addCard(true)),
 			);
 			menu.addItem((item) =>
 			item
@@ -598,7 +603,7 @@ export function SectionGroup(props: SectionProps) {
 
 			{collapsed || !board.stacks.length ? null : (
 				<div class="eb-section-compose">
-					<button type="button" class="eb-add-card" onClick={addCard}>
+					<button type="button" class="eb-add-card" onClick={() => addCard()}>
 						<Icon name="plus" class="eb-button-icon" />
 						<span>{t('stack.addCard')}</span>
 					</button>

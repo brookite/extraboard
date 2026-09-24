@@ -39,12 +39,13 @@ function countHiddenAfter(hidden: Set<number>, index: number): number {
 
 function StackColumnInner({ stack, index, config, api, settings, display }: Props) {
 	const [renaming, setRenaming] = useState(false);
-	// Set right after a fresh card is inserted at the top, so that card's tile
-	// opens itself for editing once, then clears this back.
-	const [pendingNewCard, setPendingNewCard] = useState(false);
+	// Set right after a fresh card is inserted, so that card's tile opens itself
+	// for editing once, then clears this back: `'entry'` for the composer's card
+	// (wherever the entry end is), an item index for one added under a divider.
+	const [pendingNewCard, setPendingNewCard] = useState<'entry' | number | null>(null);
 	// Stable across renders: an inline lambda here would change on every render of
 	// this column and defeat every card's memo (m10-perf.md §2).
-	const clearPendingNewCard = useCallback(() => setPendingNewCard(false), []);
+	const clearPendingNewCard = useCallback(() => setPendingNewCard(null), []);
 	// As for a card or a divider: the rename is the slot's state, and an external
 	// reload can put a different stack at this index (view/reload.ts).
 	useCloseOnReload(() => setRenaming(false));
@@ -84,7 +85,21 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 	const addCard = (): void => {
 		setCollapsed(false);
 		api.update((b) => ops.addCard(b, index, '', entryPos));
-		setPendingNewCard(true);
+		setPendingNewCard('entry');
+	};
+
+	/** The divider menu's **Add card**: a blank card right under that divider. */
+	const addCardUnder = useCallback(
+		(dividerIndex: number): void => {
+			api.update((b) => ops.addCardUnderDivider(b, { stack: index, item: dividerIndex }, ''));
+			setPendingNewCard(dividerIndex + 1);
+		},
+		[api, index],
+	);
+
+	/** A divider enters the stack where a card would (§6.7): top or end. */
+	const addDivider = (name: string | undefined): void => {
+		api.update((b) => ops.addDivider(b, index, name, entryPos));
 	};
 
 	/** Name, the completion flag and the accent, in one form (§3.3, §6.2). */
@@ -162,13 +177,13 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 			item
 				.setTitle(t('stack.addDivider'))
 				.setIcon('minus')
-				.onClick(() => api.update((b) => ops.addDivider(b, index, undefined))),
+				.onClick(() => addDivider(undefined)),
 			);
 			menu.addItem((item) =>
 			item
 				.setTitle(t('stack.addNamedDivider'))
 				.setIcon('heading')
-				.onClick(() => api.update((b) => ops.addDivider(b, index, 'Group'))),
+				.onClick(() => addDivider('Group')),
 			);
 			menu.addSeparator();
 		// "Edit", not "Rename": the flag belongs to the same form as the name
@@ -319,7 +334,11 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 							groupColor={ops.groupColor(stack, i)}
 							api={api}
 							settings={settings}
-							forceEdit={i === (entryPos === 0 ? 0 : stack.items.length - 1) && pendingNewCard}
+							forceEdit={
+								pendingNewCard === 'entry'
+									? i === (entryPos === 0 ? 0 : stack.items.length - 1)
+									: pendingNewCard === i
+							}
 							onForceEditConsumed={clearPendingNewCard}
 							display={display}
 						/>
@@ -331,6 +350,7 @@ function StackColumnInner({ stack, index, config, api, settings, display }: Prop
 							index={i}
 							api={api}
 							hiddenCount={countHiddenAfter(hidden, i)}
+							onAddCard={addCardUnder}
 						/>
 					),
 					)}

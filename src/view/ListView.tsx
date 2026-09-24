@@ -214,7 +214,7 @@ export function ListView({ board, view, api, settings }: Props) {
 	 * remember where it went so that tile opens the inline editor (§4.2). The op
 	 * reports the position itself, since it may have created a divider above it.
 	 */
-	const addCard = (section: Section): void => {
+	const addCard = (section: Section, atTop?: boolean): void => {
 		// Which pair the composer names depends on the axis: a section group picks
 		// the stack, a stack group picks the section (§4.2).
 		const stack =
@@ -222,13 +222,17 @@ export function ListView({ board, view, api, settings }: Props) {
 				? section.key.index
 				: Math.min(composerStacks[sessionKey(section)] ?? 0, board.stacks.length - 1);
 		if (!board.stacks[stack]) return;
+		// A stack group's start is the stack's own top, the head of its sectionless
+		// cards, whatever section the composer is pointed at (§4.4).
 		const key: SectionKey =
 			section.key.kind === 'stack'
-				? (composerSections[sessionKey(section)] ?? { kind: 'none' })
+				? atTop
+					? { kind: 'none' }
+					: (composerSections[sessionKey(section)] ?? { kind: 'none' })
 				: section.key;
 		let inserted: ops.ItemRef | null = null;
 		api.update((b) => {
-			const result = ops.addCardToSectionAt(b, stack, key, '', entryTop(b, stack, key));
+			const result = ops.addCardToSectionAt(b, stack, key, '', atTop ?? entryTop(b, stack, key));
 			inserted = result.ref;
 			return result.board;
 		});
@@ -513,7 +517,7 @@ export function ListView({ board, view, api, settings }: Props) {
 							setComposerSections((current) => ({ ...current, [sessionKey(section)]: key }))
 						}
 						onState={(patch) => patchState(section, patch)}
-						onAddCard={() => addCard(section)}
+						onAddCard={(atTop) => addCard(section, atTop)}
 						pending={pending}
 						onDrop={onDrop}
 						menuExtra={menuExtra}
@@ -543,7 +547,11 @@ export function ListView({ board, view, api, settings }: Props) {
 						class="eb-list-add-section-editor"
 						onSubmit={(name) => {
 							setAddingSection(false);
-							api.update((b) => ops.addSection(b, name));
+							// A new section enters where a new card would: the first
+							// stack's entry end decides first or last (§4.0).
+							api.update((b) =>
+								ops.addSection(b, name, cardEntryPos(b.stacks[0], b.config, settings) === 0),
+							);
 						}}
 						onCancel={() => setAddingSection(false)}
 					/>
