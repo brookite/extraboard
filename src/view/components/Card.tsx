@@ -153,6 +153,7 @@ function CardTileInner({
 		new ChecklistModal(api.app, {
 			// The card as it reads, with its content link flattened to its text.
 			title: unlinkedTitle(card.title),
+			sourcePath: api.sourcePath(),
 			// Read through the live board every time: the modal outlives the render
 			// that opened it, and every edit replaces the board object.
 			items: () => {

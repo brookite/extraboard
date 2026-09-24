@@ -4,28 +4,13 @@
 // Obsidian's own renderer and then **unwrapped** out of the paragraph the
 // renderer puts it in — the card supplies the layout, not the Markdown block.
 
-import { Component, MarkdownRenderer } from 'obsidian';
+import { Component } from 'obsidian';
 import { useLayoutEffect, useRef } from 'preact/hooks';
 import type { BoardApi } from '../api';
 import { hoverLinkText, openLinkText } from '../links';
+import { renderInlineMarkdown } from '../inlineMarkdown';
 
-/**
- * Characters that could start any inline construct. A title without one of them
- * is plain text, and skipping the renderer for it keeps a large board cheap —
- * most titles are prose.
- */
-const MARKDOWN_RE = /[[\]`*_~=$<>&^!\\|]/;
-
-export function hasMarkdown(text: string): boolean {
-	return MARKDOWN_RE.test(text);
-}
-
-/** Lift a single rendered paragraph's children up into `el`. */
-function unwrapParagraph(el: HTMLElement): void {
-	const only = el.childElementCount === 1 ? el.firstElementChild : null;
-	if (!(only instanceof HTMLParagraphElement)) return;
-	el.replaceChildren(...Array.from(only.childNodes));
-}
+export { hasMarkdown } from '../inlineMarkdown';
 
 interface Props {
 	markdown: string;
@@ -41,19 +26,11 @@ export function MarkdownText({ markdown, api, class: cls }: Props) {
 		const el = ref.current;
 		if (!el) return;
 		let cancelled = false;
-		el.empty();
 		// Child of the view, so anything the renderer loads (embeds, popovers)
 		// unloads with the board rather than leaking.
 		const owner = new Component();
 		api.component.addChild(owner);
-		void MarkdownRenderer.render(api.app, markdown, el, sourcePath, owner)
-			.then(() => {
-				if (!cancelled) unwrapParagraph(el);
-			})
-			.catch((err: unknown) => {
-				console.error('Extraboard: failed to render card title', err);
-				if (!cancelled) el.setText(markdown);
-			});
+		void renderInlineMarkdown(api.app, markdown, el, sourcePath, owner, () => !cancelled);
 		return () => {
 			cancelled = true;
 			api.component.removeChild(owner);

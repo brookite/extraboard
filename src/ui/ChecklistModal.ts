@@ -6,11 +6,13 @@
 // comes back, so closing the modal is not a commit and dismissing it undoes
 // nothing.
 
-import { App, Modal, setIcon } from 'obsidian';
+import { App, Component, Keymap, Modal, setIcon } from 'obsidian';
 import Sortable from 'sortablejs';
 import * as cl from '../model/checklist';
 import type { ChecklistItem, ChecklistPath } from '../model/checklist';
 import { createEmbeddedEditor, type EmbeddedEditorHandle } from '../view/embeddedEditor';
+import { renderInlineMarkdown } from '../view/inlineMarkdown';
+import { openLinkText } from '../view/links';
 import { t } from '../i18n';
 import { showDropdownMenu } from '../util/menu';
 import { keyboardAwareModal } from './keyboardInset';
@@ -18,6 +20,8 @@ import { keyboardAwareModal } from './keyboardInset';
 export interface ChecklistModalOptions {
 	/** The card's display text, shown as the modal title. */
 	title: string;
+	/** The board file, which links in an item resolve against. */
+	sourcePath: string;
 	/** The card's checklist as it stands right now. */
 	items(): ChecklistItem[];
 	/** Apply a pure transform to it (through a board op). */
@@ -46,6 +50,11 @@ export class ChecklistModal extends Modal {
 	 * text until it is pointed at.
 	 */
 	private editing: { path: ChecklistPath; handle: EmbeddedEditorHandle } | null = null;
+	/**
+	 * Owns what the rows' rendered Markdown loaded; replaced on every render and
+	 * unloaded on close, so rows that are gone take their children with them.
+	 */
+	private rowsOwner: Component | null = null;
 
 	constructor(
 		app: App,
@@ -88,6 +97,8 @@ export class ChecklistModal extends Modal {
 		this.options.apply((items) => cl.pruneEmpty(items));
 		this.sortable?.destroy();
 		this.sortable = null;
+		this.rowsOwner?.unload();
+		this.rowsOwner = null;
 		this.contentEl.empty();
 	}
 
@@ -109,6 +120,9 @@ export class ChecklistModal extends Modal {
 		// The editor lives inside a row, and every row is about to be replaced.
 		this.closeEditor(false);
 		this.listEl.empty();
+		this.rowsOwner?.unload();
+		this.rowsOwner = new Component();
+		this.rowsOwner.load();
 		this.rebuilding = false;
 		const items = this.options.items();
 		const { done, total } = cl.progress(items);
@@ -155,9 +169,16 @@ export class ChecklistModal extends Modal {
 		text.dataset.path = path.join('.');
 		text.tabIndex = 0;
 		this.fillText(text, item.text);
-		const edit = (): void => this.editRow(path);
-		text.addEventListener('click', edit);
-		text.addEventListener('focus', edit);
+		// A link in a rendered row is a link, not a way into the editor: keep the
+		// press from focusing the row (focus opens the editor), then follow it.
+		text.addEventListener('mousedown', (evt) => {
+			if (this.linkAt(evt)) evt.preventDefault();
+		});
+		text.addEventListener('click', (evt) => {
+			if (this.followLink(evt)) return;
+			this.editRow(path);
+		});
+		text.addEventListener('focus', () => this.editRow(path));
 
 		const menu = rowEl.createEl('button', { cls: 'eb-icon-button', attr: { type: 'button' } });
 		setIcon(menu, 'more-vertical');
@@ -167,12 +188,54 @@ export class ChecklistModal extends Modal {
 		});
 	}
 
-	/** A row's read-mode content: its text, or the placeholder for an empty one. */
+	/**
+	 * A row's read-mode content: its text rendered as inline Markdown, the way
+	 * a card title is, or the placeholder for an empty one.
+	 */
 	private fillText(el: HTMLElement, text: string): void {
 		el.empty();
 		el.removeClass('is-editing');
-		if (text) el.setText(text);
-		else el.createSpan({ cls: 'eb-placeholder', text: t('modal.checklist.itemPlaceholder') });
+		if (!text) {
+			el.createSpan({ cls: 'eb-placeholder', text: t('modal.checklist.itemPlaceholder') });
+			return;
+		}
+		const owner = this.rowsOwner;
+		if (!owner) {
+			el.setText(text);
+			return;
+		}
+		// Dropped if the row became an editor, or was rebuilt, before it landed.
+		const current = (): boolean =>
+			this.rowsOwner === owner && el.isConnected && !el.hasClass('is-editing');
+		void renderInlineMarkdown(this.app, text, el, this.options.sourcePath, owner, current);
+	}
+
+	/** The rendered link under a pointer event, if any. */
+	private linkAt(evt: MouseEvent): HTMLAnchorElement | null {
+		const anchor = evt.target instanceof Element ? evt.target.closest('a') : null;
+		return anchor instanceof HTMLAnchorElement ? anchor : null;
+	}
+
+	/**
+	 * Follow a link clicked in a rendered row. An internal link opens its note —
+	 * in the board's tab, which the modal gives way to, or in a new tab with
+	 * Ctrl/Cmd, keeping the checklist open. An external link is left to
+	 * Obsidian. A tag is not a link here: it falls through to editing.
+	 */
+	private followLink(evt: MouseEvent): boolean {
+		const anchor = this.linkAt(evt);
+		if (!anchor) return false;
+		if (anchor.hasClass('tag')) {
+			evt.preventDefault();
+			return false;
+		}
+		const href = anchor.getAttribute('data-href');
+		if (href === null) return true; // external link: Obsidian opens it
+		evt.preventDefault();
+		const newTab = Keymap.isModEvent(evt);
+		if (!newTab) this.close();
+		openLinkText(this.app, href, this.options.sourcePath, evt);
+		return true;
 	}
 
 	private textEl(path: ChecklistPath): HTMLElement | null {
