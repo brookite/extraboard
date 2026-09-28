@@ -627,6 +627,24 @@ export function duplicateItem(board: Board, ref: ItemRef): Board {
 }
 
 /**
+ * A copy of a named divider — its name and color, not its cards — placed right
+ * after the group it heads, so the original keeps every card and the copy
+ * starts an empty, expanded group of its own (kanban-view.md §6.3).
+ */
+export function duplicateDivider(board: Board, ref: ItemRef): Board {
+	const stack = board.stacks[ref.stack];
+	const entry = stack?.items[ref.item];
+	if (!stack || entry?.kind !== 'divider' || !isNamedDivider(entry.divider)) return board;
+	const copy: StackItem = {
+		kind: 'divider',
+		divider: { ...entry.divider, collapsed: false, trailing: entry.divider.trailing.slice() },
+	};
+	const items = stack.items.slice();
+	items.splice(groupRange(stack, ref.item).end, 0, copy);
+	return withItems(board, ref.stack, items);
+}
+
+/**
  * Move an item before the item currently at `before` in `toStack` (or to the
  * end of that stack). Positions are resolved by identity, so `before` may be an
  * index taken from the pre-move board even for same-stack moves.

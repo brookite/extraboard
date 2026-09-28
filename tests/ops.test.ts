@@ -198,6 +198,55 @@ describe('ops: stacks and dividers', () => {
 		expect(text(b)).toContain('### Renamed %%collapsed%%');
 	});
 
+	it('duplicates a named divider after its group, without its cards (§6.3)', () => {
+		const b = parseBoard(
+			[
+				FM,
+				'## Doing',
+				'',
+				'### Front %%collapsed%% %%color|#f00%%',
+				'',
+				'- A',
+				'',
+				'---',
+				'',
+				'- B',
+				'',
+				'### Back',
+				'',
+				'- C',
+				'',
+			].join('\n'),
+		);
+		const next = ops.duplicateDivider(b, { stack: 0, item: 0 });
+		const items = next.stacks[0]!.items;
+		// Past the nested `---` and its card, in front of the next named divider.
+		expect(items.map((i) => (i.kind === 'card' ? i.card.title : (i.divider.name ?? '---')))).toEqual([
+			'Front',
+			'A',
+			'---',
+			'B',
+			'Front',
+			'Back',
+			'C',
+		]);
+		const copy = items[4];
+		expect(copy?.kind === 'divider' && copy.divider).toMatchObject({ color: '#f00', collapsed: false });
+		// The original keeps its state.
+		expect(items[0]?.kind === 'divider' && items[0].divider.collapsed).toBe(true);
+	});
+
+	it('duplicates the last named divider to the end of the stack', () => {
+		const next = ops.duplicateDivider(board(), { stack: 1, item: 0 });
+		expect(text(next)).toContain('## Doing\n\n### Group\n\n- Grouped card\n\n### Group\n\n## Done');
+	});
+
+	it('does not duplicate a plain divider or a card', () => {
+		const b = parseBoard([FM, '## Doing', '', '---', '', '- A', ''].join('\n'));
+		expect(ops.duplicateDivider(b, { stack: 0, item: 0 })).toBe(b);
+		expect(ops.duplicateDivider(b, { stack: 0, item: 1 })).toBe(b);
+	});
+
 	it('drops a divider name to make it plain', () => {
 		const next = ops.renameDivider(board(), { stack: 1, item: 0 }, undefined);
 		expect(text(next)).toContain('## Doing\n\n---\n\n- Grouped card');

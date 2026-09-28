@@ -117,6 +117,13 @@ function DividerRowInner({ divider, stackIndex, index, api, hiddenCount, onAddCa
 					.setIcon('minus')
 					.onClick(() => api.update((b) => ops.renameDivider(b, ref, undefined))),
 			);
+			// Only the divider, placed after its group: the cards stay where they are.
+			menu.addItem((item) =>
+				item
+					.setTitle(t('divider.duplicateDivider'))
+					.setIcon('copy')
+					.onClick(() => api.update((b) => ops.duplicateDivider(b, ref))),
+			);
 			}
 			menu.addSeparator();
 			menu.addItem((item) =>

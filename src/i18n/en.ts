@@ -169,6 +169,7 @@ export const en = {
 		nameDivider: 'Name divider',
 		dividerColor: 'Divider color',
 		removeName: 'Remove name',
+		duplicateDivider: 'Duplicate divider',
 		deleteDivider: 'Delete divider',
 		namePlaceholder: 'Divider name',
 		unnamed: 'Unnamed',

@@ -170,6 +170,7 @@ export const ru: DeepPartial<typeof en> = {
 		nameDivider: 'Назвать разделитель',
 		dividerColor: 'Цвет разделителя',
 		removeName: 'Убрать название',
+		duplicateDivider: 'Дублировать разделитель',
 		deleteDivider: 'Удалить разделитель',
 		namePlaceholder: 'Название разделителя',
 		unnamed: 'Без названия',
