@@ -593,6 +593,19 @@ body.eb-dragging-card .eb-group:not(.is-collapsed) > .eb-item-list:empty {
 	margin-bottom: 0;
 }
 
+/* The head's strip overlays the body's top padding and the first divider row
+   instead of pushing the stack down: picking a card up must not shift every
+   stack that opens with a named divider. Negative margins cancel its height
+   and the body's gap; `z-index` lifts it over the divider row, so the pointer
+   hits the strip there. A collapsed stack's head is its full-spine drop layer
+   and is left alone. */
+body.eb-dragging-card .eb-stack:not(.is-collapsed) .eb-item-list.is-head:empty {
+	position: relative;
+	z-index: 1;
+	margin-top: -8px;
+	margin-bottom: -16px;
+}
+
 .eb-group.is-collapsed > .eb-item-list {
 	display: none;
 }
