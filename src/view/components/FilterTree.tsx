@@ -24,6 +24,16 @@ import { useSortable, type DropInfo } from '../useSortable';
 import { Icon } from './Icon';
 import { t } from '../../i18n';
 
+/**
+ * The closed vocabularies an operand can be picked from: the board's tags, and
+ * its stack and section names for `@stack` / `@section`.
+ */
+export interface FieldChoices {
+	tags: string[];
+	stacks: string[];
+	sections: string[];
+}
+
 export interface FieldOption {
 	field: FieldRef;
 	id: string;
@@ -32,7 +42,7 @@ export interface FieldOption {
 
 /** Every field a filter or a sort can name: the card's own, then the board's. */
 export function fieldOptions(config: BoardConfig): FieldOption[] {
-	const builtins: FieldOption[] = (['title', 'tags', 'done', 'note'] as const).map((id) => ({
+	const builtins: FieldOption[] = (['title', 'tags', 'done', 'note', 'stack', 'section'] as const).map((id) => ({
 		field: { kind: 'builtin', id },
 		id: `@${id}`,
 		label: t(`filter.field.${id}`),
@@ -57,14 +67,14 @@ function ValueEditor({
 	app,
 	config,
 	condition,
-	tags,
+	choices,
 	second,
 	onChange,
 }: {
 	app: App;
 	config: BoardConfig;
 	condition: FilterCondition;
-	tags: string[];
+	choices: FieldChoices;
 	/** Edit `value2` — the upper bound of `between`. */
 	second?: boolean;
 	onChange: (value: string) => void;
@@ -75,8 +85,14 @@ function ValueEditor({
 	const def =
 		field.kind === 'property' ? config.properties.find((p) => p.name === field.name) : undefined;
 	const options =
-		field.kind === 'builtin' && field.id === 'tags'
-			? tags
+		field.kind === 'builtin'
+			? field.id === 'tags'
+				? choices.tags
+				: field.id === 'stack'
+					? choices.stacks
+					: field.id === 'section'
+						? choices.sections
+						: []
 			: (def?.options ?? []).map((option) => option.value);
 	const editor = editorFor(kind, condition.op, options.length > 0);
 	const value = (second ? condition.value2 : condition.value) ?? '';
@@ -134,8 +150,8 @@ function ValueEditor({
 interface TreeProps {
 	app: App;
 	config: BoardConfig;
-	/** Every tag the board uses — the suggestions a tag condition offers. */
-	tags: string[];
+	/** What a tag, stack or section condition offers to pick from. */
+	choices: FieldChoices;
 	root: FilterGroup;
 	/** Ordinal of each group, by path key; the drag protocol's coordinate. */
 	ordinals: Map<string, number>;
@@ -148,7 +164,7 @@ interface TreeProps {
 function ConditionRow({
 	app,
 	config,
-	tags,
+	choices,
 	condition,
 	path,
 	index,
@@ -157,7 +173,7 @@ function ConditionRow({
 }: {
 	app: App;
 	config: BoardConfig;
-	tags: string[];
+	choices: FieldChoices;
 	condition: FilterCondition;
 	path: NodePath;
 	index: number;
@@ -213,7 +229,7 @@ function ConditionRow({
 				app={app}
 				config={config}
 				condition={condition}
-				tags={tags}
+				choices={choices}
 				onChange={(value) => onChange(path, { ...condition, value })}
 			/>
 			{needsSecondValue(condition.op) ? (
@@ -223,7 +239,7 @@ function ConditionRow({
 						app={app}
 						config={config}
 						condition={condition}
-						tags={tags}
+						choices={choices}
 						second
 						onChange={(value2) => onChange(path, { ...condition, value2 })}
 					/>
@@ -310,7 +326,7 @@ export function GroupNode({
 							key={i}
 							app={rest.app}
 							config={rest.config}
-							tags={rest.tags}
+							choices={rest.choices}
 							condition={child}
 							path={[...path, i]}
 							index={i}

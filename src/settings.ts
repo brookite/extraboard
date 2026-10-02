@@ -8,6 +8,7 @@ import type { Lang } from './i18n';
 import type { DateFormatMode, WeekStart } from './i18n/dates';
 import type { ArchiveOpts, InsertPos } from './model/ops';
 import { formatDate } from './model/dates';
+import type { BoardStates } from './schedule/state';
 
 /** Bounds of `archiveLimit`, shared by the settings tab and the clamp below. */
 export const ARCHIVE_LIMIT_MIN = 1;
@@ -166,6 +167,12 @@ export interface ExtraboardSettings {
 	 * state with the file and skip the write when they match.
 	 */
 	reduceBoardFileWrites: boolean;
+	/**
+	 * What this device has already shown per board — digests and reminders —
+	 * and which of their sections are collapsed, by board path. Not in the
+	 * settings tab (digest-and-reminders.md §9).
+	 */
+	boardState: BoardStates;
 }
 
 export const DEFAULT_SETTINGS: ExtraboardSettings = {
@@ -189,4 +196,5 @@ export const DEFAULT_SETTINGS: ExtraboardSettings = {
 	weekStart: 'auto',
 	dateHighlights: [],
 	reduceBoardFileWrites: false,
+	boardState: {},
 };

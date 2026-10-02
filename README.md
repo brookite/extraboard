@@ -32,8 +32,17 @@ with its own file format, not a fork.
   and a due date shows on both days, and once where they fall on the same one.
   Today is highlighted, and week numbers can be shown per view.
 - **Filters and sorting for a list:** a condition builder with AND / OR / NOT
-  groups over any property plus the card's own text, tags, checkbox and linked
-  note, and as many sort keys as you like, each with its own direction.
+  groups over any property plus the card's own text, tags, checkbox, linked
+  note, stack and section, and as many sort keys as you like, each with its own
+  direction.
+- **Daily and weekly digests:** a board can show the cards of the day or the
+  week in a window at a chosen time — with last period's completed cards in a
+  collapsible section — the first time Obsidian checks after that time.
+- **Reminders:** per-board rules on a date property — once, or at every launch
+  until a condition is met, at any number of minutes, hours, days, weeks or
+  months before or after the date — gathered into sections named by their
+  comment. Digests and reminders are checked for boards open in a tab; cards
+  are edited right in the window.
 - **Per-view card settings:** choose which property badges, tags, checkbox,
   progress and color a view draws — remembered per view, across restarts.
 - **Drag and drop** cards within and across stacks — including collapsed

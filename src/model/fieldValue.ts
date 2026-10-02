@@ -15,19 +15,34 @@ import type { BoardConfig, Card, PropertyValue } from './types';
  * A card's own conceptual properties (§2.2): the ones every card has without
  * the board declaring them.
  */
-export type BuiltinField = 'title' | 'tags' | 'done' | 'note';
+export type BuiltinField = 'title' | 'tags' | 'done' | 'note' | 'stack' | 'section';
 
 export type FieldRef =
 	| { kind: 'property'; name: string }
 	| { kind: 'builtin'; id: BuiltinField };
 
 /** The shape of a field, which is what decides the operators it offers (§3). */
-export type FieldKind = 'text' | 'number' | 'bool' | 'date' | 'list' | 'link';
+export type FieldKind = 'text' | 'number' | 'bool' | 'date' | 'list' | 'link' | 'choice';
+
+/**
+ * Where a card sits on the board: its stack's name and the name of its named
+ * divider (`''` when it is under none). Not a fact about the card itself, so a
+ * reader only knows it when the caller says (digest-and-reminders.md §7).
+ */
+export interface CardPlace {
+	stack: string;
+	section: string;
+}
 
 export interface FieldCtx {
 	config: BoardConfig;
 	/** Today, for the one thing that moves on its own: a repetition rule (§2.3). */
 	today: CalDate;
+	/**
+	 * The card's place on the board, for `@stack` and `@section`. Absent — or
+	 * answering `undefined` — and both fields read as unanswered.
+	 */
+	where?: (card: Card) => CardPlace | undefined;
 }
 
 export type FieldValue =
@@ -58,6 +73,7 @@ export function fieldKind(config: BoardConfig, field: FieldRef): FieldKind {
 	if (field.kind === 'builtin') {
 		if (field.id === 'tags') return 'list';
 		if (field.id === 'done') return 'bool';
+		if (field.id === 'stack' || field.id === 'section') return 'choice';
 		return field.id === 'note' ? 'link' : 'text';
 	}
 	const def = config.properties.find((p) => p.name === field.name);
@@ -157,6 +173,11 @@ export function readField(card: Card, field: FieldRef, ctx: FieldCtx): FieldValu
 			case 'note': {
 				const link = parseCardLink(card.title);
 				return link ? { kind: 'text', text: link.linktext } : { kind: 'none' };
+			}
+			case 'stack':
+			case 'section': {
+				const name = ctx.where?.(card)?.[field.id] ?? '';
+				return name ? { kind: 'text', text: name } : { kind: 'none' };
 			}
 		}
 	}

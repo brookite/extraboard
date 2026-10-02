@@ -3660,3 +3660,38 @@ body.is-mobile .eb-card-stack {
 .eb-keyboard-aware.is-keyboard-open .eb-tag-picker-list {
 	max-height: none;
 }
+
+/* ---------------------------------------------------------------------------
+   Digest and reminder modals (digest-and-reminders.md §5): the list view's
+   sections inside a modal, with a toolbar for the session filter.
+   --------------------------------------------------------------------------- */
+
+.eb-digest-modal {
+	width: min(720px, 100%);
+}
+
+.eb-digest-toolbar .eb-digest-period {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small, 0.9em);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.eb-digest .eb-section-body.eb-digest-empty {
+	min-height: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller, 0.8em);
+}
+
+.eb-digest-time {
+	width: auto;
+}
+
+/* The offset rows carry their own top margin; the button under them needs one
+   too, or it sits flush against the last row's dropdowns. */
+.eb-reminder-add-offset {
+	margin-top: 8px;
+}

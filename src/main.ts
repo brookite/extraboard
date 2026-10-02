@@ -9,6 +9,9 @@ import {
 	normalizePath,
 } from 'obsidian';
 import { DEFAULT_SETTINGS, ExtraboardSettings } from './settings';
+import { BoardScheduler } from './schedule/scheduler';
+import { deleteBoardState, readBoardStates, renameBoardState } from './schedule/state';
+import type { DigestKind } from './model/digest';
 import { BoardSettingsModal } from './ui/BoardSettingsModal';
 import { cloneDefs } from './ui/PropertyDefsEditor';
 import { ExtraboardSettingTab } from './ui/SettingsTab';
@@ -22,6 +25,8 @@ import { setLanguage, t } from './i18n';
 
 export default class ExtraboardPlugin extends Plugin {
 	settings!: ExtraboardSettings;
+	/** Decides when digests and reminders are shown (digest-and-reminders.md §2). */
+	scheduler = new BoardScheduler(this);
 	/** Files the user just switched to Markdown; skip one auto-open for them. */
 	private suppressed = new Set<string>();
 	/** "Open as board" buttons added to Markdown views, keyed by view instance. */
@@ -101,6 +106,23 @@ export default class ExtraboardPlugin extends Plugin {
 			},
 		});
 
+		// Show a digest now, whatever was shown before — also the manual way to
+		// look at it again (digest-and-reminders.md §8).
+		const digestCommand = (id: string, name: string, kind: DigestKind): void => {
+			this.addCommand({
+				id,
+				name,
+				checkCallback: (checking: boolean) => {
+					const view = this.app.workspace.getActiveViewOfType(BoardView);
+					if (!view?.board?.config.digest?.[kind]) return false;
+					if (!checking) this.scheduler.showDigest(view, kind);
+					return true;
+				},
+			});
+		};
+		digestCommand('show-daily-digest', t('command.showDailyDigest'), 'daily');
+		digestCommand('show-weekly-digest', t('command.showWeeklyDigest'), 'weekly');
+
 		this.addCommand({
 			id: 'open-archive',
 			name: t('command.openArchive'),
@@ -150,14 +172,42 @@ export default class ExtraboardPlugin extends Plugin {
 		// cache is warm, so the patch cannot detect them; reconcile once ready.
 		this.app.workspace.onLayoutReady(() => {
 			void this.convertOpenBoards();
+			this.scheduler.request();
 		});
+
+		// What this device has shown follows a board file around, and goes with it
+		// (digest-and-reminders.md §9).
+		this.registerEvent(
+			this.app.vault.on('rename', (file, oldPath) => {
+				this.scheduler.forget(oldPath);
+				const next = renameBoardState(this.settings.boardState, oldPath, file.path);
+				if (next === this.settings.boardState) return;
+				this.settings.boardState = next;
+				void this.saveSettings();
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on('delete', (file) => {
+				this.scheduler.forget(file.path);
+				const next = deleteBoardState(this.settings.boardState, file.path);
+				if (next === this.settings.boardState) return;
+				this.settings.boardState = next;
+				void this.saveSettings();
+			}),
+		);
 
 		// Relative date labels ("in 3 days") and future date-highlight rules are
 		// facts about the current moment, not the file — recomputed by a plain
 		// re-render, never a save (i18n-and-dates.md §4). A minute is the finest
 		// unit a relative label ever shows, so that is how often this needs to run;
 		// switching back to a board tab also catches up immediately.
-		this.registerInterval(window.setInterval(() => this.tickBoards(), 60_000));
+		// The same tick is when a digest's time or a reminder's trigger is noticed.
+		this.registerInterval(
+			window.setInterval(() => {
+				this.tickBoards();
+				this.scheduler.request();
+			}, 60_000),
+		);
 		this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.tickBoards()));
 
 		// A highlight's text color is derived from its background, which may be a
@@ -390,6 +440,8 @@ export default class ExtraboardPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			(await this.loadData()) as Partial<ExtraboardSettings>,
 		);
+		// An owned copy: the defaults' object must never be the one mutated.
+		this.settings.boardState = readBoardStates(this.settings.boardState);
 	}
 
 	async saveSettings() {

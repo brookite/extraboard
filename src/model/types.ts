@@ -6,6 +6,8 @@ import type { ChecklistItem } from './checklist';
 // Type-only, so the `dateHighlights.ts` <-> `types.ts` pair stays a compile-time
 // cycle that erases away, exactly like `ChecklistItem` above.
 import type { DateHighlightRule } from './dateHighlights';
+import type { DigestConfig } from './digest';
+import type { ReminderDef } from './reminders';
 import type { FilterNode } from './filter';
 import type { SortRule } from './sort';
 
@@ -181,6 +183,10 @@ export interface BoardConfig {
 	 * all (i18n-and-dates.md §3.2).
 	 */
 	dateHighlights?: DateHighlightRule[];
+	/** Daily / weekly digest definitions; absent = off (digest-and-reminders.md §3). */
+	digest?: DigestConfig;
+	/** Reminder definitions, in modal order (digest-and-reminders.md §4). */
+	reminders?: ReminderDef[];
 }
 
 /** Ordered, discriminated card property values. Spec: properties.md. */

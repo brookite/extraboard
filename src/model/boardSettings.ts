@@ -13,7 +13,17 @@ import {
 	ViewDef,
 	ViewDisplay,
 } from './types';
-import { normalizeViews, parseViews } from './views';
+import { normalizeViews, parseViews, toFilter, toSortRules } from './views';
+import { parseMinutesClock, formatMinutesClock } from './dates';
+import { DEFAULT_DIGEST_TIME, type DigestConfig, type DigestDef } from './digest';
+import {
+	REMINDER_UNITS,
+	isReminderId,
+	nextReminderId,
+	type ReminderDef,
+	type ReminderOffset,
+	type ReminderUnit,
+} from './reminders';
 import { fieldId } from './fieldValue';
 import { isEmptyFilter, type FilterNode } from './filter';
 import type { SortRule } from './sort';
@@ -98,6 +108,95 @@ function toPropertyDef(v: unknown): PropertyDef | null {
 	return def;
 }
 
+/** Non-empty, de-duplicated, trimmed names; `undefined` when there are none. */
+function toNameList(v: unknown): string[] | undefined {
+	if (!Array.isArray(v)) return undefined;
+	const out: string[] = [];
+	for (const entry of v) {
+		const name = asString(entry)?.trim();
+		if (name && !out.includes(name)) out.push(name);
+	}
+	return out.length ? out : undefined;
+}
+
+/** One digest kind (digest-and-reminders.md §3.1); `undefined` = off. */
+function toDigestDef(v: unknown, weekly: boolean): DigestDef | undefined {
+	if (!isRecord(v)) return undefined;
+	const minutes = parseMinutesClock(asString(v.time) ?? '');
+	const properties = toNameList(v.properties);
+	const filter = toFilter(v.filter);
+	const sorts = toSortRules(v.sorts);
+	const weekStart = v.weekStart;
+	return {
+		time: minutes === null ? DEFAULT_DIGEST_TIME : formatMinutesClock(minutes),
+		...(properties && { properties }),
+		...(weekly &&
+			typeof weekStart === 'number' &&
+			Number.isInteger(weekStart) &&
+			weekStart >= 0 &&
+			weekStart <= 6 && { weekStart }),
+		...(filter && { filter }),
+		...(sorts && { sorts }),
+	};
+}
+
+function toDigest(v: unknown): DigestConfig | undefined {
+	if (!isRecord(v)) return undefined;
+	const daily = toDigestDef(v.daily, false);
+	const weekly = toDigestDef(v.weekly, true);
+	if (!daily && !weekly) return undefined;
+	return { ...(daily && { daily }), ...(weekly && { weekly }) };
+}
+
+function toOffset(v: unknown): ReminderOffset | null {
+	if (!isRecord(v)) return null;
+	const unit = asString(v.unit);
+	if (!unit || !REMINDER_UNITS.includes(unit as ReminderUnit)) return null;
+	if (typeof v.amount !== 'number' || !Number.isInteger(v.amount) || v.amount < 0) return null;
+	return { dir: v.dir === 'before' ? 'before' : 'after', amount: v.amount, unit: unit as ReminderUnit };
+}
+
+/**
+ * One reminder (§4.1). Without a property it cannot fire, so it is dropped, as
+ * an unparseable property definition is; a bad offset costs only itself.
+ */
+function toReminder(v: unknown, id: string): ReminderDef | null {
+	if (!isRecord(v)) return null;
+	const property = asString(v.property)?.trim();
+	if (!property) return null;
+	const repeat = v.repeat === 'launch' ? 'launch' : 'once';
+	const offsets = Array.isArray(v.offsets)
+		? v.offsets.map(toOffset).filter((o): o is ReminderOffset => o !== null)
+		: [];
+	const filter = toFilter(v.filter);
+	const endFilter = repeat === 'launch' ? toFilter(v.endFilter) : undefined;
+	const sorts = toSortRules(v.sorts);
+	return {
+		id,
+		comment: asString(v.comment)?.trim() ?? '',
+		property,
+		repeat,
+		offsets,
+		...(filter && { filter }),
+		...(endFilter && { endFilter }),
+		...(sorts && { sorts }),
+	};
+}
+
+/** The reminder list; ids kept when well formed and unique, generated otherwise. */
+function toReminders(v: unknown): ReminderDef[] | undefined {
+	if (!Array.isArray(v)) return undefined;
+	const out: ReminderDef[] = [];
+	for (const entry of v) {
+		const wanted = isRecord(entry) ? asString(entry.id)?.trim() : undefined;
+		const id =
+			wanted && isReminderId(wanted) && !out.some((r) => r.id === wanted) ? wanted : nextReminderId(out);
+		const reminder = toReminder(entry, id);
+		if (reminder) out.push(reminder);
+	}
+	return out.length ? out : undefined;
+}
+
 /** Read a decoded settings object into a BoardConfig, applying every default. */
 export function toConfig(raw: unknown): BoardConfig {
 	const config: BoardConfig = defaultBoardConfig();
@@ -133,6 +232,11 @@ export function toConfig(raw: unknown): BoardConfig {
 			.map(toPropertyDef)
 			.filter((d): d is PropertyDef => d !== null);
 	}
+
+	const digest = toDigest(raw.digest);
+	if (digest) config.digest = digest;
+	const reminders = toReminders(raw.reminders);
+	if (reminders) config.reminders = reminders;
 
 	config.views = normalizeViews(parseViews(raw.views));
 	const active = asString(raw.activeView)?.trim();
@@ -229,6 +333,39 @@ function viewToPlain(v: ViewDef): Record<string, unknown> {
 	return out;
 }
 
+function digestDefToPlain(def: DigestDef): Record<string, unknown> {
+	return {
+		time: def.time,
+		...(def.properties?.length && { properties: def.properties }),
+		...(def.weekStart !== undefined && { weekStart: def.weekStart }),
+		...(def.filter && !isEmptyFilter(def.filter) && { filter: filterToPlain(def.filter) }),
+		...(def.sorts?.length && { sorts: sortsToPlain(def.sorts) }),
+	};
+}
+
+function digestToPlain(digest: DigestConfig | undefined): Record<string, unknown> | undefined {
+	if (!digest) return undefined;
+	const out: Record<string, unknown> = {};
+	if (digest.daily) out.daily = digestDefToPlain(digest.daily);
+	if (digest.weekly) out.weekly = digestDefToPlain(digest.weekly);
+	return Object.keys(out).length ? out : undefined;
+}
+
+function reminderToPlain(r: ReminderDef): Record<string, unknown> {
+	return {
+		id: r.id,
+		...(r.comment && { comment: r.comment }),
+		property: r.property,
+		repeat: r.repeat,
+		...(r.offsets.length && { offsets: r.offsets.map((o) => ({ ...o })) }),
+		...(r.filter && !isEmptyFilter(r.filter) && { filter: filterToPlain(r.filter) }),
+		...(r.repeat === 'launch' &&
+			r.endFilter &&
+			!isEmptyFilter(r.endFilter) && { endFilter: filterToPlain(r.endFilter) }),
+		...(r.sorts?.length && { sorts: sortsToPlain(r.sorts) }),
+	};
+}
+
 /** Minimal, empty-pruned plain object written into the settings block. */
 export function configToPlain(config: BoardConfig): Record<string, unknown> {
 	const out: Record<string, unknown> = { version: config.version };
@@ -247,6 +384,9 @@ export function configToPlain(config: BoardConfig): Record<string, unknown> {
 	// An empty array is written on purpose — it is how a board says "no
 	// highlights" instead of "follow the plugin setting".
 	if (config.dateHighlights) out.dateHighlights = config.dateHighlights;
+	const digest = digestToPlain(config.digest);
+	if (digest) out.digest = digest;
+	if (config.reminders?.length) out.reminders = config.reminders.map(reminderToPlain);
 	if (config.properties.length) out.properties = config.properties;
 	if (Object.keys(config.tagColors).length) out.tagColors = config.tagColors;
 	return out;

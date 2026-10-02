@@ -19,6 +19,7 @@ export const OPS_BY_KIND: Record<FieldKind, readonly FilterOp[]> = {
 	bool: ['isSet'],
 	list: ['contains', 'isSet'],
 	link: ['linksTo', 'isSet'],
+	choice: ['equals', 'contains', 'isSet'],
 };
 
 /** What the row shows for the operand. */

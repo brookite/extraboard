@@ -8,6 +8,10 @@ import type { BadgeColor, Board, BoardConfig, ProgressStyle, PropertyDef } from 
 import { colorField } from './ColorPicker';
 import { PropertyDefsEditor, cloneDefs } from './PropertyDefsEditor';
 import { DateHighlightsEditor } from './DateHighlightsEditor';
+import { DigestEditor, cloneJson } from './DigestEditor';
+import { RemindersEditor } from './RemindersEditor';
+import type { DigestConfig } from '../model/digest';
+import type { ReminderDef } from '../model/reminders';
 import { FolderSuggest } from './FolderSuggest';
 import { cloneRules, type DateHighlightRule } from '../model/dateHighlights';
 import { kanbanView, listView } from '../model/views';
@@ -41,6 +45,10 @@ export class BoardSettingsModal extends Modal {
 	private highlights?: DateHighlightRule[];
 	private highlightsEl?: HTMLElement;
 	private highlightsEditor?: DateHighlightsEditor;
+	private digest?: DigestConfig;
+	private digestEditor?: DigestEditor;
+	private reminders?: ReminderDef[];
+	private remindersEditor?: RemindersEditor;
 	private saved = false;
 
 	constructor(
@@ -52,6 +60,8 @@ export class BoardSettingsModal extends Modal {
 		this.config = { ...config };
 		this.properties = cloneDefs(config.properties);
 		this.highlights = config.dateHighlights ? cloneRules(config.dateHighlights) : undefined;
+		this.digest = config.digest ? cloneJson(config.digest) : undefined;
+		this.reminders = config.reminders ? cloneJson(config.reminders) : undefined;
 		this.tags = Object.entries(config.tagColors).map(([tag, color]) => ({
 			tag,
 			color: { ...color },
@@ -208,6 +218,39 @@ export class BoardSettingsModal extends Modal {
 		this.highlightsEl = contentEl.createDiv();
 		this.renderHighlights();
 
+		// Digests and reminders (digest-and-reminders.md §6). Their property
+		// pickers and filters read the draft, so they follow its property list.
+		const definitions = {
+			properties: () => this.properties,
+			config: () => this.nextConfig(),
+			...(this.options.board && { board: this.options.board }),
+		};
+		new Setting(contentEl).setName(t('digest.editor.heading')).setHeading();
+		contentEl.createDiv({ cls: 'setting-item-description', text: t('digest.editor.desc') });
+		this.digestEditor = new DigestEditor(
+			this.app,
+			contentEl.createDiv(),
+			this.digest,
+			(digest) => {
+				this.digest = digest;
+			},
+			definitions,
+		);
+		this.digestEditor.render();
+
+		new Setting(contentEl).setName(t('reminder.editor.heading')).setHeading();
+		contentEl.createDiv({ cls: 'setting-item-description', text: t('reminder.editor.desc') });
+		this.remindersEditor = new RemindersEditor(
+			this.app,
+			contentEl.createDiv(),
+			this.reminders,
+			(reminders) => {
+				this.reminders = reminders;
+			},
+			definitions,
+		);
+		this.remindersEditor.render();
+
 		new Setting(contentEl).setName(t('modal.boardSettings.properties.heading')).setHeading();
 		contentEl.createDiv({
 			cls: 'setting-item-description',
@@ -218,6 +261,8 @@ export class BoardSettingsModal extends Modal {
 			this.properties = defs;
 			// The rule rows pick their property from this list, so they follow it.
 			this.highlightsEditor?.render();
+			this.digestEditor?.render();
+			this.remindersEditor?.render();
 			this.renderImpact();
 		});
 		editor.render();
@@ -337,6 +382,10 @@ export class BoardSettingsModal extends Modal {
 		// "follow the plugin" is the absence of the key (§3.2).
 		if (this.highlights) config.dateHighlights = cloneRules(this.highlights);
 		else delete config.dateHighlights;
+		if (this.digest) config.digest = cloneJson(this.digest);
+		else delete config.digest;
+		if (this.reminders?.length) config.reminders = cloneJson(this.reminders);
+		else delete config.reminders;
 		return config;
 	}
 

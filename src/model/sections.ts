@@ -9,8 +9,9 @@
 // on to the next named divider, so a `---` below a `### name` subdivides that
 // section instead of opening one of its own.
 
+import type { CardPlace } from './fieldValue';
 import type { ItemRef } from './ops';
-import type { Board, Divider, ListGroupBy, Stack } from './types';
+import type { Board, Card, Divider, ListGroupBy, Stack } from './types';
 
 /**
  * What identifies a section. `named` merges across stacks and is the only kind
@@ -243,4 +244,39 @@ export function stackRuns(stack: Stack): StackRun[] {
 		at = i;
 	}
 	return runs;
+}
+
+/**
+ * Every card's stack and named section, for the `@stack` / `@section` filter
+ * fields (digest-and-reminders.md §7). The index is built on the first question
+ * and only then, so a filter that never names either field costs nothing.
+ */
+export function placesOf(board: Board): (card: Card) => CardPlace | undefined {
+	let index: Map<Card, CardPlace> | null = null;
+	return (card) => {
+		if (!index) {
+			const built = new Map<Card, CardPlace>();
+			for (const stack of board.stacks) {
+				let section = '';
+				for (const entry of stack.items) {
+					if (entry.kind === 'card') built.set(entry.card, { stack: stack.name, section });
+					else if (isNamedDivider(entry.divider)) section = sectionName(entry.divider.name);
+				}
+			}
+			index = built;
+		}
+		return index.get(card);
+	};
+}
+
+/** Stack names and named-section names, de-duplicated, in board order. */
+export function boardNames(board: Board): { stacks: string[]; sections: string[] } {
+	const stacks: string[] = [];
+	for (const stack of board.stacks) {
+		if (stack.name && !stacks.includes(stack.name)) stacks.push(stack.name);
+	}
+	const sections = sectionsOf(board)
+		.filter((section) => section.key.kind === 'named')
+		.map((section) => section.name);
+	return { stacks, sections };
 }

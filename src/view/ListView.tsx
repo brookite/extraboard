@@ -11,6 +11,7 @@ import { countConditions, filterCards, isEmptyFilter, type FilterNode } from '..
 import * as ops from '../model/ops';
 import {
 	groupsOf,
+	placesOf,
 	sameKey,
 	sectionOf,
 	sectionsOf,
@@ -104,7 +105,8 @@ export function ListView({ board, view, api, settings }: Props) {
 	const sections = groupsOf(board, groupBy);
 	// Filters ask about dates, and a repetition rule's answer moves at midnight,
 	// so the clock is part of the query (filters-and-sorting.md §2.3).
-	const ctx = { config: board.config, today: useNow().date };
+	// `@stack` / `@section` read the card's place, indexed only if asked for.
+	const ctx = { config: board.config, today: useNow().date, where: placesOf(board) };
 
 	/**
 	 * A section's collapse (§1.4, §5). An anonymous section's is its divider's own

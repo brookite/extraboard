@@ -22,9 +22,10 @@ import {
 	replaceNode,
 } from '../model/filter';
 import type { SortRule } from '../model/sort';
+import { boardNames } from '../model/sections';
 import { tagsOf } from '../model/sectionView';
 import type { Board, BoardConfig } from '../model/types';
-import { GroupNode, groupOrdinals } from '../view/components/FilterTree';
+import { GroupNode, groupOrdinals, type FieldChoices } from '../view/components/FilterTree';
 import { SortList } from '../view/components/SortList';
 import type { DropInfo } from '../view/useSortable';
 import { t } from '../i18n';
@@ -35,8 +36,22 @@ export interface FilterSortResult {
 	sorts: SortRule[];
 }
 
+/** Which halves of the editor are offered. */
+export type FilterSortTabs = 'both' | 'filters' | 'sorts';
+
 export interface FilterSortModalOptions {
-	board: Board;
+	/** The board whose tags, stacks and sections the operands offer. Absent
+	 * while a board is being created: there is nothing to suggest yet. */
+	board?: Board;
+	/**
+	 * The configuration fields are read from; defaults to the board's. Board
+	 * settings passes its draft, whose properties may not be saved yet.
+	 */
+	config?: BoardConfig;
+	/** The heading; defaults to "Filters and sorting". */
+	title?: string;
+	/** Default `both`. A reminder's end filter has no order to set, for one. */
+	tabs?: FilterSortTabs;
 	filter?: FilterNode;
 	sorts?: SortRule[];
 	/** The whole result at once — one edit, one save. */
@@ -57,19 +72,21 @@ function rootOf(filter: FilterNode | undefined): FilterGroup {
 function Editor({
 	app,
 	config,
-	tags,
+	choices,
+	tabs,
 	initial,
 	onApply,
 	onCancel,
 }: {
 	app: App;
 	config: BoardConfig;
-	tags: string[];
+	choices: FieldChoices;
+	tabs: FilterSortTabs;
 	initial: { filter?: FilterNode; sorts?: SortRule[] };
 	onApply: (result: FilterSortResult) => void;
 	onCancel: () => void;
 }) {
-	const [tab, setTab] = useState<'filters' | 'sorts'>('filters');
+	const [tab, setTab] = useState<'filters' | 'sorts'>(tabs === 'sorts' ? 'sorts' : 'filters');
 	const [root, setRoot] = useState<FilterGroup>(() => rootOf(initial.filter));
 	const [sorts, setSorts] = useState<SortRule[]>(() => (initial.sorts ?? []).map((r) => ({ ...r })));
 
@@ -105,22 +122,26 @@ function Editor({
 	return (
 		<div class="eb-filter-modal-body">
 			<div class="eb-filter-tabs">
-				<button
-					type="button"
-					class={tab === 'filters' ? 'is-active' : ''}
-					onClick={() => setTab('filters')}
-				>
-					{t('filter.filtersTab')}
-					{count > 0 ? <span class="eb-filter-count">{count}</span> : null}
-				</button>
-				<button
-					type="button"
-					class={tab === 'sorts' ? 'is-active' : ''}
-					onClick={() => setTab('sorts')}
-				>
-					{t('filter.sortTab')}
-					{sorts.length > 0 ? <span class="eb-filter-count">{sorts.length}</span> : null}
-				</button>
+				{tabs !== 'sorts' ? (
+					<button
+						type="button"
+						class={tab === 'filters' ? 'is-active' : ''}
+						onClick={() => setTab('filters')}
+					>
+						{t('filter.filtersTab')}
+						{count > 0 ? <span class="eb-filter-count">{count}</span> : null}
+					</button>
+				) : null}
+				{tabs !== 'filters' ? (
+					<button
+						type="button"
+						class={tab === 'sorts' ? 'is-active' : ''}
+						onClick={() => setTab('sorts')}
+					>
+						{t('filter.sortTab')}
+						{sorts.length > 0 ? <span class="eb-filter-count">{sorts.length}</span> : null}
+					</button>
+				) : null}
 				{tab === 'filters' ? (
 					// The top-level operator sits in the corner, above the tree it
 					// governs: it is a property of the whole filter, not of a row (§4.1).
@@ -147,7 +168,7 @@ function Editor({
 				<GroupNode
 					app={app}
 					config={config}
-					tags={tags}
+					choices={choices}
 					root={root}
 					group={root}
 					path={[]}
@@ -189,18 +210,22 @@ class FilterSortModal extends Modal {
 	override onOpen(): void {
 		keyboardAwareModal(this);
 		this.modalEl.addClass('eb-filter-modal');
-		this.titleEl.setText(t('filter.title'));
+		this.titleEl.setText(this.options.title ?? t('filter.title'));
 		const { board } = this.options;
+		const config = this.options.config ?? board?.config;
+		if (!config) return;
 		// Every tag on the board, so a tag condition suggests instead of asking the
-		// user to remember (§3.3).
-		const refs = board.stacks.flatMap((stack, s) =>
+		// user to remember (§3.3); the stack and section names likewise.
+		const refs = (board?.stacks ?? []).flatMap((stack, s) =>
 			stack.items.map((_, i) => ({ stack: s, item: i })),
 		);
+		const names = board ? boardNames(board) : { stacks: [], sections: [] };
 		render(
 			<Editor
 				app={this.app}
-				config={board.config}
-				tags={tagsOf(board, refs)}
+				config={config}
+				choices={{ tags: board ? tagsOf(board, refs) : [], ...names }}
+				tabs={this.options.tabs ?? 'both'}
 				initial={{ filter: this.options.filter, sorts: this.options.sorts }}
 				onApply={(result) => {
 					this.options.onApply(result);

@@ -2,7 +2,7 @@
 // manages the underlying Markdown file (load/save, tab, rename, delete).
 // Spec: docs/specs/kanban-view.md §1, §6.
 
-import { HoverPopover, Menu, Notice, Platform, TextFileView, WorkspaceLeaf, setIcon } from 'obsidian';
+import { HoverPopover, Menu, Notice, Platform, TextFileView, TFile, WorkspaceLeaf, setIcon } from 'obsidian';
 import { render } from 'preact';
 import type ExtraboardPlugin from '../main';
 import type { Board } from '../model/types';
@@ -98,6 +98,22 @@ export class BoardView extends TextFileView {
 
 	getViewType(): string {
 		return VIEW_TYPE_BOARD;
+	}
+
+	/**
+	 * The board's editing surface, for UI that lives outside this view's tree but
+	 * edits this board — the digest and reminder modals
+	 * (digest-and-reminders.md §5).
+	 */
+	getApi(): BoardApi {
+		return this.api;
+	}
+
+	/** A board becoming open is one of the moments digests and reminders are
+	 * checked (digest-and-reminders.md §2). */
+	override async onLoadFile(file: TFile): Promise<void> {
+		await super.onLoadFile(file);
+		this.plugin.scheduler.request();
 	}
 
 	getIcon(): string {

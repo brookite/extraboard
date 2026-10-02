@@ -264,13 +264,20 @@ function toSectionState(v: unknown): SectionState | undefined {
 
 // --- filters and sorting (filters-and-sorting.md §5) ------------------------
 
-/** A field reference: `@title`/`@tags`/`@done`/`@note`, else a property name. */
-function toFieldRef(v: unknown): FieldRef | null {
+/** A field reference: `@title`/`@tags`/`@done`/`@note`/`@stack`/`@section`, else a property name. */
+export function toFieldRef(v: unknown): FieldRef | null {
 	const raw = asString(v)?.trim();
 	if (!raw) return null;
 	if (!raw.startsWith('@')) return { kind: 'property', name: raw };
 	const id = raw.slice(1);
-	if (id === 'title' || id === 'tags' || id === 'done' || id === 'note') {
+	if (
+		id === 'title' ||
+		id === 'tags' ||
+		id === 'done' ||
+		id === 'note' ||
+		id === 'stack' ||
+		id === 'section'
+	) {
 		return { kind: 'builtin', id };
 	}
 	return null;
