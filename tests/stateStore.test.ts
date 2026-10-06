@@ -28,24 +28,6 @@ describe('BoardStateStore', () => {
 		expect(host.writes).toBe(0);
 	});
 
-	it('starts a device without state from the legacy data.json block, once', () => {
-		const host = fakeHost();
-		const store = BoardStateStore.open(host, { 'a.md': { digest: { daily: '2026-10-02' } } });
-		expect(store.get('a.md')).toEqual({ digest: { daily: '2026-10-02' } });
-		expect(host.data.get(BOARD_STATE_KEY)).toEqual({ 'a.md': { digest: { daily: '2026-10-02' } } });
-
-		// Once the device has its own state, the legacy block is ignored.
-		const again = BoardStateStore.open(host, { 'a.md': { digest: { daily: '2020-01-01' } } });
-		expect(again.get('a.md')).toEqual({ digest: { daily: '2026-10-02' } });
-	});
-
-	it('writes nothing for an empty legacy block', () => {
-		const host = fakeHost();
-		BoardStateStore.open(host, {});
-		BoardStateStore.open(host);
-		expect(host.writes).toBe(0);
-	});
-
 	it('persists sets, collapses, renames and deletes', () => {
 		const host = fakeHost();
 		const store = BoardStateStore.open(host);

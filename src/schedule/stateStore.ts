@@ -27,15 +27,9 @@ export class BoardStateStore {
 		private states: BoardStates,
 	) {}
 
-	/**
-	 * The device's stored state. A device with none yet starts from `legacy` —
-	 * the `boardState` an earlier version kept in `data.json` — once.
-	 */
-	static open(host: LocalStorageHost, legacy?: unknown): BoardStateStore {
-		const stored = host.loadLocalStorage(BOARD_STATE_KEY);
-		const store = new BoardStateStore(host, readBoardStates(stored ?? legacy));
-		if (stored == null && Object.keys(store.states).length) store.persist();
-		return store;
+	/** The device's stored state; empty on a device with none. */
+	static open(host: LocalStorageHost): BoardStateStore {
+		return new BoardStateStore(host, readBoardStates(host.loadLocalStorage(BOARD_STATE_KEY)));
 	}
 
 	get(path: string): BoardState {

@@ -10,6 +10,7 @@ import {
 } from 'obsidian';
 import { DEFAULT_SETTINGS, ExtraboardSettings } from './settings';
 import { BoardScheduler } from './schedule/scheduler';
+import { migrateLegacyBoardState } from './schedule/legacyBoardState';
 import { BoardStateStore } from './schedule/stateStore';
 import type { DigestKind } from './model/digest';
 import { BoardSettingsModal } from './ui/BoardSettingsModal';
@@ -434,11 +435,11 @@ export default class ExtraboardPlugin extends Plugin {
 		const stored = (await this.loadData()) as
 			| (Partial<ExtraboardSettings> & { boardState?: unknown })
 			| null;
-		const { boardState: legacy, ...rest } = stored ?? {};
+		// MIGRATION from 0.7.0, to be deleted (legacyBoardState.ts).
+		const { rest, found } = migrateLegacyBoardState(this.app, stored);
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, rest);
-		this.boardStates = BoardStateStore.open(this.app, legacy);
-		// Up to 0.7.0 the state lived in `data.json`, which sync rewrote once a minute.
-		if (legacy !== undefined) await this.saveSettings();
+		this.boardStates = BoardStateStore.open(this.app);
+		if (found) await this.saveSettings();
 	}
 
 	async saveSettings() {
