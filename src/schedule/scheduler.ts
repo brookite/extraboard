@@ -150,15 +150,14 @@ export class BoardScheduler {
 		const clock = new Date();
 		const now = nowStamp(clock);
 		const ms = clock.getTime();
-		const states = this.plugin.settings.boardState;
-		let changed = false;
+		const store = this.plugin.boardStates;
 
 		for (const open of this.openBoards()) {
 			const board = await this.boardOf(open);
 			const config = board?.config;
 			if (!board || !config || (!config.digest && !config.reminders?.length)) continue;
 
-			const before = states[open.path] ?? {};
+			const before = store.get(open.path);
 			const next: BoardState = {
 				...before,
 				...(before.digest && { digest: { ...before.digest } }),
@@ -213,13 +212,8 @@ export class BoardScheduler {
 			}
 			for (const key of launched) this.launchSeen.add(key);
 
-			if (JSON.stringify(next) !== JSON.stringify(before)) {
-				states[open.path] = next;
-				changed = true;
-			}
+			if (JSON.stringify(next) !== JSON.stringify(before)) store.set(open.path, next);
 		}
-
-		if (changed) await this.plugin.saveSettings();
 	}
 
 	// --- modals -----------------------------------------------------------------
@@ -242,13 +236,8 @@ export class BoardScheduler {
 
 	private collapseFor(path: string): CollapseStore {
 		return {
-			get: (key) => this.plugin.settings.boardState[path]?.collapsed?.[key],
-			set: (key, collapsed) => {
-				const states = this.plugin.settings.boardState;
-				const state = states[path] ?? {};
-				states[path] = { ...state, collapsed: { ...state.collapsed, [key]: collapsed } };
-				void this.plugin.saveSettings();
-			},
+			get: (key) => this.plugin.boardStates.get(path).collapsed?.[key],
+			set: (key, collapsed) => this.plugin.boardStates.setCollapsed(path, key, collapsed),
 		};
 	}
 

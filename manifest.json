@@ -2,7 +2,7 @@
 	"id": "extraboard",
 	"name": "Extraboard",
 	"version": "0.7.0",
-	"minAppVersion": "1.4.10",
+	"minAppVersion": "1.8.7",
 	"description": "Markdown-backed Kanban and calendar boards with typed card properties, checklists, and an archive. Mobile-friendly.",
 	"author": "Brookit",
 	"authorUrl": "https://github.com/brookite",

@@ -10,7 +10,7 @@ import {
 } from 'obsidian';
 import { DEFAULT_SETTINGS, ExtraboardSettings } from './settings';
 import { BoardScheduler } from './schedule/scheduler';
-import { deleteBoardState, readBoardStates, renameBoardState } from './schedule/state';
+import { BoardStateStore } from './schedule/stateStore';
 import type { DigestKind } from './model/digest';
 import { BoardSettingsModal } from './ui/BoardSettingsModal';
 import { cloneDefs } from './ui/PropertyDefsEditor';
@@ -25,6 +25,8 @@ import { setLanguage, t } from './i18n';
 
 export default class ExtraboardPlugin extends Plugin {
 	settings!: ExtraboardSettings;
+	/** What this device has shown, in `localStorage` (digest-and-reminders.md §9). */
+	boardStates!: BoardStateStore;
 	/** Decides when digests and reminders are shown (digest-and-reminders.md §2). */
 	scheduler = new BoardScheduler(this);
 	/** Files the user just switched to Markdown; skip one auto-open for them. */
@@ -180,19 +182,13 @@ export default class ExtraboardPlugin extends Plugin {
 		this.registerEvent(
 			this.app.vault.on('rename', (file, oldPath) => {
 				this.scheduler.forget(oldPath);
-				const next = renameBoardState(this.settings.boardState, oldPath, file.path);
-				if (next === this.settings.boardState) return;
-				this.settings.boardState = next;
-				void this.saveSettings();
+				this.boardStates.rename(oldPath, file.path);
 			}),
 		);
 		this.registerEvent(
 			this.app.vault.on('delete', (file) => {
 				this.scheduler.forget(file.path);
-				const next = deleteBoardState(this.settings.boardState, file.path);
-				if (next === this.settings.boardState) return;
-				this.settings.boardState = next;
-				void this.saveSettings();
+				this.boardStates.delete(file.path);
 			}),
 		);
 
@@ -435,13 +431,14 @@ export default class ExtraboardPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<ExtraboardSettings>,
-		);
-		// An owned copy: the defaults' object must never be the one mutated.
-		this.settings.boardState = readBoardStates(this.settings.boardState);
+		const stored = (await this.loadData()) as
+			| (Partial<ExtraboardSettings> & { boardState?: unknown })
+			| null;
+		const { boardState: legacy, ...rest } = stored ?? {};
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, rest);
+		this.boardStates = BoardStateStore.open(this.app, legacy);
+		// Up to 0.7.0 the state lived in `data.json`, which sync rewrote once a minute.
+		if (legacy !== undefined) await this.saveSettings();
 	}
 
 	async saveSettings() {
