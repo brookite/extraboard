@@ -35,11 +35,6 @@ interface Due {
 	runs: ReminderRun[];
 }
 
-/** A deferred leaf's loader, present from Obsidian 1.7.2 (feature-detected). */
-interface MaybeDeferredLeaf {
-	loadIfDeferred?(): Promise<void>;
-}
-
 export class BoardScheduler {
 	private running = false;
 	private again = false;
@@ -129,15 +124,8 @@ export class BoardScheduler {
 	 * otherwise (§1).
 	 */
 	private async apiOf(open: OpenBoard): Promise<BoardApi | null> {
-		let view = open.leaf.view;
-		if (!(view instanceof BoardView)) {
-			// Not on the minimum app version, so only ever reached through this
-			// structural view of the leaf; an older app has no deferred tabs.
-			const deferred = open.leaf as unknown as MaybeDeferredLeaf;
-			if (typeof deferred.loadIfDeferred !== 'function') return null;
-			await deferred.loadIfDeferred();
-			view = open.leaf.view;
-		}
+		if (!(open.leaf.view instanceof BoardView)) await open.leaf.loadIfDeferred();
+		const view = open.leaf.view;
 		if (!(view instanceof BoardView) || !view.board || view.file?.path !== open.path) return null;
 		return view.getApi();
 	}
