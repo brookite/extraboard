@@ -1,3 +1,4 @@
+import { Platform } from 'obsidian';
 import { useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { Divider } from '../../model/types';
@@ -159,7 +160,10 @@ function DividerRowInner({ divider, stackIndex, index, api, hiddenCount, onAddCa
 			style={color ? `--eb-divider-color: ${color}` : undefined}
 			onContextMenu={(e) => {
 				e.preventDefault();
-				openMenu(e);
+				// A touch long-press picks the row up for a drag, and Chromium also
+				// synthesizes `contextmenu` for it — which opened the menu over the
+				// drag. On mobile, as for a card, the menu is the visible ⋯ only.
+				if (!Platform.isMobile && !isDragging()) openMenu(e);
 			}}
 		>
 			<button
