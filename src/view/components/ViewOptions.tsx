@@ -3,30 +3,35 @@
 //
 // A panel rather than an Obsidian `Menu`, because every row here is a *toggle*
 // and a menu closes on the first click — turning three badges off would mean
-// opening it three times. It hangs off the header button on desktop and rises
-// as a sheet on a phone (CSS), and every switch applies immediately through an
-// op, so what is on screen is what the file says.
+// opening it three times. It hangs off the header button on desktop; from the
+// ⋯ menu — the only way in on a phone — the same rows open in a modal
+// (`openViewOptionsModal`), which covers the mobile navbar and closes on Back.
+// Every switch applies immediately through an op, so what is on screen is what
+// the file says.
 
+import type { App } from 'obsidian';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import type { Board, ViewDef, ViewDisplay } from '../../model/types';
-import { dateProperties } from '../../model/views';
+import { activeViewOf, dateProperties } from '../../model/views';
+import { openPreactModal } from '../../ui/PreactModal';
 import type { BoardApi } from '../api';
 import { t } from '../../i18n';
 import { placeViewOptions, type Position } from '../viewOptionsPosition';
 
-interface Props {
+interface BodyProps {
 	board: Board;
 	view: ViewDef;
 	api: BoardApi;
+}
+
+interface Props extends BodyProps {
 	/**
-	 * The header action the panel hangs under, or `null` when it was opened from
-	 * the ⋯ menu — on a phone it is a bottom sheet and has nothing to hang from.
-	 * Kept as the element, not its box: the same element also has to be excluded
-	 * from the outside-click check, or pressing it again would close and reopen
-	 * the panel in one gesture.
+	 * The header action the panel hangs under. Kept as the element, not its box:
+	 * the same element also has to be excluded from the outside-click check, or
+	 * pressing it again would close and reopen the panel in one gesture.
 	 */
-	trigger: HTMLElement | null;
+	trigger: HTMLElement;
 	onClose: () => void;
 }
 
@@ -66,7 +71,7 @@ export function ViewOptions({ board, view, api, trigger, onClose }: Props) {
 			if (!(target instanceof Node)) return;
 			if (ref.current?.contains(target)) return;
 			// The trigger toggles by itself; closing here too would undo its work.
-			if (trigger?.contains(target)) return;
+			if (trigger.contains(target)) return;
 			onClose();
 		};
 		const onKeyDown = (evt: KeyboardEvent): void => {
@@ -85,7 +90,6 @@ export function ViewOptions({ board, view, api, trigger, onClose }: Props) {
 	// using the trigger's viewport `top` directly is what placed the panel far
 	// below its button in an offset workspace pane.
 	useLayoutEffect(() => {
-		if (!trigger) return;
 		const update = (): void => {
 			const panel = ref.current;
 			const root = panel?.closest('.eb-root');
@@ -105,6 +109,23 @@ export function ViewOptions({ board, view, api, trigger, onClose }: Props) {
 		return () => window.removeEventListener('resize', update);
 	}, [onClose, trigger]);
 
+	return (
+		<div
+			class="eb-view-options"
+			ref={ref}
+			style={
+				position
+					? `top: ${String(Math.round(position.top))}px; left: ${String(Math.round(position.left))}px`
+					: 'top: 0; left: 0; visibility: hidden'
+			}
+		>
+			<ViewOptionsBody board={board} view={view} api={api} />
+		</div>
+	);
+}
+
+/** The rows themselves, shared by the header panel and the modal. */
+function ViewOptionsBody({ board, view, api }: BodyProps) {
 	const display: ViewDisplay = view.display ?? {};
 	const hidden = display.hiddenProperties ?? [];
 	const patch = (next: Partial<ViewDisplay>): void => {
@@ -120,17 +141,7 @@ export function ViewOptions({ board, view, api, trigger, onClose }: Props) {
 	const dates = dateProperties(board.config);
 
 	return (
-		<div
-			class="eb-view-options"
-			ref={ref}
-			style={
-				trigger
-					? position
-						? `top: ${String(Math.round(position.top))}px; left: ${String(Math.round(position.left))}px`
-						: 'top: 0; left: 0; visibility: hidden'
-					: 'bottom: 0; right: 0; left: 0; top: auto'
-			}
-		>
+		<>
 			{badgeProps.length > 0 ? (
 				<>
 					<div class="eb-view-options-head">{t('viewOptions.properties')}</div>
@@ -239,6 +250,23 @@ export function ViewOptions({ board, view, api, trigger, onClose }: Props) {
 					</div>
 				</>
 			) : null}
-		</div>
+		</>
 	);
+}
+
+/**
+ * The same rows in a modal: what the ⋯ menu opens, and so all a phone has.
+ * Re-read from the board on every change, so a toggle shows its new state and
+ * a view switched underneath is followed rather than edited blind.
+ */
+export function openViewOptionsModal(app: App, api: BoardApi): void {
+	openPreactModal(app, {
+		title: t('viewOptions.title'),
+		cls: 'eb-view-options-modal',
+		body: () => {
+			const board = api.getBoard();
+			return board ? <ViewOptionsBody board={board} view={activeViewOf(board.config)} api={api} /> : null;
+		},
+		subscribe: (rerender) => api.onChange(rerender),
+	});
 }

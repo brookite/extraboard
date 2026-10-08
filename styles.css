@@ -309,22 +309,6 @@
 	white-space: normal;
 }
 
-/* On a phone the header button it would hang from is in the ⋯ menu, so the
-   panel rises from the bottom instead — the shape a touch UI expects
-   (mobile.md §4). */
-body.is-mobile .eb-view-options {
-	position: fixed;
-	top: auto !important;
-	right: 0 !important;
-	bottom: 0;
-	left: 0;
-	width: auto;
-	max-width: none;
-	max-height: 60vh;
-	border-radius: var(--radius-l, 12px) var(--radius-l, 12px) 0 0;
-	padding-bottom: calc(var(--size-4-4, 16px) + env(safe-area-inset-bottom, 0px));
-}
-
 /* Horizontal, scrollable row of stacks. */
 .eb-board {
 	display: flex;

@@ -23,7 +23,7 @@ import { BoardApi, confirmDestructive, searchTag } from './api';
 import { CalendarView } from './CalendarView';
 import { KanbanView, addStack } from './KanbanView';
 import { ListView } from './ListView';
-import { ViewOptions } from './components/ViewOptions';
+import { ViewOptions, openViewOptionsModal } from './components/ViewOptions';
 import { NowContext, currentNow } from './now';
 import { ReloadContext } from './reload';
 import { boardSaveNeeded, PluginSaveRequests } from './saveGuard';
@@ -47,8 +47,6 @@ export class BoardView extends TextFileView {
 	 * the panel has to survive the edits its own switches make.
 	 */
 	private optionsTrigger: HTMLElement | null = null;
-	/** Open, but with nothing to hang from — the ⋯ menu's path on a phone. */
-	private optionsOpen = false;
 	/** The in-board "now showing <view>" indicator, and the timer that fades it. */
 	private indicatorEl?: HTMLElement;
 	private indicatorTimer?: number;
@@ -150,7 +148,7 @@ export class BoardView extends TextFileView {
 		if (!full) return;
 
 		// The card settings of the active view, one tap from the board they change
-		// (views.md §5). On a phone the same panel opens from the ⋯ menu.
+		// (views.md §5). On a phone the same rows open as a modal from the ⋯ menu.
 		this.addAction(ICONS.viewOptions, t('viewOptions.title'), (event) => {
 			this.toggleViewOptions(event.currentTarget);
 		});
@@ -340,9 +338,12 @@ export class BoardView extends TextFileView {
 			item
 				.setTitle(t('viewOptions.title'))
 				.setIcon(ICONS.viewOptions)
-				// No trigger to hang off here: on a phone the panel is a sheet and
-				// ignores the anchor anyway (mobile.md §4).
-				.onClick(() => this.toggleViewOptions(null)),
+				// Nothing to hang a panel off here, and on a phone a panel would sit
+				// under the navbar: a modal covers it and closes on Back (mobile.md §4).
+				.onClick(() => {
+					this.closeViewOptions();
+					openViewOptionsModal(this.app, this.api);
+				}),
 		);
 		menu.addItem((item) =>
 			item
@@ -391,18 +392,17 @@ export class BoardView extends TextFileView {
 	 * toggle rather than a command.
 	 */
 	private toggleViewOptions(trigger: EventTarget | null): void {
-		if (this.optionsOpen) {
+		if (this.optionsTrigger) {
 			this.closeViewOptions();
 			return;
 		}
-		this.optionsTrigger = trigger instanceof HTMLElement ? trigger : null;
-		this.optionsOpen = true;
+		if (!(trigger instanceof HTMLElement)) return;
+		this.optionsTrigger = trigger;
 		this.renderBoard();
 	}
 
 	private closeViewOptions(): void {
-		if (!this.optionsOpen) return;
-		this.optionsOpen = false;
+		if (!this.optionsTrigger) return;
 		this.optionsTrigger = null;
 		this.renderBoard();
 	}
@@ -589,7 +589,7 @@ export class BoardView extends TextFileView {
 					) : (
 						<KanbanView board={this.board} view={view} api={this.api} settings={settings} />
 					)}
-					{this.optionsOpen ? (
+					{this.optionsTrigger ? (
 						<ViewOptions
 							board={this.board}
 							view={view}
