@@ -67,7 +67,8 @@ with its own file format, not a fork.
 - **Stacks and dividers that mean something:** a stack can mark the cards
   entering it as done, and a named divider can color the cards in its group,
   gathers the plain dividers below it, drags its whole group at once, adds
-  a card right under itself, and duplicates itself as an empty group.
+  a card or plain divider right under itself, and duplicates itself as an empty
+  group.
 - **Tags** with per-board colors; selecting one searches the vault for it. While
   editing a card, a tag button opens a searchable picker over the board's and
   the vault's tags — add, remove, or create one without leaving the card.
@@ -80,8 +81,8 @@ with its own file format, not a fork.
 
 ## Status
 
-**Post-MVP active development.** The full feature set above is implemented and
-manually verified on desktop and mobile. The current version is **0.7.2**;
+**Post-MVP active development.** The full feature set above is implemented.
+The current version is **0.7.3**;
 packaging and draft GitHub Releases are automated.
 
 ## Development

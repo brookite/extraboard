@@ -88,6 +88,16 @@ function DividerRowInner({ divider, stackIndex, index, api, hiddenCount, onAddCa
 				.setIcon('plus')
 				.onClick(() => onAddCard(index)),
 			);
+			if (named) {
+				menu.addItem((item) =>
+					item
+						.setTitle(t('stack.addDivider'))
+						.setIcon('minus')
+						.onClick(() => api.update((b) =>
+							ops.addDivider(ops.setDividerCollapsed(b, ref, false), stackIndex, undefined, index + 1),
+						)),
+				);
+			}
 			menu.addSeparator();
 			menu.addItem((item) =>
 			item
