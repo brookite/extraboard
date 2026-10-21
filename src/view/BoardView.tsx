@@ -26,7 +26,7 @@ import { ListView } from './ListView';
 import { ViewOptions, openViewOptionsModal } from './components/ViewOptions';
 import { NowContext, currentNow } from './now';
 import { ReloadContext } from './reload';
-import { boardSaveNeeded, PluginSaveRequests } from './saveGuard';
+import { boardSaveNeeded, PluginSaveRequests, SaveQueue } from './saveGuard';
 import { t } from '../i18n';
 
 export class BoardView extends TextFileView {
@@ -54,6 +54,8 @@ export class BoardView extends TextFileView {
 	private listeners = new Set<() => void>();
 	/** Saves requested by `applyEdit`, tracked separately from host lifecycle saves. */
 	private saveRequests = new PluginSaveRequests();
+	/** Serializes every save, so a caller awaiting one awaits the write itself. */
+	private saveQueue = new SaveQueue();
 	/**
 	 * The settings as the rendered tree last saw them. Its **identity** is how a
 	 * display-setting change reaches memoized components: `refresh()` replaces the
@@ -174,7 +176,14 @@ export class BoardView extends TextFileView {
 		return this.data;
 	}
 
-	override async save(clear?: boolean): Promise<void> {
+	override save(clear?: boolean): Promise<void> {
+		// The quit hook and `onUnloadFile` await the save they call. If it could
+		// return while an earlier save was still writing, Obsidian would close
+		// the window mid-write and leave an empty file (reduced-board-file-writes.md).
+		return this.saveQueue.run(() => this.saveNow(clear));
+	}
+
+	private async saveNow(clear?: boolean): Promise<void> {
 		const generation = this.saveRequests.pending();
 		if (generation === null) {
 			await super.save(clear);

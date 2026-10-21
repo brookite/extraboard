@@ -38,3 +38,20 @@ export class PluginSaveRequests {
 		this.handled = Math.max(this.handled, generation);
 	}
 }
+
+/**
+ * Runs saves one after another. `TextFileView.save()` lets a second call return
+ * at once while a write is in flight, and Obsidian's quit hook relies on that
+ * write being visible through its own `saving` flag. The asynchronous check
+ * above hides it, so without this queue a quit could close the window while
+ * `writeFile` has truncated the board but not yet written it.
+ */
+export class SaveQueue {
+	private tail: Promise<void> = Promise.resolve();
+
+	run(task: () => Promise<void>): Promise<void> {
+		const next = this.tail.then(task);
+		this.tail = next.catch(() => undefined);
+		return next;
+	}
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseBoard } from '../src/model/parse';
 import * as ops from '../src/model/ops';
-import { boardSaveNeeded, PluginSaveRequests } from '../src/view/saveGuard';
+import { boardSaveNeeded, PluginSaveRequests, SaveQueue } from '../src/view/saveGuard';
 import { boardHead } from './boardFile';
 
 const ORIGINAL_TEXT =
@@ -77,5 +77,42 @@ describe('PluginSaveRequests', () => {
 
 		requests.markHandled(second!);
 		expect(requests.pending()).toBeNull();
+	});
+});
+
+describe('SaveQueue', () => {
+	it('settles a later save only after an earlier one has finished writing', async () => {
+		const queue = new SaveQueue();
+		const events: string[] = [];
+		let finishWrite!: () => void;
+
+		const first = queue.run(async () => {
+			events.push('first: check');
+			await new Promise<void>((resolve) => (finishWrite = resolve));
+			events.push('first: written');
+		});
+		const second = queue.run(async () => {
+			events.push('second');
+		});
+
+		await Promise.resolve();
+		finishWrite();
+		await second;
+		expect(events).toEqual(['first: check', 'first: written', 'second']);
+		await first;
+	});
+
+	it('keeps running after a failed save', async () => {
+		const queue = new SaveQueue();
+		const failed = queue.run(async () => {
+			throw new Error('write failed');
+		});
+		await expect(failed).rejects.toThrow('write failed');
+
+		let ran = false;
+		await queue.run(async () => {
+			ran = true;
+		});
+		expect(ran).toBe(true);
 	});
 });

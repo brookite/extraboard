@@ -82,7 +82,7 @@ with its own file format, not a fork.
 ## Status
 
 **Post-MVP active development.** The full feature set above is implemented.
-The current version is **0.7.3**;
+The current version is **0.7.4**;
 packaging and draft GitHub Releases are automated.
 
 ## Development
