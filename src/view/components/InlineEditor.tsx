@@ -25,6 +25,10 @@ interface Props {
 	 */
 	onSubmit: (text: string, again: boolean) => void;
 	onCancel: () => void;
+	/** `false`: losing focus leaves the text alone instead of submitting it. */
+	submitOnBlur?: boolean;
+	/** Keys the caller owns, seen first; `true` means handled. */
+	onKey?: (evt: KeyboardEvent) => boolean;
 	/** Reports a handle on the live text while this editor is mounted, `null` after. */
 	onReady?: (handle: InlineEditorHandle | null) => void;
 	class?: string;
@@ -41,6 +45,8 @@ export function InlineEditor({
 	placeholder,
 	keepOpen = false,
 	allowEmpty = false,
+	submitOnBlur = true,
+	onKey,
 	onSubmit,
 	onCancel,
 	onReady,
@@ -109,8 +115,14 @@ export function InlineEditor({
 			placeholder={placeholder ?? ''}
 			value={value}
 			onInput={(e) => autosize(e.currentTarget)}
-			onBlur={() => submit(false)}
+			onBlur={() => {
+				if (submitOnBlur) submit(false);
+			}}
 			onKeyDown={(e) => {
+				if (!e.isComposing && onKey?.(e)) {
+					e.preventDefault();
+					return;
+				}
 				if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
 					e.preventDefault();
 					submit(true);

@@ -254,13 +254,19 @@ export function moveStack(board: Board, from: number, before: InsertPos): Board 
 
 // --- item operations --------------------------------------------------------
 
-export function addCard(board: Board, stackIndex: number, text: string, at: InsertPos = null): Board {
+export function addCard(
+	board: Board,
+	stackIndex: number,
+	text: string | Card,
+	at: InsertPos = null,
+): Board {
 	const stack = board.stacks[stackIndex];
 	if (!stack) return board;
 	const items = stack.items.slice();
 	const index = at === null ? items.length : Math.max(0, Math.min(at, items.length));
-	// A card created in a completing stack is created done (§3.2).
-	const card = enteringCard(newCard(text, board), stack);
+	// A card created in a completing stack is created done (§3.2). A prepared
+	// card (the quick-add dialog's draft, quick-add-card.md §4) skips parsing.
+	const card = enteringCard(typeof text === 'string' ? newCard(text, board) : text, stack);
 	items.splice(index, 0, { kind: 'card', card });
 	return withItems(board, stackIndex, items);
 }
@@ -868,7 +874,7 @@ export function addCardToSectionAt(
 	board: Board,
 	stackIndex: number,
 	key: SectionKey,
-	text: string,
+	text: string | Card,
 	atTop = false,
 ): { board: Board; ref: ItemRef | null } {
 	if (!board.stacks[stackIndex]) return { board, ref: null };

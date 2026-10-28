@@ -91,6 +91,10 @@ interface FieldProps {
 	onSubmit: (text: string) => void;
 	onCommit: (text: string) => void;
 	onCancel: () => void;
+	/** See `EmbeddedEditorOptions.submitOnBlur`; the quick-add dialog's. */
+	submitOnBlur?: boolean;
+	/** Keys the caller owns, seen before the field's own (`true` = handled). */
+	onKey?: (evt: KeyboardEvent) => boolean;
 }
 
 /**
@@ -98,7 +102,7 @@ interface FieldProps {
  * does not expose it (docs/NOTICES.md). A card must always be editable, so the
  * fallback is a normal render path, not an error case.
  */
-function RichField({
+export function RichField({
 	app,
 	value,
 	placeholder,
@@ -108,14 +112,16 @@ function RichField({
 	onSubmit,
 	onCommit,
 	onCancel,
+	submitOnBlur,
+	onKey,
 }: FieldProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const [fallback, setFallback] = useState(false);
 	// The callbacks change identity on every render; the editor is mounted once
 	// and owns its text until it closes, so it reads them through a ref rather
 	// than being torn down and rebuilt under the user's cursor.
-	const handlers = useRef({ onReady, onRelease, onSubmit, onCommit, onCancel });
-	handlers.current = { onReady, onRelease, onSubmit, onCommit, onCancel };
+	const handlers = useRef({ onReady, onRelease, onSubmit, onCommit, onCancel, onKey });
+	handlers.current = { onReady, onRelease, onSubmit, onCommit, onCancel, onKey };
 	const initial = useRef(value);
 	// The fallback field's handle, kept so it can be handed back on release.
 	const inlineField = useRef<CardField | null>(null);
@@ -126,6 +132,8 @@ function RichField({
 		const handle = createEmbeddedEditor(app, host, {
 			value: initial.current,
 			...(scope.current && { scope: scope.current }),
+			...(submitOnBlur !== undefined && { submitOnBlur }),
+			onKey: (evt) => handlers.current.onKey?.(evt) ?? false,
 			onSubmit: (text) => handlers.current.onSubmit(text),
 			onCommit: (text) => handlers.current.onCommit(text),
 			onCancel: () => handlers.current.onCancel(),
@@ -144,7 +152,7 @@ function RichField({
 			handlers.current.onRelease(field);
 			handle.destroy();
 		};
-	}, [app, fallback, scope]);
+	}, [app, fallback, scope, submitOnBlur]);
 
 	if (fallback) {
 		return (
@@ -152,6 +160,8 @@ function RichField({
 				value={value}
 				placeholder={placeholder}
 				allowEmpty
+				{...(submitOnBlur !== undefined && { submitOnBlur })}
+				{...(onKey && { onKey })}
 				onReady={(handle) => {
 					if (handle) {
 						inlineField.current = handle;

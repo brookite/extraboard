@@ -3679,3 +3679,102 @@ body.is-mobile .eb-card-stack {
 .eb-reminder-add-offset {
 	margin-top: 8px;
 }
+
+/* ---- Quick add card (quick-add-card.md §3) ---- */
+
+.eb-quick-add-modal {
+	width: min(560px, 100%);
+}
+
+.eb-quick-add {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+}
+
+.eb-quick-add-board {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small, 0.9em);
+}
+
+.eb-quick-add-board span:last-child {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.eb-quick-add-board .eb-button-icon,
+.eb-quick-add-chip .eb-button-icon {
+	display: inline-flex;
+}
+
+.eb-quick-add-board svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* Room for a couple of lines: this field is the whole point of the dialog. */
+.eb-quick-add-editor .eb-card-field,
+.eb-quick-add-editor .eb-editor {
+	min-height: 3.2em;
+}
+
+.eb-quick-add-editor .eb-card-field .cm-editor {
+	background: none;
+}
+
+.eb-quick-add-editor .eb-card-field .cm-scroller {
+	padding: 0;
+	overflow-x: hidden;
+}
+
+/* The tag picker opens under the badge row inside the dialog; at the board's
+   40vh it doubled the dialog's height. A few rows and the search are enough. */
+.eb-quick-add-editor .eb-tag-picker-list {
+	max-height: min(22vh, 180px);
+}
+
+.eb-quick-add-hint {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller, 0.8em);
+}
+
+.eb-quick-add-dest {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	min-width: 0;
+}
+
+.eb-quick-add-dest .eb-quick-add-chip {
+	max-width: 100%;
+	padding: 4px 10px;
+	font-size: var(--font-ui-small, 0.9em);
+	border-radius: var(--radius-s, 6px);
+}
+
+.eb-quick-add-chip span:not(.eb-button-icon) {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.eb-quick-add-buttons {
+	flex-wrap: wrap;
+	margin-top: 0;
+}
+
+/* A phone's thumb wants bigger targets, and three buttons may need two rows. */
+body.is-mobile .eb-quick-add-dest .eb-quick-add-chip {
+	min-height: 36px;
+	padding: 6px 12px;
+}
+
+body.is-mobile .eb-quick-add-buttons button {
+	flex: 1 1 auto;
+	min-height: 40px;
+}

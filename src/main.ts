@@ -15,8 +15,10 @@ import { BoardStateStore } from './schedule/stateStore';
 import type { DigestKind } from './model/digest';
 import { BoardSettingsModal } from './ui/BoardSettingsModal';
 import { cloneDefs } from './ui/PropertyDefsEditor';
+import { chooseBoardAndQuickAdd } from './ui/quickAddTarget';
 import { ExtraboardSettingTab } from './ui/SettingsTab';
 import { BoardView } from './view/BoardView';
+import { hasBoardKey } from './util/boardFiles';
 import { ICONS, VIEW_TYPE_BOARD } from './util/constants';
 import { clearReadableCache } from './util/color';
 import { NEW_BOARD_BASENAME, newBoardConfig, newBoardText } from './util/newBoard';
@@ -73,6 +75,18 @@ export default class ExtraboardPlugin extends Plugin {
 				if (!view || !view.file) return false;
 				if (!checking) void this.openAsBoard(view.leaf, view.file);
 				return true;
+			},
+		});
+
+		// Quick add: the active board's dialog, or a board picked first when no
+		// board is in front (quick-add-card.md §1, §2).
+		this.addCommand({
+			id: 'add-card',
+			name: t('command.addCard'),
+			callback: () => {
+				const view = this.app.workspace.getActiveViewOfType(BoardView);
+				if (view?.board) view.addCard();
+				else chooseBoardAndQuickAdd(this.app, this.settings);
 			},
 		});
 
@@ -289,20 +303,11 @@ export default class ExtraboardPlugin extends Plugin {
 		});
 	}
 
-	/** True iff cached frontmatter carries the top-level `extraboard` marker. */
-	private hasBoardKey(fm: unknown): boolean {
-		return (
-			typeof fm === 'object' &&
-			fm !== null &&
-			Object.prototype.hasOwnProperty.call(fm, 'extraboard')
-		);
-	}
-
 	/** Synchronous board check from the metadata cache (path already indexed). */
 	private isBoardPath(path: string): boolean {
 		const file = this.app.vault.getAbstractFileByPath(path);
 		if (!(file instanceof TFile) || file.extension !== 'md') return false;
-		return this.hasBoardKey(this.app.metadataCache.getFileCache(file)?.frontmatter);
+		return hasBoardKey(this.app.metadataCache.getFileCache(file)?.frontmatter);
 	}
 
 	/**
@@ -313,7 +318,7 @@ export default class ExtraboardPlugin extends Plugin {
 	private async isBoard(file: TFile): Promise<boolean> {
 		if (file.extension !== 'md') return false;
 		const cache = this.app.metadataCache.getFileCache(file);
-		if (cache) return this.hasBoardKey(cache.frontmatter);
+		if (cache) return hasBoardKey(cache.frontmatter);
 		try {
 			const content = await this.app.vault.cachedRead(file);
 			return isBoardText(content);

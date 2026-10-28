@@ -157,6 +157,12 @@ export interface EmbeddedEditorOptions {
 	 * it and does nothing of its own.
 	 */
 	onKey?(evt: KeyboardEvent): boolean;
+	/**
+	 * `false` makes leaving the field only ever save (`onCommit`), never finish:
+	 * the quick-add dialog adds its card on Enter or its button, not because a
+	 * chip beside the field was tapped (quick-add-card.md §3). Defaults to `true`.
+	 */
+	submitOnBlur?: boolean;
 	/** Enter (without Shift, with no completion open) commits and closes. */
 	onSubmit(text: string): void;
 	/** Blur inside `scope`: save the text, keep the field open. */
@@ -285,6 +291,10 @@ export function createEmbeddedEditor(
 		window.setTimeout(() => {
 			if (closed || suggestionOpen()) return;
 			if (container.contains(document.activeElement)) return;
+			if (options.submitOnBlur === false) {
+				options.onCommit?.(readValue());
+				return;
+			}
 			// Still inside the editor (a property badge): save, but stay open.
 			// A modal raised *above* this field counts as inside: the phone's tag
 			// picker and date editor (mobile.md §7.1) are the card's own controls

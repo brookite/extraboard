@@ -6,6 +6,7 @@ import type { en } from './en';
 
 export const ru: DeepPartial<typeof en> = {
 	command: {
+		addCard: 'Добавить карточку',
 		createBoard: 'Создать доску',
 		openAsBoard: 'Открыть текущий файл как доску',
 		boardSettings: 'Настройки доски',
@@ -20,6 +21,7 @@ export const ru: DeepPartial<typeof en> = {
 		createBoard: 'Создать доску',
 	},
 	action: {
+		addCard: 'Добавить карточку',
 		openAsBoard: 'Открыть как доску',
 		views: 'Виды',
 		switchBoardView: 'Переключить вид доски',
@@ -27,6 +29,19 @@ export const ru: DeepPartial<typeof en> = {
 		openAsMarkdown: 'Открыть как Markdown',
 		viewAria: 'Вид: {name}',
 		switchToAria: 'Переключить на {name}',
+	},
+	quickAdd: {
+		title: 'Новая карточка',
+		stack: 'Стопка',
+		section: 'Секция',
+		add: 'Добавить',
+		addAnother: 'Добавить ещё',
+		hint: 'Enter — добавить · {mod}+Enter — добавить ещё · Shift+Enter — новая строка',
+		added: 'Карточка добавлена в «{board}»',
+		chooseBoard: 'Выберите доску…',
+		noBoards: 'В хранилище нет досок.',
+		noStacks: 'На доске нет стопок для новой карточки.',
+		notBoard: 'Этот файл не является доской.',
 	},
 	board: {
 		parseError: 'Не удалось разобрать эту доску.',

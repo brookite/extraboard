@@ -15,9 +15,10 @@ import { activeViewOf } from '../model/views';
 import { ArchiveModal } from '../ui/ArchiveModal';
 import { BoardSettingsModal } from '../ui/BoardSettingsModal';
 import { pickColor } from '../ui/ColorPicker';
+import { openQuickAdd } from '../ui/quickAddTarget';
 import { openViewsModal } from '../ui/ViewsModal';
 import { createCardNote, resolveNoteFolder } from '../util/cardNote';
-import { ICONS, VIEW_TYPE_BOARD, viewIcon } from '../util/constants';
+import { addStackIcon, ICONS, VIEW_TYPE_BOARD, viewIcon } from '../util/constants';
 import { showDropdownMenu } from '../util/menu';
 import { BoardApi, confirmDestructive, searchTag } from './api';
 import { CalendarView } from './CalendarView';
@@ -126,14 +127,15 @@ export class BoardView extends TextFileView {
 
 	override async onOpen(): Promise<void> {
 		this.ensureMount();
-		// Six actions do not fit a phone's header, so on mobile only the view swap
-		// stays and the other five live in the ⋯ menu — which `fillMenu` builds,
+		// Eight actions do not fit a phone's header, so on mobile only the view swap
+		// and Add card stay and the rest live in the ⋯ menu — which `fillMenu` builds,
 		// from the same list the file menu gets. No action is lost, only moved
 		// (mobile.md §4).
 		const full = !Platform.isMobile;
 
 		// The switch wears the active view's own icon and opens the view menu
-		// (views.md §3.1); it is created first so it sits leftmost in the header.
+		// (views.md §3.1). Obsidian puts each new action to the left of the ones
+		// before it, so the first one created sits rightmost, beside ⋯.
 		if (full) {
 			this.viewSwitchEl = this.addAction(ICONS.board, t('action.views'), (event) => {
 				this.openViewMenu(event);
@@ -147,14 +149,17 @@ export class BoardView extends TextFileView {
 		this.viewCycleEl = this.addAction(ICONS.switchView, t('action.switchBoardView'), () => {
 			this.nextView();
 		});
+		// Adding a card is the other action a phone keeps, beside the view swap
+		// (quick-add-card.md §1).
+		const addCardEl = this.addAction(ICONS.add, t('action.addCard'), () => this.addCard());
 		if (!full) return;
+		const addStackEl = this.addAction(addStackIcon(), t('action.addStack'), () => this.addStack());
 
 		// The card settings of the active view, one tap from the board they change
 		// (views.md §5). On a phone the same rows open as a modal from the ⋯ menu.
 		this.addAction(ICONS.viewOptions, t('viewOptions.title'), (event) => {
 			this.toggleViewOptions(event.currentTarget);
 		});
-		this.addAction(ICONS.add, t('action.addStack'), () => this.addStack());
 		// The archive is reached often enough to deserve the header, not only the
 		// file menu (user decision, 2026-07-26).
 		this.addAction(ICONS.archive, t('menu.file.openArchive'), () => this.openArchive());
@@ -162,6 +167,9 @@ export class BoardView extends TextFileView {
 		this.addAction(ICONS.markdown, t('action.openAsMarkdown'), () => {
 			void this.openAsMarkdown();
 		});
+		// The two "add" actions lead the bar, card first, whatever order Obsidian
+		// inserted them in (quick-add-card.md §1, user decision 2026-10-28).
+		addCardEl.parentElement?.prepend(addCardEl, addStackEl);
 	}
 
 	override async onClose(): Promise<void> {
@@ -273,6 +281,13 @@ export class BoardView extends TextFileView {
 		});
 	}
 
+	/** Open the quick-add dialog for this board (quick-add-card.md §1). */
+	addCard(): void {
+		const file = this.file;
+		if (!file || !this.board) return;
+		void openQuickAdd(this.app, this.plugin.settings, file, true);
+	}
+
 	/**
 	 * Create the card's content note, rewrite its title into a link to it, and
 	 * open it (card-content-and-checklists.md §2). The title is only rewritten
@@ -356,8 +371,14 @@ export class BoardView extends TextFileView {
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle(t('action.addStack'))
+				.setTitle(t('action.addCard'))
 				.setIcon(ICONS.add)
+				.onClick(() => this.addCard()),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t('action.addStack'))
+				.setIcon(addStackIcon())
 				.onClick(() => this.addStack()),
 		);
 		menu.addItem((item) =>

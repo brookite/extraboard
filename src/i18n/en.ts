@@ -5,6 +5,7 @@
 
 export const en = {
 	command: {
+		addCard: 'Add card',
 		createBoard: 'Create new board',
 		openAsBoard: 'Open current file as board',
 		boardSettings: 'Board settings',
@@ -19,6 +20,7 @@ export const en = {
 		createBoard: 'Create new board',
 	},
 	action: {
+		addCard: 'Add card',
 		openAsBoard: 'Open as board',
 		views: 'Views',
 		switchBoardView: 'Switch board view',
@@ -26,6 +28,19 @@ export const en = {
 		openAsMarkdown: 'Open as Markdown',
 		viewAria: 'View: {name}',
 		switchToAria: 'Switch to {name}',
+	},
+	quickAdd: {
+		title: 'Add card',
+		stack: 'Stack',
+		section: 'Section',
+		add: 'Add',
+		addAnother: 'Add another',
+		hint: 'Enter to add · {mod}+Enter to add another · Shift+Enter for a new line',
+		added: 'Card added to {board}',
+		chooseBoard: 'Choose a board…',
+		noBoards: 'No boards in this vault.',
+		noStacks: 'This board has no stacks to add a card to.',
+		notBoard: 'This file is not a board.',
 	},
 	board: {
 		parseError: 'Could not parse this board.',

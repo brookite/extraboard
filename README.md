@@ -28,6 +28,11 @@ with its own file format, not a fork.
   sections, with a composer that picks which stack the new card goes to. A board
   can define several views and cycle through them from its header, and a new
   board can open as a list instead of a board.
+- **Quick add:** a `+` in the board header (on a phone too) or the **Add
+  card** command opens a dialog for one new card — Markdown text with links,
+  tags, properties, and the stack and named section it goes into. From the
+  command palette outside a board it asks which board first. Enter adds,
+  Ctrl/⌘+Enter adds and keeps the dialog open for the next card.
 - **A calendar can read several date properties at once** — a card with a start
   and a due date shows on both days, and once where they fall on the same one.
   Today is highlighted, and week numbers can be shown per view.
@@ -82,7 +87,7 @@ with its own file format, not a fork.
 ## Status
 
 **Post-MVP active development.** The full feature set above is implemented.
-The current version is **0.7.4**;
+The current version is **0.8.0**;
 packaging and draft GitHub Releases are automated.
 
 ## Development
