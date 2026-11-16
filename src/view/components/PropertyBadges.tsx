@@ -11,7 +11,7 @@
 
 import { Platform } from 'obsidian';
 import type { RefObject } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import { formatValue } from '../../model/properties';
 import { parseRecurrence } from '../../model/recurrence';
@@ -42,9 +42,17 @@ interface Props {
 	 * the moment it commits (model/tags.ts).
 	 */
 	field?: RefObject<CardField | null>;
+	/** Selected by the card menu; opened once after the editor mounts. */
+	initialProperty?: string;
+	/** Lets an inline raw-token field stay in sync with badge edits. */
+	updateProperties?: BoardApi['update'];
 }
 
-export function PropertyBadges({ config, card, target, api, settings, field }: Props) {
+export function PropertyBadges({ config, card, target, api, settings, field, initialProperty, updateProperties }: Props) {
+	const update: BoardApi['update'] = (mutate) => {
+		if (updateProperties) updateProperties(mutate);
+		else api.update(mutate);
+	};
 	// Name of the property whose editor is open; it need not be on the card yet.
 	const [open, setOpen] = useState<string | null>(null);
 	// The tag picker (§3.1.1) takes the same slot below the row, so the two are
@@ -57,14 +65,14 @@ export function PropertyBadges({ config, card, target, api, settings, field }: P
 		card.properties.find((pv) => pv.name === name);
 
 	const commit = (pv: PropertyValue | null, name: string): void => {
-		if (pv) api.update((b) => ops.setCardProperty(b, target, pv));
+		if (pv) update((b) => ops.setCardProperty(b, target, pv));
 		// An emptied field means "absent", the same rule the token grammar uses.
-		else api.update((b) => ops.removeCardProperty(b, target, name));
+		else update((b) => ops.removeCardProperty(b, target, name));
 	};
 
 	const remove = (name: string): void => {
 		setOpen(null);
-		api.update((b) => ops.removeCardProperty(b, target, name));
+		update((b) => ops.removeCardProperty(b, target, name));
 	};
 
 	/**
@@ -91,6 +99,10 @@ export function PropertyBadges({ config, card, target, api, settings, field }: P
 		}
 		setOpen(name === open ? null : name);
 	};
+
+	useEffect(() => {
+		if (initialProperty !== undefined) openProperty(initialProperty);
+	}, []);
 
 	/** The tag picker: under the row on a desktop, a modal on a phone (§7.1). */
 	const toggleTags = (): void => {

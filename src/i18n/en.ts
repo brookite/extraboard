@@ -50,6 +50,8 @@ export const en = {
 	},
 	card: {
 		editCard: 'Edit card',
+		editProperty: 'Edit property',
+		removePropertyValue: 'Remove property value',
 		duplicateCard: 'Duplicate card',
 		addCheckbox: 'Add checkbox',
 		removeCheckbox: 'Remove checkbox',

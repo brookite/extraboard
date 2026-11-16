@@ -51,6 +51,8 @@ export const ru: DeepPartial<typeof en> = {
 	},
 	card: {
 		editCard: 'Изменить карточку',
+		editProperty: 'Изменить свойство',
+		removePropertyValue: 'Удалить значение свойства',
 		duplicateCard: 'Дублировать карточку',
 		addCheckbox: 'Добавить флажок',
 		removeCheckbox: 'Убрать флажок',

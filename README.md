@@ -56,6 +56,9 @@ with its own file format, not a fork.
 - **Typed card properties** written inline as `@{name|value}`: text, number,
   percent, checkbox, color, single-select and multi-select lists with per-value
   badge colors, date, date range, list of dates, and recurrence.
+- **Property shortcuts in the card menu:** **Edit property** opens the card
+  editor with that property selected, including properties without a value yet;
+  **Remove property value** clears a selected property already on the card.
 - **Calendar-backed date editing:** select a day or an inclusive range directly
   in a card; date-list values keep dates and ranges as separate removable items.
 - **Recurring dates** in a readable phrase — `every 2 weeks on Fri`,

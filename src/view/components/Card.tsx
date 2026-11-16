@@ -9,6 +9,7 @@ import { showDropdownMenu, styleMenuItem, submenuOf } from '../../util/menu';
 import { hideMenuTree } from '../../util/menuToggle';
 import type { BoardApi } from '../api';
 import { CardEditor } from '../CardEditor';
+import { addCardPropertyMenus } from '../cardPropertyMenu';
 import { hoverLinkText, openLinkText, resolveCardLink } from '../links';
 import { memo } from '../memo';
 import { isDragging } from '../useSortable';
@@ -81,6 +82,7 @@ function CardTileInner({
 	display,
 }: Props) {
 	const [editing, setEditing] = useState(false);
+	const [initialProperty, setInitialProperty] = useState<string | undefined>();
 
 	useEffect(() => {
 		if (!forceEdit) return;
@@ -118,7 +120,11 @@ function CardTileInner({
 					target={ref}
 					api={api}
 					settings={settings}
-					onClose={() => setEditing(false)}
+					initialProperty={initialProperty}
+					onClose={() => {
+						setEditing(false);
+						setInitialProperty(undefined);
+					}}
 				/>
 			</div>
 		);
@@ -172,6 +178,10 @@ function CardTileInner({
 				.setIcon('pencil')
 				.onClick(() => setEditing(true)),
 			);
+			addCardPropertyMenus(menu, event, config, card, (name) => {
+				setInitialProperty(name);
+				setEditing(true);
+			}, (name) => api.update((b) => ops.removeCardProperty(b, ref, name)));
 			menu.addItem((item) =>
 			item
 				.setTitle(t('card.duplicateCard'))

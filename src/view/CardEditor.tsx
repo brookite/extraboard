@@ -188,6 +188,7 @@ interface Props {
 	api: BoardApi;
 	settings: ExtraboardSettings;
 	onClose: () => void;
+	initialProperty?: string;
 }
 
 /**
@@ -199,7 +200,7 @@ interface Props {
 const FLOATING =
 	'.modal-container, .menu, .suggestion-container, .notice-container, .mobile-toolbar, .mobile-toolbar-options-container';
 
-export function CardEditor({ config, card, target, api, settings, onClose }: Props) {
+export function CardEditor({ config, card, target, api, settings, onClose, initialProperty }: Props) {
 	const showRaw = settings.showRawPropertyTokens;
 	const rootRef = useRef<HTMLDivElement>(null);
 	const save = (text: string): void => {
@@ -220,6 +221,21 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 	// What the field was seeded with, so an interrupted edit can tell whether
 	// anything was actually typed.
 	const openedWith = useRef(cardEditText(card, config, showRaw));
+	const updateProperties: BoardApi['update'] = (mutate) => {
+		const live = field.current;
+		if (!showRaw || !live) {
+			api.update(mutate);
+			return;
+		}
+		// Commit typed tokens first, then reflect the badge edit in the field so
+		// its next blur/submit cannot restore an old property value.
+		save(live.getValue());
+		api.update(mutate);
+		const entry = api.getBoard()?.stacks[target.stack]?.items[target.item];
+		if (entry?.kind === 'card') {
+			live.setValue(cardEditText(entry.card, config, true), { focus: false });
+		}
+	};
 
 	// The board was re-parsed from the file underneath this editor (view/reload.ts).
 	// The field still holds the *old* card's text while `target` is an index that
@@ -309,6 +325,8 @@ export function CardEditor({ config, card, target, api, settings, onClose }: Pro
 				api={api}
 				settings={settings}
 				field={field}
+				initialProperty={initialProperty}
+				updateProperties={updateProperties}
 			/>
 		</div>
 	);
