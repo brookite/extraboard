@@ -39,7 +39,11 @@ with its own file format, not a fork.
 - **Filters and sorting for a list:** a condition builder with AND / OR / NOT
   groups over any property plus the card's own text, tags, checkbox, linked
   note, stack and section, and as many sort keys as you like, each with its own
-  direction.
+  direction. Date filters support the last/next N minutes, hours, days, weeks
+  or calendar months, plus Yesterday, Today, This week, Next week, This month
+  and Next month presets that move with the clock and respect your week start.
+  Group the list by sections (the default), by stacks, or choose **No grouping**
+  for one flat list with stack and section move badges beside each card's menu.
 - **Daily and weekly digests:** a board can show the cards of the day or the
   week in a window at a chosen time — with last period's completed cards in a
   collapsible section — the first time Obsidian checks after that time.
@@ -90,7 +94,7 @@ with its own file format, not a fork.
 ## Status
 
 **Post-MVP active development.** The full feature set above is implemented.
-The current version is **0.8.0**;
+The current version is **0.9.0**;
 packaging and draft GitHub Releases are automated.
 
 ## Development

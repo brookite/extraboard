@@ -12,6 +12,7 @@ describe('plain card titles', () => {
 		['**Bold** *italic* __strong__ _em_ ~~old~~ ==mark==', 'Bold italic strong em old mark'],
 		['***nested*** and **a**', 'nested and a'],
 		['some_identifier and 2 * 3 = 6', 'some_identifier and 2 * 3 = 6'],
+		['(*first*) _second_ and word_inside_word', '(first) second and word_inside_word'],
 		['`**literal** [[Note]]` and **bold**', '**literal** [[Note]] and bold'],
 		['``a `tick` here``', 'a `tick` here'],
 		['\\*literal\\* and \\[brackets\\]', '*literal* and [brackets]'],

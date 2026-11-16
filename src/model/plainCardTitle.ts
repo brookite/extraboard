@@ -41,7 +41,7 @@ export function plainCardTitle(title: string): string {
 		previous = text;
 		text = text
 			.replace(/(\*\*|__|~~|==)(?=\S)(\S(?:[\s\S]*?\S)?)\1/g, '$2')
-			.replace(/(?<!\w)([*_])(?=\S)(\S(?:[\s\S]*?\S)?)\1(?!\w)/g, '$2');
+			.replace(/(^|\W)([*_])(?=\S)(\S(?:[\s\S]*?\S)?)\2(?!\w)/g, '$1$3');
 	} while (text !== previous);
 	const entities: Record<string, string> = {
 		amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
