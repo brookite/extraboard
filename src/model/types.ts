@@ -25,11 +25,10 @@ export type ListControls = 'dynamic' | 'fixed' | 'session';
 
 /**
  * What a list view gathers its cards into (list-view.md §1.0): the dividers read
- * across every stack, or the stacks themselves. The two readings share one
- * component and one drop protocol; what differs is which axis is the group and
- * which one a row's badge names.
+ * across every stack, the stacks themselves, or one ungrouped list. Location
+ * badges show whichever axes the group does not already name.
  */
-export type ListGroupBy = 'section' | 'stack';
+export type ListGroupBy = 'section' | 'stack' | 'none';
 
 /**
  * Display state of one list section (list-view.md §5), keyed in `sections` by

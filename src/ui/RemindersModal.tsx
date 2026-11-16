@@ -3,7 +3,8 @@
 
 import type { App } from 'obsidian';
 import { useState } from 'preact/hooks';
-import { today as todayOf } from '../model/dates';
+import { nowStamp } from '../model/dateHighlights';
+import { resolveWeekStart } from '../i18n/dates';
 import type { FilterNode } from '../model/filter';
 import { reminderSections, type ReminderRun } from '../model/reminders';
 import { placesOf } from '../model/sections';
@@ -38,7 +39,11 @@ function RemindersBody({ options, close }: { options: RemindersModalOptions; clo
 	const board = api.getBoard();
 	if (!board) return null;
 
-	const ctx = { config: board.config, today: todayOf(), where: placesOf(board) };
+	const now = nowStamp();
+	const ctx = {
+		config: board.config, today: now.date, minutes: now.minutes,
+		weekStart: resolveWeekStart(settings.weekStart), where: placesOf(board),
+	};
 	const sections = reminderSections(board, runs, ctx, view);
 
 	const isCollapsed = (key: string): boolean => collapsed[key] ?? collapse.get(key) ?? false;

@@ -165,6 +165,13 @@ export function stackGroupsOf(board: Board): Section[] {
 
 /** The groups a list view draws, by what it groups on (list-view.md §1.0). */
 export function groupsOf(board: Board, groupBy: ListGroupBy): Section[] {
+	if (groupBy === 'none') {
+		return [{ key: { kind: 'none' }, name: '', dividers: [], movable: false,
+			cards: board.stacks.flatMap((stack, index) => stack.items.flatMap((entry, item) =>
+				entry.kind === 'card' ? [{ stack: index, item }] : [],
+			)),
+		}];
+	}
 	return groupBy === 'stack' ? stackGroupsOf(board) : sectionsOf(board);
 }
 

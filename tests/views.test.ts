@@ -422,6 +422,15 @@ describe('views: list views', () => {
 		expect(serializeBoard(board)).toContain('"groupBy":"stack"');
 	});
 
+	it('preserves no grouping across saves and changes back to the section default', () => {
+		const board = parse({ views: [{ id: 'v1', name: 'L', type: 'list', groupBy: 'none', sections: { Backlog: { collapsed: true } } }] });
+		expect(serializeBoard(board)).toContain('"groupBy":"none"');
+		expect(parseBoard(serializeBoard(board)).config.views).toEqual(board.config.views);
+		const grouped = ops.updateView(board, 'v1', { groupBy: 'section' });
+		expect(serializeBoard(grouped)).not.toContain('groupBy');
+		expect(grouped.config.views[0]).toMatchObject({ groupBy: 'section', sections: { Backlog: { collapsed: true } } });
+	});
+
 	it('defaults the controls mode and omits it when it is the default', () => {
 		const board = parse({ views: [{ id: 'v1', name: 'L', type: 'list', controls: 'nonsense' }] });
 		const view = board.config.views[0]!;

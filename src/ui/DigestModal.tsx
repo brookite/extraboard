@@ -6,6 +6,7 @@
 import type { App } from 'obsidian';
 import { useState } from 'preact/hooks';
 import { today as todayOf } from '../model/dates';
+import { nowStamp } from '../model/dateHighlights';
 import { digestSections, periodWindow, type DigestDef, type DigestKind } from '../model/digest';
 import { countConditions, isEmptyFilter, type FilterNode } from '../model/filter';
 import { placesOf } from '../model/sections';
@@ -118,7 +119,8 @@ function DigestBody({ options, close }: { options: DigestModalOptions; close: ()
 	const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 	if (!board) return null;
 
-	const ctx = { config: board.config, today: todayOf(), weekStart, where: placesOf(board) };
+	const now = nowStamp();
+	const ctx = { config: board.config, today: now.date, minutes: now.minutes, weekStart, where: placesOf(board) };
 	const { current, previous } = digestSections(board, kind, def, ctx, view);
 
 	const isCollapsed = (section: 'current' | 'done'): boolean => {

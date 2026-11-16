@@ -69,7 +69,7 @@ function markStackDrag(item: HTMLElement, on: boolean): void {
 	const stack = item.dataset.stack;
 	const root = item.closest('.eb-list');
 	if (!root) return;
-	if (root.getAttribute('data-group-by') === 'stack') return;
+	if (root.getAttribute('data-group-by') !== 'section') return;
 	if (on && stack !== undefined) {
 		root.querySelectorAll<HTMLElement>('.eb-list-row[data-stack]').forEach((row) => {
 			if (row.dataset.stack !== stack) row.classList.add(OTHER_STACK);

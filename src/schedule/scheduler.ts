@@ -9,7 +9,6 @@
 import { TFile, type WorkspaceLeaf } from 'obsidian';
 import type ExtraboardPlugin from '../main';
 import { nowStamp } from '../model/dateHighlights';
-import { today as todayOf } from '../model/dates';
 import { DIGEST_KINDS, digestDue, digestSections, periodKey, type DigestKind } from '../model/digest';
 import { parseBoard } from '../model/parse';
 import { reminderSections, type ReminderRun } from '../model/reminders';
@@ -151,7 +150,10 @@ export class BoardScheduler {
 				...(before.digest && { digest: { ...before.digest } }),
 			};
 			const due: Due = { digests: [], runs: [] };
-			const ctx = { config, today: todayOf(clock), where: placesOf(board) };
+			const ctx = {
+				config, today: now.date, minutes: now.minutes,
+				weekStart: resolveWeekStart(this.plugin.settings.weekStart), where: placesOf(board),
+			};
 
 			for (const kind of DIGEST_KINDS) {
 				const def = config.digest?.[kind];

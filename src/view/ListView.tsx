@@ -35,6 +35,7 @@ import { showDropdownMenu, submenuOf } from '../util/menu';
 import { hideMenuTree } from '../util/menuToggle';
 import { useSortable, type DropInfo } from './useSortable';
 import { t } from '../i18n';
+import { resolveWeekStart } from '../i18n/dates';
 
 type ListDef = Extract<ViewDef, { type: 'list' }>;
 
@@ -100,13 +101,17 @@ export function ListView({ board, view, api, settings }: Props) {
 	const sorts = persist ? view.sorts : session.sorts;
 	const groupBy = persist ? view.groupBy : (session.groupBy ?? view.groupBy);
 	const byStack = groupBy === 'stack';
+	const ungrouped = groupBy === 'none';
 	/** What the list draws: the board read across its dividers, or along its
 	 * stacks (§1.0). Everything below is expressed against these groups. */
 	const sections = groupsOf(board, groupBy);
-	// Filters ask about dates, and a repetition rule's answer moves at midnight,
-	// so the clock is part of the query (filters-and-sorting.md §2.3).
+	// Recurrences and moving date filters consume the minute clock.
 	// `@stack` / `@section` read the card's place, indexed only if asked for.
-	const ctx = { config: board.config, today: useNow().date, where: placesOf(board) };
+	const now = useNow();
+	const ctx = {
+		config: board.config, today: now.date, minutes: now.minutes,
+		weekStart: resolveWeekStart(settings.weekStart), where: placesOf(board),
+	};
 
 	/**
 	 * A section's collapse (§1.4, §5). An anonymous section's is its divider's own
@@ -114,6 +119,7 @@ export function ListView({ board, view, api, settings }: Props) {
 	 * follow the view's persistence mode.
 	 */
 	const stateOf = (section: Section): SectionState => {
+		if (ungrouped) return {};
 		// A stack group's collapse is the stack's own flag, exactly as an anonymous
 		// section's is its divider's: the file already holds it, and collapsing the
 		// group here collapses the column on the board (§1.0, §1.4).
@@ -128,6 +134,7 @@ export function ListView({ board, view, api, settings }: Props) {
 	};
 
 	const patchState = (section: Section, patch: Partial<SectionState>): void => {
+		if (ungrouped) return;
 		if (patch.collapsed === undefined) return;
 		const collapsed = patch.collapsed;
 		if (section.key.kind === 'stack') {
@@ -168,11 +175,11 @@ export function ListView({ board, view, api, settings }: Props) {
 
 	const pickGroupBy = (event: MouseEvent): void => {
 		showDropdownMenu(event, (menu) => {
-			for (const value of ['section', 'stack'] as const) {
+			for (const value of ['section', 'stack', 'none'] as const) {
 				menu.addItem((item) =>
 					item
 						.setTitle(t(`list.groupBy.${value}`))
-						.setIcon(value === 'stack' ? 'square-kanban' : 'heading')
+						.setIcon(value === 'stack' ? 'square-kanban' : value === 'none' ? 'list' : 'heading')
 						.setChecked(value === groupBy)
 						.onClick(() => setGroupBy(value)),
 				);
@@ -227,7 +234,7 @@ export function ListView({ board, view, api, settings }: Props) {
 		// A stack group's start is the stack's own top, the head of its sectionless
 		// cards, whatever section the composer is pointed at (§4.4).
 		const key: SectionKey =
-			section.key.kind === 'stack'
+			section.key.kind === 'stack' || ungrouped
 				? atTop
 					? { kind: 'none' }
 					: (composerSections[sessionKey(section)] ?? { kind: 'none' })
@@ -263,6 +270,12 @@ export function ListView({ board, view, api, settings }: Props) {
 		const target = sections[info.toList];
 		if (!from || !target) return;
 		const rows = drawn[info.toList] ?? [];
+		if (ungrouped) {
+			if (sorts?.length) return;
+			const before = info.before === null ? undefined : rows[info.before];
+			api.update((b) => ops.moveItem(b, from, before?.stack ?? from.stack, before?.item ?? null));
+			return;
+		}
 		// Grouped by stack a drop is a plain item move, exactly as it is on the
 		// board: the card enters that stack at that position, and whichever
 		// section the position falls in is the section it joins (§4.3).
@@ -343,35 +356,38 @@ export function ListView({ board, view, api, settings }: Props) {
 	const groupByRef = useRef<ListGroupBy>(groupBy);
 	groupByRef.current = groupBy;
 
+	const openSectionPicker = useCallback((event: MouseEvent, ref: ops.ItemRef): void => {
+		event.stopPropagation();
+		const current = api.getBoard();
+		if (!current) return;
+		const here = sectionOf(current, ref);
+		showDropdownMenu(event, (menu) => {
+			const targets: SectionKey[] = [{ kind: 'none' }, ...sectionsOf(current)
+				.filter((section) => section.key.kind === 'named').map((section) => section.key)];
+			for (const target of targets) {
+				menu.addItem((item) => item
+					.setTitle(sectionKeyLabel(current, target))
+					.setIcon(target.kind === 'named' ? 'heading' : 'minus')
+					.setDisabled(sameKey(here, target))
+					.onClick(() => api.update((b) => ops.moveCardToSection(b, ref, ref.stack, target))));
+			}
+		});
+	}, []);
+
 	/**
 	 * Open the card-header move picker from the live board: the stacks when the
 	 * groups are sections, the sections when the groups are stacks — always the
 	 * axis the row's badge names, which is the one the group does not (§1.0).
 	 */
 	const openMovePicker = useCallback((event: MouseEvent, ref: ops.ItemRef): void => {
+		if (groupByRef.current === 'stack') {
+			openSectionPicker(event, ref);
+			return;
+		}
 		event.stopPropagation();
 		const current = api.getBoard();
 		if (!current) return;
 		showDropdownMenu(event, (menu) => {
-			if (groupByRef.current === 'stack') {
-				const here = sectionOf(current, ref);
-				const targets: SectionKey[] = [
-					{ kind: 'none' },
-					...sectionsOf(current)
-						.filter((section) => section.key.kind === 'named')
-						.map((section) => section.key),
-				];
-				for (const target of targets) {
-					menu.addItem((item) =>
-						item
-							.setTitle(sectionKeyLabel(current, target))
-							.setIcon(target.kind === 'named' ? 'heading' : 'minus')
-							.setDisabled(sameKey(here, target))
-							.onClick(() => api.update((b) => ops.moveCardToSection(b, ref, ref.stack, target))),
-					);
-				}
-				return;
-			}
 			current.stacks.forEach((stack, index) => {
 				menu.addItem((item) =>
 					item
@@ -485,13 +501,13 @@ export function ListView({ board, view, api, settings }: Props) {
 				    into, next to how they are filtered and ordered (§1.0). */}
 				<button
 					type="button"
-					class={`eb-badge eb-list-group${byStack ? ' is-active' : ''}`}
+					class={`eb-badge eb-list-group${groupBy !== 'section' ? ' is-active' : ''}`}
 					disabled={locked}
 					title={locked ? t('list.controlsFixed') : t('list.groupBy.label')}
 					onClick={pickGroupBy}
 				>
-					<Icon name={byStack ? 'square-kanban' : 'heading'} class="eb-button-icon" />
-					<span>{byStack ? t('list.groupBy.chipStack') : t('list.groupBy.chipSection')}</span>
+					<Icon name={byStack ? 'square-kanban' : ungrouped ? 'list' : 'heading'} class="eb-button-icon" />
+					<span>{ungrouped ? t('list.groupBy.none') : byStack ? t('list.groupBy.chipStack') : t('list.groupBy.chipSection')}</span>
 				</button>
 			</div>
 			{board.stacks.length === 0 ? <div class="eb-list-empty">{t('list.emptyBoard')}</div> : null}
@@ -500,9 +516,10 @@ export function ListView({ board, view, api, settings }: Props) {
 				const at = movable.indexOf(section);
 				return (
 					<SectionGroup
-						key={sessionKey(section)}
+						key={ungrouped ? `ungrouped:${sorts?.length ? 'sorted' : 'document'}` : sessionKey(section)}
 						board={board}
 						section={section}
+						ungrouped={ungrouped}
 						index={index}
 						config={board.config}
 						rows={drawn[index] ?? []}
@@ -524,6 +541,7 @@ export function ListView({ board, view, api, settings }: Props) {
 						onDrop={onDrop}
 						menuExtra={menuExtra}
 						onStackPick={openMovePicker}
+						onSectionPick={openSectionPicker}
 						display={view.display}
 						{...(section.movable && { onMove: (direction: -1 | 1) => moveBy(section, direction) })}
 						canMoveUp={at > 0}
@@ -531,7 +549,7 @@ export function ListView({ board, view, api, settings }: Props) {
 					/>
 				);
 			})}
-			<div class="eb-list-add-section">
+			{ungrouped ? null : <div class="eb-list-add-section">
 				{byStack ? (
 					// The list's own end of the board's "Add stack" column
 					// (kanban-view.md §6.3): grouped by stack, a new group is a stack.
@@ -568,7 +586,7 @@ export function ListView({ board, view, api, settings }: Props) {
 						<span>{t('list.addSection')}</span>
 					</button>
 				)}
-			</div>
+			</div>}
 		</div>
 	);
 }

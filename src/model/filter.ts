@@ -16,6 +16,7 @@ import {
 	readField,
 } from './fieldValue';
 import { sameLinkTarget } from './link';
+import { dateMinute, filterDateWindow } from './filterDates';
 import type { ItemRef } from './ops';
 import type { Board, Card } from './types';
 
@@ -28,13 +29,16 @@ export type FilterOp =
 	| 'gt'
 	| 'gte'
 	| 'isSet'
-	| 'linksTo';
+	| 'linksTo'
+	| 'inLast'
+	| 'inNext'
+	| 'inPeriod';
 
 export interface FilterCondition {
 	kind: 'condition';
 	field: FieldRef;
 	op: FilterOp;
-	/** The operand, as typed; dates are canonical `YYYY-MM-DD[ HH:mm]`. */
+	/** Operand: text, absolute date, relative duration (`3 week`) or period id. */
 	value?: string;
 	/** The upper bound of `between`. */
 	value2?: string;
@@ -175,9 +179,21 @@ export function matchCondition(card: Card, condition: FilterCondition, ctx: Fiel
 	// An operator with no operand is an unfinished row, not a filter that hides
 	// every card: it matches everything until the user types something (§4.3).
 	if (!operand.trim()) return true;
+	if (
+		(condition.op === 'inLast' || condition.op === 'inNext') &&
+		/^ (minute|hour|day|week|month)$/.test(operand)
+	) return true;
 	if (value.kind === 'none') return false;
 
 	switch (condition.op) {
+		case 'inLast':
+		case 'inNext':
+		case 'inPeriod': {
+			const window = filterDateWindow(condition.op, operand, ctx.today, ctx.minutes, ctx.weekStart);
+			return value.kind === 'date' && window !== null && value.spans.some((span) =>
+				dateMinute(span.end, true) >= window.from && dateMinute(span.start) <= window.to,
+			);
+		}
 		case 'linksTo':
 			return linksOf(value).some((target) => sameLinkTarget(target, operand));
 		case 'equals':

@@ -161,6 +161,7 @@ export const en = {
 			stack: 'Stacks',
 			chipSection: 'Sections',
 			chipStack: 'Stacks',
+			none: 'No grouping',
 			desc: 'What the list gathers its cards into.',
 		},
 		controlsFixed: 'This view fixes its sort and filter',
@@ -250,6 +251,15 @@ export const en = {
 			gte: 'on or after',
 			isSet: 'is set',
 			linksTo: 'links to',
+			inLast: 'in the last',
+			inNext: 'in the next',
+			inPeriod: 'during',
+		},
+		date: {
+			preset: 'Date preset', amount: 'Amount', unit: 'Time unit',
+			minute: 'minutes', hour: 'hours', day: 'days', week: 'weeks', month: 'months',
+			yesterday: 'Yesterday', today: 'Today', thisWeek: 'This week', nextWeek: 'Next week',
+			thisMonth: 'This month', nextMonth: 'Next month',
 		},
 	},
 	// The quick view settings panel (views.md §5).
@@ -380,7 +390,7 @@ export const en = {
 			kanban: 'Kanban',
 			list: 'List',
 			sortedBy: 'sorted by {name}',
-			groupByDesc: 'Sections read the board across its dividers; stacks read it column by column.',
+			groupByDesc: 'Group by sections or stacks, or show all cards in one list.',
 			controls: {
 				label: 'Section controls',
 				desc: 'Where each section\u2019s sort and filter live.',

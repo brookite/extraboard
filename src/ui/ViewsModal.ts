@@ -440,6 +440,7 @@ class ViewFormModal extends Modal {
 						.addOptions({
 							section: t('list.groupBy.section'),
 							stack: t('list.groupBy.stack'),
+							none: t('list.groupBy.none'),
 						})
 						.setValue(this.fields.groupBy)
 						.onChange((value) => {

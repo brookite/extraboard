@@ -23,6 +23,7 @@ import { FileSuggest } from '../../ui/FileSuggest';
 import { useSortable, type DropInfo } from '../useSortable';
 import { Icon } from './Icon';
 import { t } from '../../i18n';
+import { FilterDateEditor } from './FilterDateEditor';
 
 /**
  * The closed vocabularies an operand can be picked from: the board's tags, and
@@ -98,6 +99,9 @@ function ValueEditor({
 	const value = (second ? condition.value2 : condition.value) ?? '';
 
 	if (editor === 'none') return null;
+	if (kind === 'date' && (condition.op === 'inLast' || condition.op === 'inNext' || condition.op === 'inPeriod')) {
+		return <FilterDateEditor op={condition.op} value={value} onChange={onChange} />;
+	}
 
 	if (editor === 'option') {
 		return (
@@ -216,6 +220,9 @@ function ConditionRow({
 					onChange(path, {
 						...condition,
 						op: (e.target as HTMLSelectElement).value as FilterCondition['op'],
+						...(['inLast', 'inNext', 'inPeriod'].includes(condition.op) ||
+							['inLast', 'inNext', 'inPeriod'].includes((e.target as HTMLSelectElement).value)
+							? { value: '', value2: undefined } : {}),
 					})
 				}
 			>

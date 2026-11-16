@@ -15,7 +15,7 @@ import type { FilterOp } from './filter';
 export const OPS_BY_KIND: Record<FieldKind, readonly FilterOp[]> = {
 	text: ['contains', 'equals', 'linksTo', 'isSet'],
 	number: ['equals', 'lt', 'lte', 'gt', 'gte', 'between', 'isSet'],
-	date: ['between', 'lt', 'lte', 'gt', 'gte', 'isSet'],
+	date: ['between', 'inLast', 'inNext', 'inPeriod', 'lt', 'lte', 'gt', 'gte', 'isSet'],
 	bool: ['isSet'],
 	list: ['contains', 'isSet'],
 	link: ['linksTo', 'isSet'],

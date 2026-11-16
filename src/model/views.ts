@@ -198,7 +198,7 @@ export function toListControls(v: unknown): ListControls {
 
 /** Anything but `stack` groups by section, the default (list-view.md §1.0). */
 export function toListGroupBy(v: unknown): ListGroupBy {
-	return v === 'stack' ? 'stack' : 'section';
+	return v === 'stack' || v === 'none' ? v : 'section';
 }
 
 /** A tag list: strings only, `#` stripped, blanks and duplicates dropped. */
@@ -285,6 +285,7 @@ export function toFieldRef(v: unknown): FieldRef | null {
 
 const FILTER_OPS: ReadonlySet<string> = new Set<FilterOp>([
 	'equals', 'contains', 'between', 'lt', 'lte', 'gt', 'gte', 'isSet', 'linksTo',
+	'inLast', 'inNext', 'inPeriod',
 ]);
 
 /**

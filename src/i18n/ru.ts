@@ -162,6 +162,7 @@ export const ru: DeepPartial<typeof en> = {
 			stack: 'По стопкам',
 			chipSection: 'Секции',
 			chipStack: 'Стопки',
+			none: 'Без группировки',
 			desc: 'Во что список собирает карточки.',
 		},
 		controlsFixed: 'В этом виде сортировка и фильтр зафиксированы',
@@ -250,6 +251,15 @@ export const ru: DeepPartial<typeof en> = {
 			gte: 'не раньше',
 			isSet: 'установлен',
 			linksTo: 'связан со страницей',
+			inLast: 'за последние',
+			inNext: 'в следующие',
+			inPeriod: 'в период',
+		},
+		date: {
+			preset: 'Период', amount: 'Количество', unit: 'Единица времени',
+			minute: 'минут', hour: 'часов', day: 'дней', week: 'недель', month: 'месяцев',
+			yesterday: 'Вчера', today: 'Сегодня', thisWeek: 'На этой неделе', nextWeek: 'На следующей неделе',
+			thisMonth: 'В этом месяце', nextMonth: 'В следующем месяце',
 		},
 	},
 	viewOptions: {
@@ -376,7 +386,7 @@ export const ru: DeepPartial<typeof en> = {
 			kanban: 'Канбан',
 			list: 'Список',
 			sortedBy: 'сортировка по {name}',
-			groupByDesc: 'Секции читают доску поперёк разделителей, стопки — по колонкам.',
+			groupByDesc: 'Группировать по секциям или стопкам либо показать все карточки одним списком.',
 			controls: {
 				label: 'Настройки секций',
 				desc: 'Где живут сортировка и фильтр каждой секции.',

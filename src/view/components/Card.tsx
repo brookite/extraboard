@@ -52,6 +52,9 @@ interface Props {
 	stackLabel?: string;
 	/** Opens the stack picker for this card. Stable for memoization. */
 	onStackPick?: (event: MouseEvent, ref: ops.ItemRef) => void;
+	/** Second location badge for an ungrouped list. */
+	sectionLabel?: string;
+	onSectionPick?: (event: MouseEvent, ref: ops.ItemRef) => void;
 	/**
 	 * What the mounting view draws on a card (views.md §5). Absent means all of
 	 * it. The object comes straight off the `ViewDef`, whose identity survives
@@ -79,6 +82,8 @@ function CardTileInner({
 	menuExtra,
 	stackLabel,
 	onStackPick,
+	sectionLabel,
+	onSectionPick,
 	display,
 }: Props) {
 	const [editing, setEditing] = useState(false);
@@ -91,22 +96,26 @@ function CardTileInner({
 	}, [forceEdit]);
 
 	const ref = { stack: stackIndex, item: index };
-	const renderStackControl = (editingControl = false) =>
-		stackLabel && onStackPick ? (
+	const renderLocationControl = (label: string | undefined, pick: Props['onStackPick'], section: boolean, editingControl: boolean) =>
+		label && pick ? (
 			<button
 				type="button"
 				class={`eb-badge eb-card-stack${editingControl ? '' : ' eb-hover-only'}`}
-				aria-label={`${t('card.moveToStack')}: ${stackLabel}`}
-				title={stackLabel}
+				aria-label={`${section ? t('list.moveToSection') : t('card.moveToStack')}: ${label}`}
+				title={label}
 				onClick={(event) => {
 					event.stopPropagation();
-					onStackPick(event, ref);
+					pick(event, ref);
 				}}
 			>
-				<Icon name="square-kanban" class="eb-button-icon" />
-				<span>{stackLabel}</span>
+				<Icon name={section ? 'heading' : 'square-kanban'} class="eb-button-icon" />
+				<span>{label}</span>
 			</button>
 		) : null;
+	const renderStackControl = (editingControl = false) => <>
+		{renderLocationControl(stackLabel, onStackPick, false, editingControl)}
+		{renderLocationControl(sectionLabel, onSectionPick, true, editingControl)}
+	</>;
 
 	if (editing) {
 		return (

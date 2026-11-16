@@ -128,6 +128,33 @@ describe('sections: grouping by stack', () => {
 	});
 });
 
+describe('list without grouping', () => {
+	it('collects every card once in document order, across all divider kinds', () => {
+		const b = board();
+		const groups = groupsOf(b, 'none');
+		expect(groups).toHaveLength(1);
+		expect(titles(b, groups[0]!)).toEqual(['Loose A', 'B1', 'B2', 'R1', 'Loose B', 'Anon card', 'R2', 'B3']);
+		expect(groups[0]!.movable).toBe(false);
+		expect(groups[0]!.dividers).toEqual([]);
+	});
+
+	it('includes cards in collapsed stacks and sections without changing the board', () => {
+		const b = parseBoard(BOARD.replace('## To do', '## To do %%collapsed%%').replace('### Backlog', '### Backlog %%collapsed%%'));
+		const before = structuredClone(b);
+		expect(groupsOf(b, 'none')[0]!.cards).toHaveLength(8);
+		expect(b).toEqual(before);
+	});
+
+	it('sorts matching cards across section and stack boundaries', () => {
+		const b = board();
+		const ctx = { config: b.config, today: { y: 2026, m: 8, d: 1 } };
+		const group = groupsOf(b, 'none')[0]!;
+		const filtered = filterCards(b, group.cards, { kind: 'condition', field: { kind: 'property', name: 'due' }, op: 'isSet' }, ctx);
+		const sorted = sortCards(b, filtered, [{ field: { kind: 'property', name: 'due' }, dir: 'asc' }], ctx);
+		expect(titles(b, { ...group, cards: sorted })).toEqual(['R2', 'B2', 'B1']);
+	});
+});
+
 describe('sections: grouping', () => {
 	it('lists the sectionless group first, then sections by first appearance', () => {
 		const b = board();

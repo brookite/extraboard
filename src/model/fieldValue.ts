@@ -36,8 +36,12 @@ export interface CardPlace {
 
 export interface FieldCtx {
 	config: BoardConfig;
-	/** Today, for the one thing that moves on its own: a repetition rule (§2.3). */
+	/** Local day for recurrence expansion and moving date filters. */
 	today: CalDate;
+	/** Local minute of day for rolling date filters; defaults to midnight. */
+	minutes?: number;
+	/** Resolved first weekday; defaults to Monday. */
+	weekStart?: number;
 	/**
 	 * The card's place on the board, for `@stack` and `@section`. Absent — or
 	 * answering `undefined` — and both fields read as unanswered.

@@ -30,6 +30,8 @@ import { isDoubleTap } from '../../util/gesture';
 export interface SectionProps {
 	board: Board;
 	section: Section;
+	/** One headerless list, with both location badges on each card. */
+	ungrouped?: boolean;
 	/** Position in the rendered group list — the drag protocol's coordinate. */
 	index: number;
 	config: BoardConfig;
@@ -66,6 +68,7 @@ export interface SectionProps {
 	menuExtra: (menu: Menu, ref: ops.ItemRef, event: MouseEvent) => void;
 	/** Open the card header's move picker. Stable for card memoization. */
 	onStackPick: (event: MouseEvent, ref: ops.ItemRef) => void;
+	onSectionPick: (event: MouseEvent, ref: ops.ItemRef) => void;
 	/** Group reordering, absent when this group cannot move (§1.3, §1.4). */
 	onMove?: (direction: -1 | 1) => void;
 	canMoveUp: boolean;
@@ -180,6 +183,7 @@ export function SectionGroup(props: SectionProps) {
 	const {
 		board,
 		section,
+		ungrouped = false,
 		index,
 		config,
 		rows,
@@ -197,6 +201,7 @@ export function SectionGroup(props: SectionProps) {
 		onDrop,
 		menuExtra,
 		onStackPick,
+		onSectionPick,
 		onMove,
 		canMoveUp,
 		canMoveDown,
@@ -206,7 +211,7 @@ export function SectionGroup(props: SectionProps) {
 	const [renaming, setRenaming] = useState(false);
 	const bodyRef = useRef<HTMLDivElement>(null);
 
-	const collapsed = state.collapsed === true;
+	const collapsed = !ungrouped && state.collapsed === true;
 	const key = section.key;
 	const named = key.kind === 'named';
 	/** The stack this group *is*, when the list is grouped by stack (§1.0). */
@@ -215,6 +220,7 @@ export function SectionGroup(props: SectionProps) {
 	const stack = stackIndex === null ? undefined : board.stacks[stackIndex];
 	/** Which section each row of this stack belongs to — the row badges (§1.0). */
 	const rowSections = byStack && stackIndex !== null ? sectionsInStack(board, stackIndex) : [];
+	const allRowSections = ungrouped ? board.stacks.map((_, i) => sectionsInStack(board, i)) : [];
 
 	// Rows move within and between groups; a sorted group shows the order the
 	// user asked for, not the file's, so it accepts drops but not positions.
@@ -407,8 +413,8 @@ export function SectionGroup(props: SectionProps) {
 	};
 
 	/** A row's badge: the stack it came from, or the section it sits in (§1.0). */
-	const rowBadge = (ref: ops.ItemRef) => {
-		if (!byStack) {
+	const rowBadge = (ref: ops.ItemRef, axis: 'stack' | 'section' = byStack ? 'section' : 'stack') => {
+		if (axis === 'stack') {
 			return (
 				<MoveBadge
 					label={stackLabel(board, ref.stack)}
@@ -427,7 +433,7 @@ export function SectionGroup(props: SectionProps) {
 				/>
 			);
 		}
-		const here = rowSections[ref.item] ?? { kind: 'none' };
+		const here = (ungrouped ? allRowSections[ref.stack]?.[ref.item] : rowSections[ref.item]) ?? { kind: 'none' };
 		return (
 			<MoveBadge
 				label={sectionKeyLabel(board, here)}
@@ -448,8 +454,8 @@ export function SectionGroup(props: SectionProps) {
 	};
 
 	/** The composer's picker: which stack a card is written into, or which section. */
-	const composerBadge = () =>
-		byStack ? (
+	const composerBadge = (axis: 'stack' | 'section' = byStack ? 'section' : 'stack') =>
+		axis === 'section' ? (
 			<MoveBadge
 				label={sectionKeyLabel(board, composerSection)}
 				icon={composerSection.kind === 'named' ? 'heading' : 'minus'}
@@ -501,7 +507,7 @@ export function SectionGroup(props: SectionProps) {
 			data-index={index}
 			style={accent ? { '--eb-stack-accent': accent } : undefined}
 		>
-			<div class="eb-section-header">
+			{ungrouped ? null : <div class="eb-section-header">
 				{section.movable ? (
 					<span class="eb-section-grip" title={t('modal.checklist.dragToReorder')} aria-hidden="true">
 						<Icon name="grip-vertical" />
@@ -548,7 +554,7 @@ export function SectionGroup(props: SectionProps) {
 				) : null}
 				<span class="eb-section-count">{rows.length}</span>
 				<IconButton icon="more-vertical" label={t('stack.options')} onClick={openMenu} />
-			</div>
+			</div>}
 
 			<div class="eb-section-body" ref={bodyRef} data-list={index} hidden={collapsed}>
 				{rows.flatMap((ref, i) => {
@@ -579,6 +585,8 @@ export function SectionGroup(props: SectionProps) {
 										: rowStack.name || t('modal.archive.untitled')
 								}
 								onStackPick={onStackPick}
+								sectionLabel={ungrouped ? sectionKeyLabel(board, allRowSections[ref.stack]?.[ref.item] ?? { kind: 'none' }) : undefined}
+								onSectionPick={ungrouped ? onSectionPick : undefined}
 								forceEdit={pending?.stack === ref.stack && pending.item === ref.item}
 								display={display}
 							/>
@@ -586,6 +594,7 @@ export function SectionGroup(props: SectionProps) {
 							    switch: on phones CSS joins both into one visual card,
 							    while editing never replaces or hides this footer. */}
 							{rowBadge(ref)}
+							{ungrouped ? rowBadge(ref, 'section') : null}
 						</div>
 					);
 					const out = [row];
@@ -603,7 +612,7 @@ export function SectionGroup(props: SectionProps) {
 					// Only meaningful when the groups are sections: there a drag between
 					// rows of different stacks cannot carry the card across, while a
 					// stack group's rows are all in one stack already.
-					if (byStack || !isStackBoundary(rows, i, ordered)) return out;
+					if (ungrouped || byStack || !isStackBoundary(rows, i, ordered)) return out;
 					out.unshift(
 						<div
 							class="eb-list-stack-boundary"
@@ -626,6 +635,7 @@ export function SectionGroup(props: SectionProps) {
 					    joins (§4.2) — the one decision a list group has to make that a
 					    Kanban column does not. */}
 					{composerBadge()}
+					{ungrouped ? composerBadge('section') : null}
 				</div>
 			)}
 		</div>

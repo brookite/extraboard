@@ -3254,6 +3254,15 @@ body.is-mobile .eb-add-stack-button {
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
+.eb-list[data-group-by="none"] > .eb-section {
+	background: transparent;
+	border: none;
+}
+
+.eb-list[data-group-by="none"] .eb-section-compose {
+	flex-wrap: wrap;
+}
+
 .eb-section-grip {
 	display: flex;
 	align-items: center;
@@ -3586,6 +3595,10 @@ body.is-mobile .eb-card-stack {
 	border: 1px solid var(--background-modifier-border);
 	border-top: none;
 	border-radius: 0 0 6px 6px;
+}
+
+.is-phone .eb-list[data-group-by="none"] .eb-list-row > .eb-list-stack {
+	border-radius: 0;
 }
 
 /* A card's colour over the whole chip or bar, instead of the dot
