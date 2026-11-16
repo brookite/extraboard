@@ -97,16 +97,6 @@ function dateBadgeStyle(o: DateOpts, span: DateSpan | null): Record<string, stri
 	return accentStyle(o.accent, styleFor(bg, readableOn(bg, document.body)));
 }
 
-/** Whenever a mode can hide precision, the absolute value stays one hover away. */
-function needsTooltip(opts: DateTimeOpts): boolean {
-	return (
-		opts.dateFormat === 'relative' ||
-		opts.dateFormat === 'custom' ||
-		opts.timeFormat === 'relative' ||
-		opts.timeFormat === 'custom'
-	);
-}
-
 /**
  * The rule's next hit after today (recurrence.md §5): both the badge's tooltip
  * and the date a highlight rule measures against. `null` when the rule is
@@ -127,7 +117,7 @@ function nextHit(rule: Recurrence, card: Card, propertyName: string, from: CalDa
  */
 function RecurrenceBadge({ raw, card, dates }: { raw: string; card: Card; dates: DateOpts }) {
 	const rule = parseRecurrence(raw);
-	if (!rule) return <span class={badgeClass(dates.accent)} style={accentStyle(dates.accent)}>{raw}</span>;
+	if (!rule) return <span class={badgeClass(dates.accent)} style={accentStyle(dates.accent)} title={raw}><span class="eb-badge-text">{raw}</span></span>;
 	const next = nextHit(rule, card, dates.property, dates.now.date);
 	// The chip carries the compact form; the tooltip carries everything the
 	// compaction left out — the dates and the next hit (recurrence.md §5).
@@ -150,15 +140,15 @@ function RecurrenceBadge({ raw, card, dates }: { raw: string; card: Card; dates:
 /** A `datetime` value: the raw text unchanged when it does not parse (§2.3, never garbage). */
 function DateBadge({ raw, dates }: { raw: string; dates: DateOpts }) {
 	const date = parseDate(raw);
-	if (!date) return <span class={badgeClass(dates.accent)} style={accentStyle(dates.accent)}>{raw}</span>;
+	if (!date) return <span class={badgeClass(dates.accent)} style={accentStyle(dates.accent)} title={raw}><span class="eb-badge-text">{raw}</span></span>;
 	const text = formatCalDate(date, dates.opts);
 	return (
 		<span
 			class={badgeClass(dates.accent)}
 			style={dateBadgeStyle(dates, spanOf(date))}
-			title={needsTooltip(dates.opts) ? absoluteTooltip(date) : undefined}
+			title={absoluteTooltip(date)}
 		>
-			{text}
+			<span class="eb-badge-text">{text}</span>
 		</span>
 	);
 }
@@ -171,15 +161,13 @@ function SpanBadge({ raw, dates }: { raw: string; dates: DateOpts }) {
 	if (!span) {
 		// A recurrence phrase (compound `date-list` element, recurrence.md §2.2)
 		// keeps its frozen English grammar — only real dates/ranges format here.
-		return <span class={badgeClass(dates.accent)} style={accentStyle(dates.accent)}>{raw}</span>;
+		return <span class={badgeClass(dates.accent)} style={accentStyle(dates.accent)} title={raw}><span class="eb-badge-text">{raw}</span></span>;
 	}
 	const text = formatCalSpan(span, dates.opts);
-	const tooltip = needsTooltip(dates.opts)
-		? `${absoluteTooltip(span.start)} → ${absoluteTooltip(span.end)}`
-		: undefined;
+	const tooltip = `${absoluteTooltip(span.start)} → ${absoluteTooltip(span.end)}`;
 	return (
 		<span class={badgeClass(dates.accent)} style={dateBadgeStyle(dates, span)} title={tooltip}>
-			{text}
+			<span class="eb-badge-text">{text}</span>
 		</span>
 	);
 }
@@ -215,8 +203,9 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 								class={badgeClass(accent)}
 								style={accentStyle(accent, styleFor(opt?.bg, opt?.fg))}
 								key={v}
+								title={v}
 							>
-								{v}
+								<span class="eb-badge-text">{v}</span>
 							</span>
 						);
 					})}
@@ -225,14 +214,14 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 		}
 		case 'string':
 			return (
-				<span class={badgeClass(accent)} style={accentStyle(accent)}>
-					<TextValue text={pv.value} api={api} />
+				<span class={badgeClass(accent)} style={accentStyle(accent)} title={pv.value}>
+					<span class="eb-badge-text"><TextValue text={pv.value} api={api} /></span>
 				</span>
 			);
 		case 'integer':
 			return (
-				<span class={badgeClass(accent, 'eb-badge-num')} style={accentStyle(accent)}>
-					{pv.name}: {pv.value}
+				<span class={badgeClass(accent, 'eb-badge-num')} style={accentStyle(accent)} title={`${pv.name}: ${pv.value}`}>
+					<span class="eb-badge-text">{pv.name}: {pv.value}</span>
 				</span>
 			);
 		case 'percent':
@@ -242,8 +231,8 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 			return null;
 		case 'checkbox':
 			return (
-				<span class={badgeClass(accent)} style={accentStyle(accent)}>
-					{pv.value ? '☑' : '☐'} {pv.name}
+				<span class={badgeClass(accent)} style={accentStyle(accent)} title={pv.name}>
+					<span class="eb-badge-text">{pv.value ? '☑' : '☐'} {pv.name}</span>
 				</span>
 			);
 		case 'datetime':
@@ -272,8 +261,8 @@ export function PropertyBadge({ pv, config, progress, settings, card, api }: Pro
 		}
 		case 'raw':
 			return (
-				<span class={badgeClass(accent, 'eb-badge-muted')} style={accentStyle(accent)}>
-					<TextValue text={pv.value.join(', ')} api={api} />
+				<span class={badgeClass(accent, 'eb-badge-muted')} style={accentStyle(accent)} title={pv.value.join(', ')}>
+					<span class="eb-badge-text"><TextValue text={pv.value.join(', ')} api={api} /></span>
 				</span>
 			);
 	}

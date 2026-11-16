@@ -844,6 +844,14 @@ body.eb-dragging-group
 	margin-top: 6px;
 }
 
+/* Every property chip must yield to the card, including long date ranges and
+   unbroken text values. Its label owns the ellipsis; icons keep their width. */
+.eb-card-props .eb-badge {
+	box-sizing: border-box;
+	max-width: 100%;
+	min-width: 0;
+}
+
 /* Tags on the left, the checklist indicator pinned bottom-right (§5.5). */
 .eb-card-foot {
 	display: flex;
