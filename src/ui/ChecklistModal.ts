@@ -9,6 +9,7 @@
 import { App, Component, Keymap, Modal, Notice, setIcon } from 'obsidian';
 import Sortable from 'sortablejs';
 import * as cl from '../model/checklist';
+import { plainCardTitle } from '../model/plainCardTitle';
 import type { ChecklistItem, ChecklistPath } from '../model/checklist';
 import { createEmbeddedEditor, type EmbeddedEditorHandle } from '../view/embeddedEditor';
 import { renderInlineMarkdown } from '../view/inlineMarkdown';
@@ -69,7 +70,7 @@ export class ChecklistModal extends Modal {
 	override onOpen(): void {
 		keyboardAwareModal(this);
 		this.modalEl.addClass('eb-checklist-modal');
-		this.titleEl.setText(this.options.title || t('modal.checklist.title'));
+		this.titleEl.setText(plainCardTitle(this.options.title) || t('modal.checklist.title'));
 		this.countEl = this.titleEl.createSpan({ cls: 'eb-checklist-count' });
 
 		this.listEl = this.contentEl.createDiv({ cls: 'eb-checklist' });

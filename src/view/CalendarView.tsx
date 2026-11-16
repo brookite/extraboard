@@ -33,7 +33,7 @@ import {
 	weekNumber,
 } from '../model/dates';
 import * as ops from '../model/ops';
-import { unlinkedTitle } from '../model/link';
+import { plainCardTitle } from '../model/plainCardTitle';
 import type { Board, Card, ViewDef } from '../model/types';
 import { usableDateProperties } from '../model/views';
 import type { ExtraboardSettings } from '../settings';
@@ -191,9 +191,9 @@ function cardOf(board: Board, occurrenceRef: ops.ItemRef): Card | null {
 	return entry?.kind === 'card' ? entry.card : null;
 }
 
-/** Plain, cheap card text: the title with its link flattened and tokens gone. */
+/** Plain card label without Markdown syntax; the model already removed tokens. */
 function chipText(card: Card): string {
-	const text = unlinkedTitle(card.title).trim();
+	const text = plainCardTitle(card.title);
 	return text || t('modal.archive.untitled');
 }
 

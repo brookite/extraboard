@@ -1,6 +1,6 @@
 import { Menu, Platform } from 'obsidian';
 import { useEffect, useState } from 'preact/hooks';
-import { parseCardLink, unlinkedTitle } from '../../model/link';
+import { parseCardLink } from '../../model/link';
 import * as ops from '../../model/ops';
 import type { BoardConfig, Card, ViewDisplay } from '../../model/types';
 import { archiveOpts, cardEntryPos, type ExtraboardSettings } from '../../settings';
@@ -157,8 +157,8 @@ function CardTileInner({
 
 	const openChecklist = (): void => {
 		new ChecklistModal(api.app, {
-			// The card as it reads, with its content link flattened to its text.
-			title: unlinkedTitle(card.title),
+			// The modal converts inline Markdown to its plain-text heading.
+			title: card.title,
 			sourcePath: api.sourcePath(),
 			// Read through the live board every time: the modal outlives the render
 			// that opened it, and every edit replaces the board object.
