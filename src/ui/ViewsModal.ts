@@ -17,6 +17,8 @@ import { dateProperties, defaultViewName, hasKanbanView, isViewUsable } from '..
 import type { BoardApi } from '../view/api';
 import { ICONS, viewIcon } from '../util/constants';
 import type { FieldRef } from '../model/fieldValue';
+import type { FilterNode } from '../model/filter';
+import type { SortRule } from '../model/sort';
 import { openFilterSortModal } from './FilterSortModal';
 import { t } from '../i18n';
 import { keyboardAwareModal } from './keyboardInset';
@@ -188,6 +190,8 @@ class ViewsModal extends Modal {
 				weekNumbers: view.type === 'calendar' && !!view.weekNumbers,
 				controls: view.type === 'list' ? view.controls : 'dynamic',
 				groupBy: view.type === 'list' ? view.groupBy : 'section',
+				...(view.type === 'list' && view.filter && { filter: view.filter }),
+				...(view.type === 'list' && view.sorts && { sorts: view.sorts }),
 			},
 			lockType: true,
 			kanbanTaken: hasKanbanView(board.config.views),
@@ -222,15 +226,21 @@ class ViewsModal extends Modal {
 						this.close();
 						this.options.openBoardSettings();
 					},
-					openFilters: () => {
+					openFilters: (fields) => {
 						const view = options.view;
 						const board = this.board();
-						if (view?.type !== 'list' || !board) return;
+						if (fields.type !== 'list' || !board) return;
 						openFilterSortModal(this.app, {
 							board,
-							...(view.filter && { filter: view.filter }),
-							...(view.sorts && { sorts: view.sorts }),
+							...(fields.filter && { filter: fields.filter }),
+							...(fields.sorts && { sorts: fields.sorts }),
 							onApply: ({ filter, sorts }) => {
+								if (filter) fields.filter = filter;
+								else delete fields.filter;
+								fields.sorts = sorts;
+								// New views keep these in the form until Create; existing
+								// views retain their immediate Apply behavior.
+								if (view?.type !== 'list') return;
 								this.options.api.update((b) =>
 									ops.setViewSorts(ops.setViewFilter(b, view.id, filter), view.id, sorts),
 								);
@@ -275,6 +285,8 @@ interface ViewFields {
 	controls: ListControls;
 	/** List only: what the rows are gathered into (list-view.md §1.0). */
 	groupBy: ListGroupBy;
+	filter?: FilterNode;
+	sorts?: SortRule[];
 }
 
 /** How a sort key reads in a view's subtitle. */
@@ -295,13 +307,17 @@ function newViewOf(fields: ViewFields): ops.NewView {
 		};
 	}
 	if (fields.type !== 'list') return { name, type: 'kanban' };
-	return { name, type: 'list', controls: fields.controls, groupBy: fields.groupBy };
+	return {
+		name, type: 'list', controls: fields.controls, groupBy: fields.groupBy,
+		...(fields.filter && { filter: fields.filter }),
+		...(fields.sorts?.length && { sorts: fields.sorts }),
+	};
 }
 
 interface ViewFormOptions {
 	title: string;
 	/** Open the filter builder for the view being edited (list views only). */
-	openFilters: () => void;
+	openFilters: (fields: ViewFields) => void;
 	cta: string;
 	fields: ViewFields;
 	/** Editing: the type is fixed once a view exists (views.md §4.2). */
@@ -454,7 +470,7 @@ class ViewFormModal extends Modal {
 				.setDesc(t('modal.views.filtersDesc'))
 				.addButton((button) =>
 					button.setButtonText(t('filter.title')).onClick(() => {
-						this.options.openFilters();
+						this.options.openFilters(this.fields);
 					}),
 				);
 		}
