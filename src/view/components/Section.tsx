@@ -10,7 +10,7 @@
 // what the header edits, what the badge names, and what a drop means.
 
 import { Menu } from 'obsidian';
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
 import { sameKey, sectionsOf, type Section, type SectionKey } from '../../model/sections';
 import { isNestedRule, isStackBoundary } from '../../model/sectionView';
@@ -192,7 +192,13 @@ export function SectionGroup(props: SectionProps) {
 	const [renaming, setRenaming] = useState(false);
 	const bodyRef = useRef<HTMLDivElement>(null);
 
-	const collapsed = !ungrouped && state.collapsed === true;
+	const empty = rows.length === 0;
+	const [emptyExpanded, setEmptyExpanded] = useState(false);
+	useEffect(() => {
+		if (!empty) setEmptyExpanded(false);
+	}, [empty]);
+	// An empty group can be opened for its composer without changing saved state.
+	const collapsed = !ungrouped && (empty ? !emptyExpanded : state.collapsed === true);
 	const key = section.key;
 	const named = key.kind === 'named';
 	/** The stack this group *is*, when the list is grouped by stack (§1.0). */
@@ -206,7 +212,10 @@ export function SectionGroup(props: SectionProps) {
 	// user asked for, not the file's, so it accepts drops but not positions.
 	useSortable(bodyRef, { group: 'eb-list-rows', draggable: '.eb-list-row', sort: ordered, disabled: byTag }, onDrop);
 
-	const setCollapsed = (value: boolean): void => onState({ collapsed: value });
+	const setCollapsed = (value: boolean): void => {
+		if (empty) setEmptyExpanded(!value);
+		else onState({ collapsed: value });
+	};
 
 	/** Renaming is offered wherever there is a name in the file to change. */
 	const renameable = byStack || named;
@@ -237,7 +246,7 @@ export function SectionGroup(props: SectionProps) {
 	 * filter would hide it.
 	 */
 	const addCard = (atTop?: boolean): void => {
-		setCollapsed(false);
+		if (state.collapsed) onState({ collapsed: false });
 		onAddCard(atTop);
 	};
 

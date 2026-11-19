@@ -515,6 +515,8 @@ export function ListView({ board, view, api, settings }: Props) {
 			</div>
 			{board.stacks.length === 0 ? <div class="eb-list-empty">{t('list.emptyBoard')}</div> : null}
 			{sections.map((section, index) => {
+				const rows = drawn[index] ?? [];
+				if (section.key.kind === 'tag' && section.key.tag !== null && rows.length === 0) return null;
 				const state = stateOf(section);
 				const at = movable.indexOf(section);
 				return (
@@ -526,7 +528,7 @@ export function ListView({ board, view, api, settings }: Props) {
 						ungrouped={ungrouped}
 						index={index}
 						config={board.config}
-						rows={drawn[index] ?? []}
+						rows={rows}
 						state={state}
 						ordered={!sorts?.length}
 						api={api}

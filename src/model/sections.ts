@@ -172,9 +172,7 @@ function tagGroupsOf(board: Board): Section[] {
 			}
 		});
 	});
-	const sorted = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
-	if (untagged.cards.length > 0 || sorted.length === 0) sorted.push(untagged);
-	return sorted;
+	return [untagged, ...[...groups.values()].sort((a, b) => a.name.localeCompare(b.name))];
 }
 
 /** Named sections in list order — what a move is expressed against (§4.1). */

@@ -10,7 +10,11 @@ import { boardHead } from './boardFile';
 
 // Exercise the real group renderer and badge callbacks without Obsidian's DOM.
 vi.mock('obsidian', () => ({ Menu: class {}, setIcon: vi.fn(), Platform: { isMobile: false } }));
-vi.mock('preact/hooks', () => ({ useRef: () => ({ current: null }), useState: (value: unknown) => [value, vi.fn()] }));
+vi.mock('preact/hooks', () => ({
+	useEffect: vi.fn(),
+	useRef: () => ({ current: null }),
+	useState: (value: unknown) => [value, vi.fn()],
+}));
 vi.mock('../src/view/useSortable', () => ({ useSortable: vi.fn() }));
 vi.mock('../src/view/components/Card', () => ({ CardTile: () => null }));
 vi.mock('../src/view/components/InlineEditor', () => ({ InlineEditor: () => null }));
@@ -83,6 +87,22 @@ describe('ungrouped list rendering', () => {
 		const tile = rendered.find((node) => node.type === CardTile)!;
 		expect(tile.props.sectionLabel).toBeUndefined();
 	});
+
+	it('automatically collapses a group with no visible rows and leaves its header available', () => {
+		const { props } = setup(false);
+		const rendered = nodes(SectionGroup({ ...props, rows: [], state: {} }));
+		expect(rendered.some((node) => node.props.class === 'eb-section-header')).toBe(true);
+		expect(rendered.find((node) => node.props.class === 'eb-section-body')?.props.hidden).toBe(true);
+		expect(rendered.some((node) => node.props.class === 'eb-section-compose')).toBe(false);
+		expect(props.onState).not.toHaveBeenCalled();
+	});
+
+	it('keeps the composer visible when the flat list is empty', () => {
+		const { props } = setup();
+		const rendered = nodes(SectionGroup({ ...props, rows: [] }));
+		expect(rendered.find((node) => node.props.class === 'eb-section-body')?.props.hidden).toBe(false);
+		expect(rendered.some((node) => node.props.class === 'eb-section-compose')).toBe(true);
+	});
 });
 
 describe('tag group rendering', () => {
@@ -96,25 +116,32 @@ describe('tag group rendering', () => {
 
 	it('renders one shared card in every tag and keeps both location badges', () => {
 		const groups = tagTiles(board());
-		expect(groups.map(({ tag }) => tag)).toEqual(['a', 'b', '']);
-		const a = groups[0]!.tiles[0]!.props;
-		const b = groups[1]!.tiles[0]!.props;
+		expect(groups.map(({ tag }) => tag)).toEqual(['', 'a', 'b']);
+		const a = groups[1]!.tiles[0]!.props;
+		const b = groups[2]!.tiles[0]!.props;
 		expect(a.card).toBe(b.card);
 		expect(a).toMatchObject({ stackLabel: 'To do', sectionLabel: 'Work' });
 		expect(b).toMatchObject({ stackLabel: 'To do', sectionLabel: 'Work' });
-		expect(groups[2]!.tiles[0]!.props.card).toMatchObject({ title: 'Untagged' });
+		expect(groups[0]!.tiles[0]!.props.card).toMatchObject({ title: 'Untagged' });
+	});
+
+	it('keeps No tags at the top when every card has a tag', () => {
+		const tagged = parseBoard(`${boardHead()}\n## To do\n\n- Tagged #a\n`);
+		const [first, ...rest] = tagTiles(tagged);
+		expect(first).toEqual({ tag: '', tiles: [] });
+		expect(rest.map(({ tag }) => tag)).toEqual(['a']);
 	});
 
 	it('refreshes repeated rows and changes group membership after saving a card', () => {
 		const before = board();
-		const ref = groupsOf(before, 'tag')[0]!.cards[0]!;
+		const ref = groupsOf(before, 'tag')[1]!.cards[0]!;
 		const revised = setCardText(before, ref, 'Revised #a #b');
-		expect(tagTiles(revised).slice(0, 2).map(({ tiles }) => (tiles[0]!.props.card as Card).title))
+		expect(tagTiles(revised).slice(1).map(({ tiles }) => (tiles[0]!.props.card as Card).title))
 			.toEqual(['Revised', 'Revised']);
 
 		const retagged = setCardText(revised, ref, 'Retagged #a #c');
 		expect(tagTiles(retagged).map(({ tag, tiles }) => [tag, (tiles[0]!.props.card as Card).title]))
-			.toEqual([['a', 'Retagged'], ['c', 'Retagged'], ['', 'Untagged']]);
+			.toEqual([['', 'Untagged'], ['a', 'Retagged'], ['c', 'Retagged']]);
 
 		const untagged = setCardText(retagged, ref, 'No longer tagged');
 		expect(tagTiles(untagged).map(({ tag, tiles }) => [
