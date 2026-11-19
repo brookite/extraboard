@@ -111,6 +111,11 @@
 	font-size: var(--font-ui-smaller, 0.9em);
 }
 
+.eb-filter-condition > :is(select, input) {
+	max-inline-size: 100%;
+	box-sizing: border-box;
+}
+
 .eb-filter-field {
 	flex: 1 1 120px;
 }
@@ -121,6 +126,20 @@
 
 .eb-filter-value {
 	flex: 1 1 120px;
+}
+
+.eb-filter-date-window {
+	display: grid;
+	grid-template-columns: minmax(0, min(45%, 6.5rem)) minmax(0, 1fr);
+	gap: var(--size-4-1, 4px);
+	flex: 1 1 13rem;
+	min-inline-size: 0;
+	max-inline-size: 100%;
+}
+
+.eb-filter-date-window > :is(input, select) {
+	inline-size: 100%;
+	box-sizing: border-box;
 }
 
 .eb-filter-and {

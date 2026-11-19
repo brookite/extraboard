@@ -21,16 +21,16 @@ export function FilterDateEditor({ op, value, onChange }: {
 	}
 	const [amount = '', unit = 'day'] = value.split(' ');
 	return (
-		<>
-			<input class="eb-filter-value" type="number" min="0" step="1" value={amount}
+		<div class="eb-filter-date-window">
+			<input type="number" min="0" step="1" value={amount}
 				aria-label={t('filter.date.amount')} placeholder={t('filter.date.amount')}
 				onInput={(e) => onChange(`${e.currentTarget.value} ${unit}`)} />
-			<select class="eb-filter-op dropdown" value={unit} aria-label={t('filter.date.unit')}
+			<select class="dropdown" value={unit} aria-label={t('filter.date.unit')}
 				onChange={(e) => onChange(`${amount} ${e.currentTarget.value}`)}>
 				{FILTER_DATE_UNITS.map((entry) => (
 					<option key={entry} value={entry}>{t(`filter.date.${entry}`)}</option>
 				))}
 			</select>
-		</>
+		</div>
 	);
 }
