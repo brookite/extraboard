@@ -35,6 +35,7 @@ with its own file format, not a fork.
   Ctrl/⌘+Enter adds and keeps the dialog open for the next card.
 - **A calendar can read several date properties at once** — a card with a start
   and a due date shows on both days, and once where they fall on the same one.
+  A date property's badge accent outlines its events, including compact dots.
   Today is highlighted, and week numbers can be shown per view.
 - **Filters and sorting for a list:** a condition builder with AND / OR / NOT
   groups over any property plus the card's own text, tags, checkbox, linked

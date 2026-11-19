@@ -2654,6 +2654,7 @@ body.eb-dragging-card .eb-archive-drop {
 	width: 6px;
 	height: 6px;
 	border-radius: 999px;
+	outline: 1px solid var(--eb-cal-date-accent);
 	/* Uncolored cards still have to be countable, so they take the muted text
 	   color rather than disappearing. */
 	background: var(--text-muted);
@@ -2703,6 +2704,11 @@ body.eb-dragging-card .eb-archive-drop {
 .eb-cal-bar-text {
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+.eb-cal-chip,
+.eb-cal-bar {
+	box-shadow: inset 0 0 0 1px var(--eb-cal-date-accent);
 }
 
 /* A segment that continues into another row must not look like a shorter one. */

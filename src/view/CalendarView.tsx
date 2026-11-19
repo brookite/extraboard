@@ -1,4 +1,4 @@
-// The calendar: a month or week grid placing cards by one date property.
+// The calendar: a month or week grid placing cards by their date properties.
 // Spec: docs/specs/calendar-view.md §2–§4, §6.
 //
 // The rule that shapes this file: **a day cell is a read-only summary.** Chips
@@ -41,6 +41,7 @@ import { pickDateProperty } from '../ui/DatePropertyModal';
 import { chipUnits, planChips } from '../model/calendarChips';
 import { openDayModal } from '../ui/DayModal';
 import type { BoardApi } from './api';
+import { occurrenceAccent } from './calendarAccent';
 import { Icon } from './components/Icon';
 import { safeColor } from './components/style';
 import { readableOn } from '../util/color';
@@ -219,10 +220,13 @@ function chipColor(board: Board, ref: ops.ItemRef, card: Card): string | undefin
  * picked for it — `util/color.ts:readableOn` is the one place that decides
  * black or white on a colour, shared with the date highlights' badges.
  */
-function colorStyle(color: string | undefined, fill: boolean): string | undefined {
-	if (!color) return undefined;
-	const text = fill ? readableOn(color, document.body) : undefined;
-	return `--eb-card-color: ${color}${text === undefined ? '' : `; --eb-card-text: ${text}`}`;
+function colorStyle(color: string | undefined, fill: boolean, accent?: string): string | undefined {
+	const text = fill && color ? readableOn(color, document.body) : undefined;
+	return [
+		color ? `--eb-card-color: ${color}` : '',
+		text ? `--eb-card-text: ${text}` : '',
+		accent ? `--eb-cal-date-accent: ${accent}` : '',
+	].filter(Boolean).join('; ') || undefined;
 }
 
 /**
@@ -258,6 +262,7 @@ interface ChipProps {
 	repeating?: boolean;
 	/** Named in the tooltip; passed only when the view reads several properties. */
 	sources?: OccurrenceSource[];
+	accent?: string;
 	/** Paint the card's colour over the whole chip rather than as a dot (§3.4). */
 	fill?: boolean;
 	onOpen: () => void;
@@ -275,6 +280,7 @@ function Chip({
 	opts,
 	repeating,
 	sources,
+	accent,
 	fill,
 	onOpen,
 }: ChipProps) {
@@ -284,7 +290,7 @@ function Chip({
 	// A duration is drawn only when it is both known and worth a row of its own.
 	const span = units !== undefined && units > 1;
 	const style = [
-		colorStyle(color, filled) ?? '',
+		colorStyle(color, filled, accent) ?? '',
 		span ? `--eb-cal-chip-units: ${String(units)}` : '',
 		lines !== undefined && lines > 1 ? `--eb-cal-chip-lines: ${String(lines)}` : '',
 	]
@@ -763,7 +769,8 @@ function WeekRow({
 					if (!card) return null;
 					const color = chipColor(board, segment.occurrence.ref, card);
 					const filled = fill && !!color;
-					const paint = colorStyle(color, filled);
+					const accent = occurrenceAccent(board.config, segment.occurrence.sources);
+					const paint = colorStyle(color, filled, accent);
 					return (
 						<div
 							key={`${String(segment.index)}`}
@@ -799,6 +806,7 @@ function WeekRow({
 						dim: showOutside && day.m !== anchorMonth,
 						isToday: sameDay(day, now),
 						occurrences: byDay.get(dayKey(day)) ?? [],
+						multi,
 						onOpen: () => onOpenDay(day),
 						onDrop,
 					};
@@ -815,7 +823,6 @@ function WeekRow({
 							indexOf={indexOf}
 							stretch={stretch}
 							fill={fill}
-							multi={multi}
 							dateTimeOpts={dateTimeOpts}
 						/>
 					);
@@ -834,6 +841,8 @@ interface BaseCellProps {
 	dim: boolean;
 	isToday: boolean;
 	occurrences: Occurrence[];
+	/** Name the source properties in event tooltips. */
+	multi: boolean;
 	onOpen: () => void;
 	onDrop: (drop: DropInfo) => void;
 }
@@ -846,8 +855,6 @@ interface CellProps extends BaseCellProps {
 	stretch: boolean;
 	/** Paint a card's colour over its whole chip (§3.4). */
 	fill: boolean;
-	/** Name the properties in chip tooltips (§3.1). */
-	multi: boolean;
 	dateTimeOpts: DateTimeOpts;
 }
 
@@ -865,7 +872,7 @@ function cellClass(dim: boolean, isToday: boolean): string {
  * width — but the container keeps its `data-list`, so a card can still be
  * dropped onto a day from the "No date" tray.
  */
-function CompactDayCell({ board, day, index, dim, isToday, occurrences, onOpen, onDrop }: BaseCellProps) {
+function CompactDayCell({ board, day, index, dim, isToday, occurrences, multi, onOpen, onDrop }: BaseCellProps) {
 	const listRef = useRef<HTMLDivElement>(null);
 	useSortable(listRef, { group: 'eb-cal', sort: false, draggable: '.eb-cal-chip' }, onDrop);
 
@@ -882,12 +889,13 @@ function CompactDayCell({ board, day, index, dim, isToday, occurrences, onOpen, 
 					const card = cardOf(board, occurrence.ref);
 					if (!card) return null;
 					const color = chipColor(board, occurrence.ref, card);
+					const accent = occurrenceAccent(board.config, occurrence.sources);
 					return (
 						<span
 							key={`${String(occurrence.ref.stack)}-${String(occurrence.ref.item)}-${String(i)}`}
 							class={`eb-cal-mark${ops.isCardDone(card) ? ' is-done' : ''}${color ? ' is-colored' : ''}`}
-							style={color ? `--eb-card-color: ${color}` : undefined}
-							title={chipText(card)}
+							style={colorStyle(color, false, accent)}
+							title={chipTooltip(card, multi ? occurrence.sources : undefined)}
 						/>
 					);
 				})}
@@ -949,6 +957,7 @@ function DayCell({
 							opts={dateTimeOpts}
 							repeating={occurrence.repeating}
 							sources={multi ? occurrence.sources : undefined}
+							accent={occurrenceAccent(board.config, occurrence.sources)}
 							fill={fill}
 							onOpen={onOpen}
 						/>

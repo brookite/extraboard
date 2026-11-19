@@ -14,6 +14,7 @@ import { formatDate } from '../src/model/dates';
 import { parseBoard } from '../src/model/parse';
 import { serializeBoard } from '../src/model/serialize';
 import type { Board } from '../src/model/types';
+import { occurrenceAccent } from '../src/view/calendarAccent';
 import { boardHead } from './boardFile';
 
 const FM = boardHead({
@@ -56,6 +57,28 @@ describe('calendar: several date properties (§1.3)', () => {
 		expect(occurrences).toHaveLength(2);
 		expect(occurrences.map((o) => formatDate(o.start))).toEqual(['2026-07-20', '2026-07-28']);
 		expect(occurrences.map(names)).toEqual([['start'], ['due']]);
+	});
+
+	it('uses only the properties that placed each occurrence for its outline', () => {
+		const b = board('- Ship @{start|2026-07-20} @{due|2026-07-28}');
+		b.config.properties.find((def) => def.name === 'start')!.accent = '#e5484d';
+		b.config.properties.find((def) => def.name === 'due')!.accent = '#3e63dd';
+		const { occurrences } = placeCards(b, ['start', 'due']);
+		expect(occurrences.map((o) => occurrenceAccent(b.config, o.sources)))
+			.toEqual(['#e5484d', '#3e63dd']);
+	});
+
+	it.each([
+		['#e5484d', undefined, '#e5484d'],
+		['#e5484d', '#E5484D', '#e5484d'],
+		['#e5484d', '#3e63dd', undefined],
+		[undefined, undefined, undefined],
+	])('resolves a merged outline from %s and %s to %s', (start, due, expected) => {
+		const b = board('- Ship @{start|2026-07-28} @{due|2026-07-28}');
+		b.config.properties.find((def) => def.name === 'start')!.accent = start;
+		b.config.properties.find((def) => def.name === 'due')!.accent = due;
+		const { occurrences } = placeCards(b, ['start', 'due']);
+		expect(occurrenceAccent(b.config, occurrences[0]!.sources)).toBe(expected);
 	});
 
 	it('merges a range contained in another, keeping the wider geometry', () => {
