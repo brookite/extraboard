@@ -36,8 +36,10 @@ export interface FilterSortResult {
 	sorts: SortRule[];
 }
 
+export type FilterSortTab = 'filters' | 'sorts';
+
 /** Which halves of the editor are offered. */
-export type FilterSortTabs = 'both' | 'filters' | 'sorts';
+export type FilterSortTabs = 'both' | FilterSortTab;
 
 export interface FilterSortModalOptions {
 	/** The board whose tags, stacks and sections the operands offer. Absent
@@ -52,6 +54,8 @@ export interface FilterSortModalOptions {
 	title?: string;
 	/** Default `both`. A reminder's end filter has no order to set, for one. */
 	tabs?: FilterSortTabs;
+	/** First tab to show when both are available. Defaults to filters. */
+	initialTab?: FilterSortTab;
 	filter?: FilterNode;
 	sorts?: SortRule[];
 	/** The whole result at once — one edit, one save. */
@@ -74,6 +78,7 @@ function Editor({
 	config,
 	choices,
 	tabs,
+	initialTab,
 	initial,
 	onApply,
 	onCancel,
@@ -82,11 +87,12 @@ function Editor({
 	config: BoardConfig;
 	choices: FieldChoices;
 	tabs: FilterSortTabs;
+	initialTab: FilterSortTab;
 	initial: { filter?: FilterNode; sorts?: SortRule[] };
 	onApply: (result: FilterSortResult) => void;
 	onCancel: () => void;
 }) {
-	const [tab, setTab] = useState<'filters' | 'sorts'>(tabs === 'sorts' ? 'sorts' : 'filters');
+	const [tab, setTab] = useState(initialTab);
 	const [root, setRoot] = useState<FilterGroup>(() => rootOf(initial.filter));
 	const [sorts, setSorts] = useState<SortRule[]>(() => (initial.sorts ?? []).map((r) => ({ ...r })));
 
@@ -220,12 +226,14 @@ class FilterSortModal extends Modal {
 			stack.items.map((_, i) => ({ stack: s, item: i })),
 		);
 		const names = board ? boardNames(board) : { stacks: [], sections: [] };
+		const tabs = this.options.tabs ?? 'both';
 		render(
 			<Editor
 				app={this.app}
 				config={config}
 				choices={{ tags: board ? tagsOf(board, refs) : [], ...names }}
-				tabs={this.options.tabs ?? 'both'}
+				tabs={tabs}
+				initialTab={tabs === 'both' ? (this.options.initialTab ?? 'filters') : tabs}
 				initial={{ filter: this.options.filter, sorts: this.options.sorts }}
 				onApply={(result) => {
 					this.options.onApply(result);

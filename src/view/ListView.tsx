@@ -23,7 +23,7 @@ import { sectionMoveTargets } from '../model/sectionView';
 import { sortCards, type SortRule } from '../model/sort';
 import type { Board, ListGroupBy, SectionState, ViewDef } from '../model/types';
 import { cardEntryPos, type ExtraboardSettings } from '../settings';
-import { openFilterSortModal } from '../ui/FilterSortModal';
+import { openFilterSortModal, type FilterSortTab } from '../ui/FilterSortModal';
 import type { BoardApi } from './api';
 import { SectionGroup } from './components/Section';
 import { addStack } from './KanbanView';
@@ -186,9 +186,10 @@ export function ListView({ board, view, api, settings }: Props) {
 	};
 
 	/** The filter and sort builder (§4). A `session` view keeps the result here. */
-	const editFilters = (): void => {
+	const editFilterSort = (initialTab: FilterSortTab): void => {
 		openFilterSortModal(api.app, {
 			board,
+			initialTab,
 			...(filter && { filter }),
 			...(sorts && { sorts }),
 			onApply: ({ filter: next, sorts: nextSorts }) => {
@@ -484,7 +485,7 @@ export function ListView({ board, view, api, settings }: Props) {
 					class={`eb-badge eb-list-filter${filtered ? ' is-active' : ''}`}
 					disabled={locked}
 					title={locked ? t('list.controlsFixed') : t('filter.title')}
-					onClick={editFilters}
+					onClick={() => editFilterSort('filters')}
 				>
 					<Icon name="filter" class="eb-button-icon" />
 					<span>{filtered ? t('filter.conditions', { count: conditions }) : t('filter.chip')}</span>
@@ -494,7 +495,7 @@ export function ListView({ board, view, api, settings }: Props) {
 					class={`eb-badge eb-list-sort${sorts?.length ? ' is-active' : ''}`}
 					disabled={locked}
 					title={locked ? t('list.controlsFixed') : t('filter.sortTab')}
-					onClick={editFilters}
+					onClick={() => editFilterSort('sorts')}
 				>
 					<Icon name="arrow-up-down" class="eb-button-icon" />
 					<span>{sortLabel}</span>
