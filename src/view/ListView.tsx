@@ -9,19 +9,18 @@ import { Menu } from 'obsidian';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { countConditions, filterCards, isEmptyFilter, type FilterNode } from '../model/filter';
 import * as ops from '../model/ops';
+import { listGroups, moveListGroup, type ListGroup } from '../model/listGroups';
 import {
-	groupsOf,
 	placesOf,
 	sameKey,
 	sectionOf,
 	sectionsOf,
 	stateKeyOf,
-	type Section,
 	type SectionKey,
 } from '../model/sections';
 import { sectionMoveTargets } from '../model/sectionView';
 import { sortCards, type SortRule } from '../model/sort';
-import type { Board, ListGroupBy, SectionState, ViewDef } from '../model/types';
+import type { Board, ListGroupBy, ListGroupState, ListGroupStates, SectionState, ViewDef } from '../model/types';
 import { cardEntryPos, type ExtraboardSettings } from '../settings';
 import { openFilterSortModal, type FilterSortTab } from '../ui/FilterSortModal';
 import type { BoardApi } from './api';
@@ -55,9 +54,7 @@ interface Props {
 
 /**
  * What a `session` view keeps in the component instead of the file (§3.4): the
- * view's own filter and sort, and every section's collapse. Keyed by section,
- * which is stable for as long as the board's shape is — the state is meant to
- * be lost on a reload anyway.
+ * view's filters, sorting, grouping and each grouping's presentation.
  */
 interface SessionState {
 	filter?: FilterNode;
@@ -65,20 +62,11 @@ interface SessionState {
 	/** Absent means "whatever the view definition says" — unlike a filter, a
 	 * grouping has no empty value to fall back to (§1.0). */
 	groupBy?: ListGroupBy;
-	collapsed: Record<string, boolean>;
-}
-
-/** The key a section's session state is held under. */
-function sessionKey(section: Section): string {
-	const key = section.key;
-	if (key.kind === 'none') return 'none';
-	if (key.kind === 'named') return `named:${key.name}`;
-	if (key.kind === 'tag') return `tag:${key.tag ?? ''}`;
-	return `stack:${String(key.index)}`;
+	groupStates?: ListGroupStates;
 }
 
 export function ListView({ board, view, api, settings }: Props) {
-	const [session, setSession] = useState<SessionState>({ collapsed: {} });
+	const [session, setSession] = useState<SessionState>({});
 	const [addingSection, setAddingSection] = useState(false);
 	const rootRef = useRef<HTMLDivElement>(null);
 	// The composer's stack, per section, remembered for as long as the view is
@@ -111,9 +99,10 @@ export function ListView({ board, view, api, settings }: Props) {
 	const byStack = groupBy === 'stack';
 	const ungrouped = groupBy === 'none';
 	const byTag = groupBy === 'tag';
-	/** What the list draws: the board read across its dividers, or along its
-	 * stacks (§1.0). Everything below is expressed against these groups. */
-	const sections = useMemo(() => groupsOf(board, groupBy), [board, groupBy]);
+	const groupStates = persist ? view.groupStates : session.groupStates;
+	const groupingState = groupBy === 'none' ? undefined : groupStates?.[groupBy];
+	const order = groupingState?.order;
+	const groups = useMemo(() => listGroups(board, groupBy, order), [board, groupBy, order]);
 	// Recurrences and moving date filters consume the minute clock.
 	// `@stack` / `@section` read the card's place, indexed only if asked for.
 	const now = useNow();
@@ -123,37 +112,41 @@ export function ListView({ board, view, api, settings }: Props) {
 		weekStart: resolveWeekStart(settings.weekStart), where,
 	};
 
-	/** Section collapse follows the view's persistence mode (§5). */
-	const stateOf = (section: Section): SectionState => {
-		if (ungrouped) return {};
-		// A stack group's collapse also collapses its Kanban column (§1.0).
-		if (section.key.kind === 'stack') {
-			return { collapsed: board.stacks[section.key.index]?.collapsed === true };
-		}
+	const stateOf = ({ id, section }: ListGroup): SectionState => {
+		if (groupBy === 'none') return {};
+		const temporary = locked ? session.groupStates?.[groupBy]?.collapsed?.[id] : undefined;
+		const saved = temporary ?? groupingState?.collapsed?.[id];
+		if (typeof saved === 'boolean') return { collapsed: saved };
 		const key = stateKeyOf(section.key);
-		const stored = key === null ? undefined : view.sections?.[key];
-		const collapsed = persist && key !== null
-			? stored?.collapsed === true
-			: session.collapsed[sessionKey(section)] === true;
-		return { collapsed };
+		if (persist && key !== null) return { collapsed: view.sections?.[key]?.collapsed };
+		if (section.key.kind === 'stack') return { collapsed: board.stacks[section.key.index]?.collapsed };
+		return {};
 	};
 
-	const patchState = (section: Section, patch: Partial<SectionState>): void => {
-		if (ungrouped) return;
-		if (patch.collapsed === undefined) return;
-		const collapsed = patch.collapsed;
-		if (section.key.kind === 'stack') {
-			const at = section.key.index;
-			api.update((b) => ops.setStackCollapsed(b, at, collapsed));
+	const updateGroupingState = (update: (state: ListGroupState) => ListGroupState, save = persist): void => {
+		if (groupBy === 'none') return;
+		if (save) {
+			api.update((b) => ops.setListGroupState(b, view.id, groupBy, update));
 			return;
 		}
-		const key = stateKeyOf(section.key);
-		if (persist && key !== null) {
-			api.update((b) => ops.setSectionState(b, view.id, key, { collapsed }));
-			return;
-		}
-		const local = sessionKey(section);
-		setSession((current) => ({ ...current, collapsed: { ...current.collapsed, [local]: collapsed } }));
+		setSession((current) => ({
+			...current,
+			groupStates: {
+				...current.groupStates,
+				[groupBy]: update(current.groupStates?.[groupBy] ?? {}),
+			},
+		}));
+	};
+
+	const patchState = (id: string, { collapsed }: SectionState): void => {
+		if (collapsed === undefined) return;
+		updateGroupingState(
+			(state) => state.collapsed?.[id] === collapsed ? state : ({
+				...state,
+				collapsed: { ...state.collapsed, [id]: collapsed },
+			}),
+			persist && !locked,
+		);
 	};
 
 	/**
@@ -211,10 +204,13 @@ export function ListView({ board, view, api, settings }: Props) {
 	// added *here* rather than inside the section — a card the user just created
 	// must be visible even when the section's own filter would hide it, and it
 	// must still be addressable as a row.
-	const drawn = sections.map((section) => {
-		const rows = sortCards(board, filterCards(board, section.cards, filter, ctx), sorts, ctx);
-		if (!pending || rows.some((ref) => sameRef(ref, pending))) return rows;
-		return section.cards.some((ref) => sameRef(ref, pending)) ? [...rows, pending] : rows;
+	const drawn = groups.flatMap((group) => {
+		const { section } = group;
+		let rows = sortCards(board, filterCards(board, section.cards, filter, ctx), sorts, ctx);
+		if (pending && !rows.some((ref) => sameRef(ref, pending)) &&
+			section.cards.some((ref) => sameRef(ref, pending))) rows = [...rows, pending];
+		if (section.key.kind === 'tag' && section.key.tag !== null && rows.length === 0) return [];
+		return [{ ...group, rows }];
 	});
 
 	/**
@@ -222,13 +218,14 @@ export function ListView({ board, view, api, settings }: Props) {
 	 * remember where it went so that tile opens the inline editor (§4.2). The op
 	 * reports the position itself, since it may have created a divider above it.
 	 */
-	const addCard = (section: Section, atTop?: boolean): void => {
+	const addCard = ({ id, section }: ListGroup, atTop?: boolean): void => {
+		const composerKey = `${groupBy}:${id}`;
 		// Which pair the composer names depends on the axis: a section group picks
 		// the stack, a stack group picks the section (§4.2).
 		const stack =
 			section.key.kind === 'stack'
 				? section.key.index
-				: Math.min(composerStacks[sessionKey(section)] ?? 0, board.stacks.length - 1);
+				: Math.min(composerStacks[composerKey] ?? 0, board.stacks.length - 1);
 		if (!board.stacks[stack]) return;
 		// A stack group's start is the stack's own top, the head of its sectionless
 		// cards, whatever section the composer is pointed at (§4.4).
@@ -236,7 +233,7 @@ export function ListView({ board, view, api, settings }: Props) {
 			section.key.kind === 'stack' || section.key.kind === 'tag' || ungrouped
 				? atTop && section.key.kind !== 'tag'
 					? { kind: 'none' }
-					: (composerSections[sessionKey(section)] ?? { kind: 'none' })
+					: (composerSections[composerKey] ?? { kind: 'none' })
 				: section.key;
 		const tag = section.key.kind === 'tag' ? section.key.tag : null;
 		let inserted: ops.ItemRef | null = null;
@@ -252,7 +249,7 @@ export function ListView({ board, view, api, settings }: Props) {
 	};
 
 	/** Only the sectionless group has an "entering card" end to choose (§6.7). */
-	const entryTop = (b: Board, stack: number, key: Section['key']): boolean =>
+	const entryTop = (b: Board, stack: number, key: SectionKey): boolean =>
 		key.kind === 'none' &&
 		(b.stacks[stack]?.completes
 			? (b.config.addToTopCompleting ?? settings.addToTopCompleting)
@@ -269,10 +266,10 @@ export function ListView({ board, view, api, settings }: Props) {
 	 */
 	const onDrop = (info: DropInfo): void => {
 		if (byTag) return;
-		const from = drawn[info.fromList]?.[info.fromIndex];
-		const target = sections[info.toList];
+		const from = drawn[info.fromList]?.rows[info.fromIndex];
+		const target = drawn[info.toList];
 		if (!from || !target) return;
-		const rows = drawn[info.toList] ?? [];
+		const { section, rows } = target;
 		if (ungrouped) {
 			if (sorts?.length) return;
 			const before = info.before === null ? undefined : rows[info.before];
@@ -282,8 +279,8 @@ export function ListView({ board, view, api, settings }: Props) {
 		// Grouped by stack a drop is a plain item move, exactly as it is on the
 		// board: the card enters that stack at that position, and whichever
 		// section the position falls in is the section it joins (§4.3).
-		if (target.key.kind === 'stack') {
-			const to = target.key.index;
+		if (section.key.kind === 'stack') {
+			const to = section.key.index;
 			const before = info.before === null ? null : (rows[info.before]?.item ?? null);
 			api.update((b) => ops.moveItem(b, from, to, before));
 			return;
@@ -292,7 +289,7 @@ export function ListView({ board, view, api, settings }: Props) {
 		if (info.before !== null) {
 			before = rows.slice(info.before).find((ref) => ref.stack === from.stack) ?? null;
 		}
-		api.update((b) => ops.moveCardToSection(b, from, from.stack, target.key, before));
+		api.update((b) => ops.moveCardToSection(b, from, from.stack, section.key, before));
 	};
 
 	/**
@@ -314,7 +311,7 @@ export function ListView({ board, view, api, settings }: Props) {
 			for (const section of targets) {
 				target.addItem((item) =>
 					item
-						.setTitle(sectionLabel(current, section))
+						.setTitle(sectionKeyLabel(current, section.key))
 						.setIcon(section.key.kind === 'named' ? 'heading' : 'minus')
 						.setDisabled(sameKey(here, section.key))
 						.onClick(() => {
@@ -403,69 +400,36 @@ export function ListView({ board, view, api, settings }: Props) {
 		});
 	}, []);
 
-	// Sections reorder among themselves; only a named one is draggable, so the
-	// grip is what Sortable takes hold of (§4.1).
+	const movable = locked ? [] : drawn.filter(({ section }) => section.movable);
+	const groupPositions = new Map(movable.map(({ id }, index) => [id, index]));
+	const moveGroup = (group: ListGroup, before: string | null): void => {
+		const at = groupPositions.get(group.id);
+		if (at === undefined || before === group.id || before === (movable[at + 1]?.id ?? null)) return;
+		updateGroupingState((state) => ({
+			...state,
+			order: moveListGroup(groups, state.order, group.id, before),
+		}));
+	};
+
+	const moveBy = (group: ListGroup, index: number, direction: -1 | 1): void => {
+		const target = index + direction;
+		if (target < 0 || target >= movable.length) return;
+		const before = movable[direction < 0 ? target : target + 1]?.id ?? null;
+		moveGroup(group, before);
+	};
+
 	useSortable(
 		rootRef,
 		{ group: 'eb-list-sections', draggable: '.eb-section.is-movable', handle: '.eb-section-grip' },
 		(info) => {
-			const moved = sections[info.fromIndex];
-			// Grouped by stack the groups *are* the stacks, so reordering them is the
-			// board's own stack move — the columns change order too, which is the
-			// point: the two views show one file (§4.1).
-			if (moved?.key.kind === 'stack') {
-				const from = moved.key.index;
-				api.update((b) => ops.moveStack(b, from, beforeStack(info.before)));
-				return;
-			}
-			if (moved?.key.kind !== 'named') return;
-			api.update((b) => ops.moveSection(b, moved.key.kind === 'named' ? moved.key.name : '', beforeName(info.before)));
+			const moved = drawn[info.fromIndex];
+			if (!moved?.section.movable) return;
+			const before = info.before === null
+				? null
+				: drawn.slice(info.before).find(({ section }) => section.movable)?.id ?? null;
+			moveGroup(moved, before);
 		},
 	);
-
-	/**
-	 * The section a move lands in front of, as `moveSection` names it: the first
-	 * **named** section at or after the drop position, since those are the only
-	 * ones the file order can be expressed against. Past the last one it is the
-	 * end of the list, which is `null`.
-	 */
-	/** The stack a stack-group move lands in front of, as `moveStack` names it. */
-	const beforeStack = (position: number | null): number | null => {
-		if (position === null) return null;
-		const target = sections[position]?.key;
-		return target?.kind === 'stack' ? target.index : null;
-	};
-
-	const beforeName = (position: number | null): string | null => {
-		if (position === null) return null;
-		for (const section of sections.slice(position)) {
-			if (section.key.kind === 'named') return section.name;
-		}
-		return null;
-	};
-
-	const movable = sections.filter((section) => section.movable);
-
-	const moveBy = (section: Section, direction: -1 | 1): void => {
-		if (section.key.kind === 'stack') {
-			const from = section.key.index;
-			const to = from + direction;
-			if (to < 0 || to >= board.stacks.length) return;
-			// "Down" means "in front of the one after the neighbour", which past the
-			// end is simply the end — the same arithmetic sections use.
-			api.update((b) => ops.moveStack(b, from, direction === -1 ? to : to + 1));
-			return;
-		}
-		if (section.key.kind !== 'named') return;
-		const name = section.name;
-		const at = movable.indexOf(section);
-		const target = at + direction;
-		if (target < 0 || target > movable.length) return;
-		// Down means "in front of the one after the neighbour", which past the end
-		// is simply the end.
-		const before = direction === -1 ? (movable[target]?.name ?? null) : (movable[target + 1]?.name ?? null);
-		api.update((b) => ops.moveSection(b, name, before));
-	};
 
 	const conditions = countConditions(filter);
 	const filtered = !isEmptyFilter(filter);
@@ -514,14 +478,13 @@ export function ListView({ board, view, api, settings }: Props) {
 				</button>
 			</div>
 			{board.stacks.length === 0 ? <div class="eb-list-empty">{t('list.emptyBoard')}</div> : null}
-			{sections.map((section, index) => {
-				const rows = drawn[index] ?? [];
-				if (section.key.kind === 'tag' && section.key.tag !== null && rows.length === 0) return null;
-				const state = stateOf(section);
-				const at = movable.indexOf(section);
+			{drawn.map((group, index) => {
+				const { id, section, rows } = group;
+				const key = `${groupBy}:${id}`;
+				const at = groupPositions.get(id) ?? -1;
 				return (
 					<SectionGroup
-						key={ungrouped ? `ungrouped:${sorts?.length ? 'sorted' : 'document'}` : sessionKey(section)}
+						key={ungrouped ? `ungrouped:${sorts?.length ? 'sorted' : 'document'}` : key}
 						board={board}
 						section={section}
 						where={where}
@@ -529,27 +492,27 @@ export function ListView({ board, view, api, settings }: Props) {
 						index={index}
 						config={board.config}
 						rows={rows}
-						state={state}
+						state={stateOf(group)}
 						ordered={!sorts?.length}
 						api={api}
 						settings={settings}
-						composerStack={composerStacks[sessionKey(section)] ?? 0}
+						composerStack={composerStacks[key] ?? 0}
 						onComposerStack={(stack) =>
-							setComposerStacks((current) => ({ ...current, [sessionKey(section)]: stack }))
+							setComposerStacks((current) => ({ ...current, [key]: stack }))
 						}
-						composerSection={composerSections[sessionKey(section)] ?? { kind: 'none' }}
-						onComposerSection={(key) =>
-							setComposerSections((current) => ({ ...current, [sessionKey(section)]: key }))
+						composerSection={composerSections[key] ?? { kind: 'none' }}
+						onComposerSection={(next) =>
+							setComposerSections((current) => ({ ...current, [key]: next }))
 						}
-						onState={(patch) => patchState(section, patch)}
-						onAddCard={(atTop) => addCard(section, atTop)}
+						onState={(patch) => patchState(id, patch)}
+						onAddCard={(atTop) => addCard(group, atTop)}
 						pending={pending}
 						onDrop={onDrop}
 						menuExtra={menuExtra}
 						onStackPick={openMovePicker}
 						onSectionPick={openSectionPicker}
 						display={view.display}
-						{...(section.movable && { onMove: (direction: -1 | 1) => moveBy(section, direction) })}
+						{...(at >= 0 && { onMove: (direction: -1 | 1) => moveBy(group, at, direction) })}
 						canMoveUp={at > 0}
 						canMoveDown={at !== -1 && at < movable.length - 1}
 					/>
@@ -606,9 +569,4 @@ function sectionKeyLabel(board: Board, key: SectionKey): string {
 	if (key.kind === 'named') return key.name;
 	if (key.kind === 'stack') return board.stacks[key.index]?.name || t('modal.archive.untitled');
 	return t('list.noSection');
-}
-
-/** The section's label as a menu shows it. */
-function sectionLabel(board: Board, section: Section): string {
-	return sectionKeyLabel(board, section.key);
 }

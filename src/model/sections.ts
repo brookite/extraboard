@@ -33,7 +33,7 @@ export interface Section {
 	dividers: ItemRef[];
 	/** Every card in it, in board order (stack by stack, top to bottom). */
 	cards: ItemRef[];
-	/** Whether the group can be reordered. */
+	/** Whether the group can be reordered in the list. */
 	movable: boolean;
 }
 
@@ -165,7 +165,7 @@ function tagGroupsOf(board: Board): Section[] {
 			for (const tag of new Set(entry.card.tags)) {
 				let group = groups.get(tag);
 				if (!group) {
-					group = { key: { kind: 'tag', tag }, name: tag, dividers: [], cards: [], movable: false };
+					group = { key: { kind: 'tag', tag }, name: tag, dividers: [], cards: [], movable: true };
 					groups.set(tag, group);
 				}
 				group.cards.push(ref);

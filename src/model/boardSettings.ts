@@ -330,6 +330,7 @@ function viewToPlain(v: ViewDef): Record<string, unknown> {
 		if (plain) sections[name] = plain;
 	}
 	if (Object.keys(sections).length) out.sections = sections;
+	if (v.groupStates) out.groupStates = v.groupStates;
 	return out;
 }
 

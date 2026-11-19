@@ -32,6 +32,8 @@ import type {
 	Divider,
 	ListControls,
 	ListGroupBy,
+	ListGrouping,
+	ListGroupState,
 	PropertyDef,
 	PropertyValue,
 	SectionState,
@@ -1442,6 +1444,24 @@ export function setViewSorts(board: Board, id: string, sorts: readonly SortRule[
 	}
 	const views = board.config.views.slice();
 	views[at] = updated;
+	return withViews(board, views);
+}
+
+/** Update one grouping's presentation state without touching the board's stacks. */
+export function setListGroupState(
+	board: Board,
+	viewId: string,
+	mode: ListGrouping,
+	update: (state: ListGroupState) => ListGroupState,
+): Board {
+	const at = board.config.views.findIndex((view) => view.id === viewId);
+	const view = board.config.views[at];
+	if (view?.type !== 'list') return board;
+	const current = view.groupStates?.[mode] ?? {};
+	const next = update(current);
+	if (next === current) return board;
+	const views = board.config.views.slice();
+	views[at] = { ...view, groupStates: { ...view.groupStates, [mode]: next } };
 	return withViews(board, views);
 }
 

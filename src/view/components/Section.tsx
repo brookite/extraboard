@@ -199,6 +199,7 @@ export function SectionGroup(props: SectionProps) {
 	}, [empty]);
 	// An empty group can be opened for its composer without changing saved state.
 	const collapsed = !ungrouped && (empty ? !emptyExpanded : state.collapsed === true);
+	const collapseAction = t(collapsed ? 'divider.expand' : 'divider.collapse');
 	const key = section.key;
 	const named = key.kind === 'named';
 	/** The stack this group *is*, when the list is grouped by stack (§1.0). */
@@ -328,7 +329,7 @@ export function SectionGroup(props: SectionProps) {
 			);
 			menu.addItem((item) =>
 			item
-				.setTitle(collapsed ? t('stack.expand') : t('stack.collapse'))
+				.setTitle(collapseAction)
 				.setIcon(collapsed ? 'chevron-down' : 'chevron-right')
 				.onClick(() => setCollapsed(!collapsed)),
 			);
@@ -336,14 +337,14 @@ export function SectionGroup(props: SectionProps) {
 			menu.addSeparator();
 			menu.addItem((item) =>
 				item
-					.setTitle(byStack ? t('list.moveStackUp') : t('list.moveUp'))
+					.setTitle(t('list.moveUp'))
 					.setIcon('chevron-up')
 					.setDisabled(!canMoveUp)
 					.onClick(() => onMove(-1)),
 			);
 			menu.addItem((item) =>
 				item
-					.setTitle(byStack ? t('list.moveStackDown') : t('list.moveDown'))
+					.setTitle(t('list.moveDown'))
 					.setIcon('chevron-down')
 					.setDisabled(!canMoveDown)
 					.onClick(() => onMove(1)),
@@ -480,7 +481,7 @@ export function SectionGroup(props: SectionProps) {
 	const classes = [
 		'eb-section',
 		collapsed ? 'is-collapsed' : '',
-		section.movable ? 'is-movable' : '',
+		onMove ? 'is-movable' : '',
 		accent ? 'is-accented' : '',
 	]
 		.filter(Boolean)
@@ -493,15 +494,15 @@ export function SectionGroup(props: SectionProps) {
 			style={accent ? { '--eb-stack-accent': accent } : undefined}
 		>
 			{ungrouped ? null : <div class="eb-section-header">
-				{section.movable ? (
-					<span class="eb-section-grip" title={t('modal.checklist.dragToReorder')} aria-hidden="true">
+				{onMove ? (
+					<span class="eb-section-grip" title={t('list.dragGroup')} aria-hidden="true">
 						<Icon name="grip-vertical" />
 					</span>
 				) : null}
 				<button
 					type="button"
 					class="eb-icon-button"
-					aria-label={collapsed ? t('stack.expand') : t('stack.collapse')}
+					aria-label={collapseAction}
 					onClick={() => setCollapsed(!collapsed)}
 				>
 					<Icon
@@ -520,7 +521,7 @@ export function SectionGroup(props: SectionProps) {
 				) : (
 					<span
 						class={`eb-section-name${key.kind === 'none' ? ' is-muted' : ''}`}
-						title={collapsed ? t('stack.expand') : t('stack.collapse')}
+						title={collapseAction}
 						onClick={onNameClick}
 					>
 						{label}

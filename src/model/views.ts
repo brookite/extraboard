@@ -9,6 +9,7 @@ import type {
 	CalendarMode,
 	ListControls,
 	ListGroupBy,
+	ListGroupStates,
 	PropertyDef,
 	PropertyType,
 	SectionState,
@@ -379,6 +380,28 @@ function toSections(v: unknown): Record<string, SectionState> | undefined {
 	return Object.keys(out).length ? out : undefined;
 }
 
+function toListGroupStates(value: unknown): ListGroupStates | undefined {
+	if (!isRecord(value)) return undefined;
+	const states: ListGroupStates = {};
+	for (const mode of ['section', 'stack', 'tag'] as const) {
+		const state = value[mode];
+		if (!isRecord(state)) continue;
+		const order = Array.isArray(state.order)
+			? [...new Set(state.order.filter((entry): entry is string => typeof entry === 'string'))]
+			: [];
+		const collapsed = isRecord(state.collapsed)
+			? Object.entries(state.collapsed).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean')
+			: [];
+		if (order.length || collapsed.length) {
+			states[mode] = {
+				...(order.length && { order }),
+				...(collapsed.length && { collapsed: Object.fromEntries(collapsed) }),
+			};
+		}
+	}
+	return Object.keys(states).length ? states : undefined;
+}
+
 /**
  * Read one view definition from the settings block, or `null` when it cannot be
  * one — an unusable definition is dropped exactly as an unparseable property
@@ -397,6 +420,7 @@ export function toViewDef(v: unknown, id: string): ViewDef | null {
 		const filter = toFilter(v.filter) ?? legacy.filter;
 		const sorts = toSortRules(v.sorts) ?? legacy.sorts;
 		const sections = toSections(v.sections);
+		const groupStates = toListGroupStates(v.groupStates);
 		return {
 			id,
 			name: name || defaultViewName('list'),
@@ -406,6 +430,7 @@ export function toViewDef(v: unknown, id: string): ViewDef | null {
 			...(filter && { filter }),
 			...(sorts && { sorts }),
 			...(sections && { sections }),
+			...(groupStates && { groupStates }),
 			...(display && { display }),
 		};
 	}

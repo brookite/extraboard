@@ -615,7 +615,7 @@ export class BoardView extends TextFileView {
 					{view.type === 'calendar' ? (
 						<CalendarView board={this.board} view={view} api={this.api} settings={settings} />
 					) : view.type === 'list' ? (
-						<ListView board={this.board} view={view} api={this.api} settings={settings} />
+						<ListView key={view.id} board={this.board} view={view} api={this.api} settings={settings} />
 					) : (
 						<KanbanView board={this.board} view={view} api={this.api} settings={settings} />
 					)}

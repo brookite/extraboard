@@ -5,6 +5,7 @@ import { groupsOf, placesOf } from '../src/model/sections';
 import { setCardText } from '../src/model/ops';
 import { parseBoard } from '../src/model/parse';
 import type { Board, Card } from '../src/model/types';
+import { t } from '../src/i18n';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { boardHead } from './boardFile';
 
@@ -31,7 +32,7 @@ function nodes(value: unknown): Node[] {
 	return [node, ...nodes(node.props.children)];
 }
 
-function renderGroup(initial: Board, section: SectionProps['section'], ungrouped = false) {
+function renderGroup(initial: Board, section: SectionProps['section'], ungrouped = false, locked = false) {
 	let board = initial;
 	const onSectionPick = vi.fn();
 	const props: SectionProps = {
@@ -42,6 +43,7 @@ function renderGroup(initial: Board, section: SectionProps['section'], ungrouped
 		onComposerSection: vi.fn(), onState: vi.fn(), onAddCard: vi.fn(), pending: null,
 		onDrop: vi.fn(), menuExtra: vi.fn(), onStackPick: vi.fn(), onSectionPick,
 		canMoveUp: false, canMoveDown: false,
+		...(!locked && section.movable && { onMove: vi.fn() }),
 	};
 	return { rendered: nodes(SectionGroup(props)), board: () => board, props };
 }
@@ -130,6 +132,24 @@ describe('tag group rendering', () => {
 		const [first, ...rest] = tagTiles(tagged);
 		expect(first).toEqual({ tag: '', tiles: [] });
 		expect(rest.map(({ tag }) => tag)).toEqual(['a']);
+	});
+
+	it('shows the six-dot handle for tag groups and leaves No tags pinned', () => {
+		const b = board();
+		const [untagged, tagged] = groupsOf(b, 'tag');
+		const handle = renderGroup(b, tagged!).rendered.find((node) => node.props.class === 'eb-section-grip');
+		expect(nodes(handle?.props.children).map((node) => node.props.name)).toContain('grip-vertical');
+		expect(renderGroup(b, untagged!).rendered.some((node) => node.props.class === 'eb-section-grip')).toBe(false);
+	});
+
+	it('removes the drag target and keeps the collapse control for fixed groups', () => {
+		const b = board();
+		const tagged = groupsOf(b, 'tag')[1]!;
+		const { rendered } = renderGroup(b, tagged, false, true);
+		expect(rendered.some((node) => node.props.class === 'eb-section-grip')).toBe(false);
+		const groupClass = rendered.find((node) => node.props['data-index'] === 0)?.props.class;
+		expect(groupClass).not.toContain('is-movable');
+		expect(rendered.some((node) => node.type === 'button' && node.props['aria-label'] === t('divider.expand'))).toBe(true);
 	});
 
 	it('refreshes repeated rows and changes group membership after saving a card', () => {

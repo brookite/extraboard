@@ -29,6 +29,14 @@ export type ListControls = 'dynamic' | 'fixed' | 'session';
  * badges show whichever axes the group does not already name.
  */
 export type ListGroupBy = 'section' | 'stack' | 'tag' | 'none';
+export type ListGrouping = Exclude<ListGroupBy, 'none'>;
+
+export interface ListGroupState {
+	order?: string[];
+	collapsed?: Record<string, boolean>;
+}
+
+export type ListGroupStates = Partial<Record<ListGrouping, ListGroupState>>;
 
 /**
  * Display state of one list section (list-view.md §5), keyed in `sections` by
@@ -96,6 +104,8 @@ export type ViewDef =
 			sorts?: SortRule[];
 			/** Per-section state, by section name (`''` = the sectionless group). */
 			sections?: Record<string, SectionState>;
+			/** Presentation preferences keyed by grouping mode and group identity. */
+			groupStates?: ListGroupStates;
 	  });
 
 /** Shape of the checklist `N/M` indicator and of `percent` badges. */
