@@ -66,8 +66,7 @@ function sessionKey(section: Section): string {
 	const key = section.key;
 	if (key.kind === 'none') return 'none';
 	if (key.kind === 'named') return `named:${key.name}`;
-	if (key.kind === 'stack') return `stack:${String(key.index)}`;
-	return `anon:${String(key.ref.stack)}:${String(key.ref.item)}`;
+	return `stack:${String(key.index)}`;
 }
 
 export function ListView({ board, view, api, settings }: Props) {
@@ -113,20 +112,13 @@ export function ListView({ board, view, api, settings }: Props) {
 		weekStart: resolveWeekStart(settings.weekStart), where: placesOf(board),
 	};
 
-	/**
-	 * A section's collapse (§1.4, §5). An anonymous section's is its divider's own
-	 * flag, since that is the one piece of its state the file can hold; the rest
-	 * follow the view's persistence mode.
-	 */
+	/** Section collapse follows the view's persistence mode (§5). */
 	const stateOf = (section: Section): SectionState => {
 		if (ungrouped) return {};
-		// A stack group's collapse is the stack's own flag, exactly as an anonymous
-		// section's is its divider's: the file already holds it, and collapsing the
-		// group here collapses the column on the board (§1.0, §1.4).
+		// A stack group's collapse also collapses its Kanban column (§1.0).
 		if (section.key.kind === 'stack') {
 			return { collapsed: board.stacks[section.key.index]?.collapsed === true };
 		}
-		if (section.key.kind === 'anon') return { collapsed: dividerCollapsed(board, section) };
 		const key = stateKeyOf(section.key);
 		const stored = key === null ? undefined : view.sections?.[key];
 		const collapsed = persist ? stored?.collapsed === true : session.collapsed[sessionKey(section)] === true;
@@ -140,13 +132,6 @@ export function ListView({ board, view, api, settings }: Props) {
 		if (section.key.kind === 'stack') {
 			const at = section.key.index;
 			api.update((b) => ops.setStackCollapsed(b, at, collapsed));
-			return;
-		}
-		// An anonymous section's collapse is the divider's, so it is an edit like
-		// any other and travels through an op (§1.4).
-		if (section.key.kind === 'anon') {
-			const ref = section.key.ref;
-			api.update((b) => ops.setDividerCollapsed(b, ref, collapsed));
 			return;
 		}
 		const key = stateKeyOf(section.key);
@@ -599,20 +584,10 @@ function sameRef(a: ops.ItemRef, b: ops.ItemRef): boolean {
 function sectionKeyLabel(board: Board, key: SectionKey): string {
 	if (key.kind === 'named') return key.name;
 	if (key.kind === 'stack') return board.stacks[key.index]?.name || t('modal.archive.untitled');
-	if (key.kind === 'none') return t('list.noSection');
-	const stack = board.stacks[key.ref.stack]?.name;
-	return t('list.unnamedSection', { stack: stack || t('modal.archive.untitled') });
+	return t('list.noSection');
 }
 
 /** The section's label as a menu shows it. */
 function sectionLabel(board: Board, section: Section): string {
 	return sectionKeyLabel(board, section.key);
-}
-
-/** An anonymous section's collapse lives on its one divider (§1.4). */
-function dividerCollapsed(board: Board, section: Section): boolean {
-	const ref = section.dividers[0];
-	if (!ref) return false;
-	const entry = board.stacks[ref.stack]?.items[ref.item];
-	return entry?.kind === 'divider' && entry.divider.collapsed;
 }

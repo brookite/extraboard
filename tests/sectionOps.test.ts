@@ -54,8 +54,8 @@ const BOARD = [
 const board = (): Board => parseBoard(BOARD);
 
 /**
- * The same board with Doing's `---` **above** its Review, so it stands alone as
- * an anonymous section. In `BOARD` it sits inside Review and subdivides it
+ * The same board with Doing's `---` **above** its Review so its cards belong
+ * to the sectionless group. In `BOARD` it sits inside Review and subdivides it
  * (list-view.md §1.5). Doing reads: Loose B, ---, Anon card, ### Review, R2.
  */
 const anonBoard = (): Board =>
@@ -65,7 +65,6 @@ const anonBoard = (): Board =>
 			['---', '', '- Anon card', '', '### Review', '', '- R2', ''].join('\n'),
 		),
 	);
-const anonKey = (b: Board) => sectionsOf(b).find((s) => s.key.kind === 'anon')!;
 const body = (b: Board): string => serializeBoard(b).slice(FM.length + 1);
 
 /** The file survives the edit: parse ∘ serialize is the identity on the tree. */
@@ -212,21 +211,17 @@ describe('sections: adding a card', () => {
 		expect(titlesOf(top, 0).slice(0, 3)).toEqual(['Loose C', 'Loose A', '### Backlog']);
 	});
 
-	it('adds to the start of a named or anonymous section on request (§4.4)', () => {
+	it('adds to the start of a named section on request (§4.4)', () => {
 		const top = ops.addCardToSectionAt(board(), 0, named('Backlog'), 'B0', true);
 		expect(titlesOf(intact(top.board), 0)).toEqual(['Loose A', '### Backlog', 'B0', 'B1', 'B2', '### Review', 'R1']);
 		expect(top.ref).toEqual({ stack: 0, item: 2 });
 		// A divider created on the way in is followed by the card either way.
 		const fresh = intact(ops.addCardToSection(board(), 1, named('Backlog'), 'B5', true));
 		expect(titlesOf(fresh, 1).slice(0, 3)).toEqual(['Loose B', '### Backlog', 'B5']);
-		const anon = anonKey(anonBoard()).key;
-		const anonTop = intact(ops.addCardToSection(anonBoard(), 1, anon, 'Anon 0', true));
-		expect(titlesOf(anonTop, 1).slice(0, 4)).toEqual(['Loose B', '### ---', 'Anon 0', 'Anon card']);
 	});
 
-	it('adds to an anonymous section by its divider', () => {
-		const anon = anonKey(anonBoard()).key;
-		const next = intact(ops.addCardToSection(anonBoard(), 1, anon, 'Anon 2'));
+	it('adds to the end of the sectionless group past a plain rule', () => {
+		const next = intact(ops.addCardToSection(anonBoard(), 1, NONE, 'Anon 2'));
 		expect(titlesOf(next, 1)).toEqual(['Loose B', '### ---', 'Anon card', 'Anon 2', '### Review', 'R2']);
 	});
 
@@ -244,11 +239,10 @@ describe('sections: adding a card', () => {
 		expect(entry?.kind === 'card' && entry.card.task).toBe('x');
 	});
 
-	it('refuses an unknown stack and an anonymous section from another stack', () => {
+	it('refuses an unknown stack or a stack group as a section', () => {
 		const before = board();
 		expect(ops.addCardToSection(before, 9, NONE, 'x')).toBe(before);
-		const anon = anonKey(anonBoard()).key;
-		expect(ops.addCardToSection(before, 0, anon, 'x')).toBe(before);
+		expect(ops.addCardToSection(before, 0, { kind: 'stack', index: 0 }, 'x')).toBe(before);
 	});
 
 	it('reports where the card landed, so the composer can open it', () => {
@@ -269,9 +263,7 @@ describe('sections: adding a card', () => {
 	});
 
 	it('reports no ref when nothing was inserted', () => {
-		const anon = anonKey(anonBoard()).key;
 		expect(ops.addCardToSectionAt(board(), 9, NONE, 'x').ref).toBeNull();
-		expect(ops.addCardToSectionAt(board(), 0, anon, 'x').ref).toBeNull();
 	});
 
 	it('creates a section in an empty stack', () => {
@@ -314,7 +306,7 @@ describe('sections: adding an empty named section', () => {
 		const added = intact(ops.addSection(plain, 'New', true));
 		expect(titlesOf(added, 0)).toEqual(['loose', '### New']);
 		expect(sectionOrder(added)).toEqual(['New', 'Old']);
-		// A leading `---` stays anonymous: the new heading goes below it, before
+		// A leading `---` stays in the head group: the new heading goes below it, before
 		// the first *named* divider, instead of swallowing it (§1.5).
 		const lead = parseBoard([FM, '## S', '', '---', '', '- a', '', '### Old', '', '- o', ''].join('\n'));
 		expect(titlesOf(intact(ops.addSection(lead, 'New', true)), 0)).toEqual(['### ---', 'a', '### New', '### Old', 'o']);
@@ -411,6 +403,12 @@ describe('sections: moving a card', () => {
 		]);
 	});
 
+	it('moves a card from below a plain rule to another stack’s sectionless group', () => {
+		const next = intact(ops.moveCardToStack(anonBoard(), { stack: 1, item: 2 }, 0));
+		expect(titlesOf(next, 0).slice(0, 3)).toEqual(['Loose A', 'Anon card', '### Backlog']);
+		expect(titlesOf(next, 1)).toEqual(['Loose B', '### ---', '### Review', 'R2']);
+	});
+
 	it('completes a card moved into a completing stack', () => {
 		const next = intact(ops.moveCardToStack(board(), { stack: 0, item: 2 }, 2));
 		const entry = next.stacks[2]!.items[2];
@@ -451,11 +449,11 @@ describe('sections: renaming and removing', () => {
 		expect(ops.renameSection(before, 'Nope', 'x')).toBe(before);
 	});
 
-	it('names an anonymous divider into an existing section', () => {
-		const ref = anonKey(anonBoard()).dividers[0]!;
+	it('names a plain divider into an existing section', () => {
+		const ref = { stack: 1, item: 1 };
 		const next = intact(ops.renameDivider(anonBoard(), ref, 'Review'));
 		expect(sectionOrder(next)).toEqual(['Backlog', 'Review']);
-		expect(sectionsOf(next).some((s) => s.key.kind === 'anon')).toBe(false);
+		expect(sectionOf(next, { stack: 1, item: 2 })).toEqual(named('Review'));
 	});
 
 	it('removes a section everywhere and keeps its cards', () => {
@@ -472,15 +470,15 @@ describe('sections: renaming and removing', () => {
 		expect(ops.removeSection(before, '')).toBe(before);
 	});
 
-	it('leaves anonymous sections alone when a named one goes', () => {
+	it('preserves a leading rule when a named section is removed', () => {
 		const next = intact(ops.removeSection(anonBoard(), 'Review'));
 		expect(titlesOf(next, 1)).toEqual(['Loose B', '### ---', 'Anon card', 'R2']);
 	});
 
-	it('frees a nested `---` into an anonymous section when its named one goes (§1.5)', () => {
+	it('returns cards below a nested rule to the sectionless group when the heading is removed (§1.5)', () => {
 		const next = intact(ops.removeSection(board(), 'Review'));
 		expect(titlesOf(next, 1)).toEqual(['Loose B', 'R2', '### ---', 'Anon card']);
-		expect(sectionOf(next, { stack: 1, item: 3 })).toEqual({ kind: 'anon', ref: { stack: 1, item: 2 } });
+		expect(sectionOf(next, { stack: 1, item: 3 })).toEqual(NONE);
 	});
 });
 

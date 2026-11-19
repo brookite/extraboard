@@ -45,6 +45,7 @@ with its own file format, not a fork.
   and Next month presets that move with the clock and respect your week start.
   Group the list by sections (the default), by stacks, or choose **No grouping**
   for one flat list with stack and section move badges beside each card's menu.
+  Only named dividers create sections.
 - **Daily and weekly digests:** a board can show the cards of the day or the
   week in a window at a chosen time — with last period's completed cards in a
   collapsible section — the first time Obsidian checks after that time.

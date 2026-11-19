@@ -12,7 +12,7 @@
 import { Menu } from 'obsidian';
 import { useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
-import { sameKey, sectionsOf, type Section, type SectionKey } from '../../model/sections';
+import { sameKey, sectionName, sectionsOf, type Section, type SectionKey } from '../../model/sections';
 import { isNestedRule, isStackBoundary } from '../../model/sectionView';
 import type { Board, BoardConfig, SectionState, ViewDisplay } from '../../model/types';
 import { archiveOpts, type ExtraboardSettings } from '../../settings';
@@ -144,7 +144,6 @@ function stackLabel(board: Board, index: number): string {
 /** A section's label as every picker writes it. */
 function sectionKeyLabel(board: Board, key: SectionKey): string {
 	if (key.kind === 'named') return key.name;
-	if (key.kind === 'anon') return t('list.unnamedSection', { stack: stackLabel(board, key.ref.stack) });
 	if (key.kind === 'stack') return stackLabel(board, key.index);
 	return t('list.noSection');
 }
@@ -159,13 +158,10 @@ function sectionsInStack(board: Board, stackIndex: number): SectionKey[] {
 	const stack = board.stacks[stackIndex];
 	if (!stack) return [];
 	let current: SectionKey = { kind: 'none' };
-	return stack.items.map((entry, item) => {
+	return stack.items.map((entry) => {
 		if (entry.kind === 'divider') {
-			const name = entry.divider.name?.trim();
-			// A `---` inside a named section subdivides it and leaves the rows in it
-			// (list-view.md §1.5).
+			const name = sectionName(entry.divider.name);
 			if (name) current = { kind: 'named', name };
-			else if (current.kind !== 'named') current = { kind: 'anon', ref: { stack: stackIndex, item } };
 		}
 		return current;
 	});
@@ -269,7 +265,6 @@ export function SectionGroup(props: SectionProps) {
 		if (!next) return;
 		if (stackIndex !== null) api.update((b) => ops.renameStack(b, stackIndex, next));
 		else if (key.kind === 'named') api.update((b) => ops.renameSection(b, key.name, next));
-		else if (key.kind === 'anon') api.update((b) => ops.renameDivider(b, key.ref, next));
 	};
 
 	/** Name, the completion flag and the accent, in the stack form the board
@@ -390,24 +385,20 @@ export function SectionGroup(props: SectionProps) {
 			);
 			return;
 			}
-			if (key.kind !== 'none') {
-			menu.addSeparator();
-			menu.addItem((item) =>
-				item
-					.setTitle(named ? t('list.renameSection') : t('list.nameSection'))
-					.setIcon('pencil')
-					.onClick(() => setRenaming(true)),
-			);
-			}
 			if (named) {
-			menu.addItem((item) =>
-				item
-					.setTitle(t('list.removeSection'))
-					.setIcon('trash-2')
-					// Nothing is lost — the cards stay and join the group above — so
-					// this is not a destructive item and asks for no confirmation (§4.4).
-					.onClick(() => api.update((b) => ops.removeSection(b, key.name))),
-			);
+				menu.addSeparator();
+				menu.addItem((item) =>
+					item
+						.setTitle(t('list.renameSection'))
+						.setIcon('pencil')
+						.onClick(() => setRenaming(true)),
+				);
+				menu.addItem((item) =>
+					item
+						.setTitle(t('list.removeSection'))
+						.setIcon('trash-2')
+						.onClick(() => api.update((b) => ops.removeSection(b, key.name))),
+				);
 			}
 		});
 	};

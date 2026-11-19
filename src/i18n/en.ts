@@ -143,12 +143,10 @@ export const en = {
 	list: {
 		addSection: 'Add section',
 		noSection: 'No section',
-		unnamedSection: 'Unnamed group ({stack})',
 		sectionNamePlaceholder: 'Section name',
 		moveUp: 'Move section up',
 		moveDown: 'Move section down',
 		renameSection: 'Rename section',
-		nameSection: 'Name section',
 		removeSection: 'Remove section',
 		moveToSection: 'Move to section',
 		addStack: 'Add stack',

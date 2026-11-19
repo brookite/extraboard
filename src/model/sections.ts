@@ -1,38 +1,30 @@
 // Reading a board as sections rather than as stacks — the list view's model.
 // Spec: docs/specs/list-view.md §1. Pure; no `obsidian` imports.
 //
-// A section *is* a divider: `### name` gathered across every stack (one
-// section), `---` standing alone (one section per divider), and everything
-// before a stack's first divider (the sectionless group, one per board).
-//
-// A named divider outranks an unnamed one (list-view.md §1.5): its group runs
-// on to the next named divider, so a `---` below a `### name` subdivides that
-// section instead of opening one of its own.
+// Named dividers define sections across stacks. Cards above the first named
+// divider belong to the sectionless group. A plain rule subdivides its stack.
 
 import type { CardPlace } from './fieldValue';
 import type { ItemRef } from './ops';
 import type { Board, Card, Divider, ListGroupBy, Stack } from './types';
 
 /**
- * What identifies a section. `named` merges across stacks and is the only kind
- * that survives a rename; `anon` is one divider, addressed by where it sits, so
- * it is only valid against the board it was computed from.
+ * What identifies a section. Named sections merge across stacks.
  */
 export type SectionKey =
 	| { kind: 'none' }
 	| { kind: 'named'; name: string }
-	| { kind: 'anon'; ref: ItemRef }
 	/**
 	 * A whole stack read as one group — what a list grouped by stack shows
 	 * (list-view.md §1.0). It is not a divider, so no op that writes one accepts
 	 * it; it addresses a stack by index and is only valid against the board it
-	 * was computed from, exactly as `anon` is.
+	 * was computed from.
 	 */
 	| { kind: 'stack'; index: number };
 
 export interface Section {
 	key: SectionKey;
-	/** The user's label: the divider name, or `''` for the two nameless kinds. */
+	/** The user's label, or `''` for the sectionless group. */
 	name: string;
 	/** Every divider behind this section, in board order; empty for `none`. A
 	 * named section lists the dividers carrying its name, not the `---` nested
@@ -40,16 +32,13 @@ export interface Section {
 	dividers: ItemRef[];
 	/** Every card in it, in board order (stack by stack, top to bottom). */
 	cards: ItemRef[];
-	/** Only a named section can be reordered (list-view.md §1.3, §1.4). */
+	/** Whether the group can be reordered. */
 	movable: boolean;
 }
 
 export function sameKey(a: SectionKey, b: SectionKey): boolean {
 	if (a.kind !== b.kind) return false;
 	if (a.kind === 'named' && b.kind === 'named') return a.name === b.name;
-	if (a.kind === 'anon' && b.kind === 'anon') {
-		return a.ref.stack === b.ref.stack && a.ref.item === b.ref.item;
-	}
 	if (a.kind === 'stack' && b.kind === 'stack') return a.index === b.index;
 	return true;
 }
@@ -80,14 +69,11 @@ export function namedDividerAbove(stack: Stack, index: number): number {
 /**
  * The key under which a section's display state is stored in the view
  * definition (list-view.md §5): the empty string for the sectionless group, the
- * name for a named section — and `null` for an anonymous one, which has no
- * stable key and therefore no persisted state (§1.4).
+ * name for a named section, or `null` for a stack whose state is on the stack.
  */
 export function stateKeyOf(key: SectionKey): string | null {
 	if (key.kind === 'none') return '';
 	if (key.kind === 'named') return key.name;
-	// An anonymous section has no stable key; a stack group's collapse is the
-	// stack's own flag in the file, so neither is stored per view (§1.0, §1.4).
 	return null;
 }
 
@@ -114,20 +100,7 @@ export function sectionsOf(board: Board): Section[] {
 				return;
 			}
 			const name = sectionName(entry.divider.name);
-			// A `---` inside a named section subdivides it (§1.5): its cards stay in
-			// the section. Only one above every named divider stands alone.
-			if (!name && current.key.kind === 'named') return;
-			if (!name) {
-				current = {
-					key: { kind: 'anon', ref },
-					name: '',
-					dividers: [ref],
-					cards: [],
-					movable: false,
-				};
-				sections.push(current);
-				return;
-			}
+			if (!name) return;
 			const existing = byName.get(name);
 			if (existing) {
 				existing.dividers.push(ref);
@@ -184,20 +157,15 @@ export function sectionOrder(board: Board): string[] {
 
 /**
  * The section a card belongs to, by walking back to the divider above it: the
- * nearest named one, past any `---` (§1.5), else the nearest `---`, else none.
+ * nearest named one, past any `---` (§1.5), or the sectionless group.
  */
 export function sectionOf(board: Board, ref: ItemRef): SectionKey {
 	const stack = board.stacks[ref.stack];
 	if (!stack) return { kind: 'none' };
-	let anon: ItemRef | null = null;
-	for (let i = ref.item - 1; i >= 0; i--) {
-		const entry = stack.items[i];
-		if (entry?.kind !== 'divider') continue;
-		const name = sectionName(entry.divider.name);
-		if (name) return { kind: 'named', name };
-		anon ??= { stack: ref.stack, item: i };
-	}
-	return anon ? { kind: 'anon', ref: anon } : { kind: 'none' };
+	const entry = stack.items[namedDividerAbove(stack, ref.item)];
+	return entry?.kind === 'divider'
+		? { kind: 'named', name: sectionName(entry.divider.name) }
+		: { kind: 'none' };
 }
 
 /** Index of the divider named `name` in this stack, or -1 when it has none. */
@@ -207,22 +175,27 @@ export function dividerIndex(stack: Stack, name: string): number {
 	);
 }
 
+/** End of the list's sectionless group in this stack. */
+export function sectionHeadEnd(stack: Stack): number {
+	const first = stack.items.findIndex((entry) => entry.kind === 'divider' && isNamedDivider(entry.divider));
+	return first === -1 ? stack.items.length : first;
+}
+
 /**
  * The half-open range of items a group covers: the items after the divider at
  * `at` (or from the top for the head group, `at === null`) up to the next
  * divider of at least its rank, or the end of the stack. A named divider's
- * group runs on to the next **named** one, taking every `---` in between with
- * it (§1.5); the head group and a `---`'s own run end at any divider. The
- * divider itself is **not** in the range.
+ * group runs to the next named divider. The head group and a plain rule's
+ * own run end at any divider. The opening divider is outside the range.
  */
 export function groupRange(stack: Stack, at: number | null): { start: number; end: number } {
 	const start = at === null ? 0 : at + 1;
 	const head = at === null ? undefined : stack.items[at];
-	const named = head?.kind === 'divider' && isNamedDivider(head.divider);
+	const namedOnly = head?.kind === 'divider' && isNamedDivider(head.divider);
 	let end = start;
 	for (; end < stack.items.length; end++) {
 		const entry = stack.items[end];
-		if (entry?.kind === 'divider' && (!named || isNamedDivider(entry.divider))) break;
+		if (entry?.kind === 'divider' && (!namedOnly || isNamedDivider(entry.divider))) break;
 	}
 	return { start, end };
 }

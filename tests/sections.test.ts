@@ -158,15 +158,15 @@ describe('list without grouping', () => {
 describe('sections: grouping', () => {
 	it('lists the sectionless group first, then sections by first appearance', () => {
 		const b = board();
-		expect(sectionsOf(b).map((s) => s.key.kind)).toEqual(['none', 'named', 'named', 'anon']);
+		expect(sectionsOf(b).map((s) => s.key.kind)).toEqual(['none', 'named', 'named']);
 		expect(sectionOrder(b)).toEqual(['Backlog', 'Review']);
 	});
 
-	it('gathers the cards before every stack’s first divider into one group', () => {
+	it('gathers the cards before every stack’s first named divider into one group', () => {
 		const b = board();
 		const none = sectionsOf(b)[0]!;
 		expect(none.key.kind).toBe('none');
-		expect(titles(b, none)).toEqual(['Loose A', 'Loose B']);
+		expect(titles(b, none)).toEqual(['Loose A', 'Loose B', 'Anon card']);
 		expect(none.movable).toBe(false);
 		expect(none.dividers).toEqual([]);
 	});
@@ -182,13 +182,9 @@ describe('sections: grouping', () => {
 		expect(backlog.movable).toBe(true);
 	});
 
-	it('gives every unnamed divider a section of its own', () => {
-		const b = board();
-		const anon = sectionsOf(b).find((s) => s.key.kind === 'anon')!;
-		expect(anon.dividers).toHaveLength(1);
-		expect(titles(b, anon)).toEqual(['Anon card']);
-		expect(anon.movable).toBe(false);
-		expect(stateKeyOf(anon.key)).toBeNull();
+	it('omits a leading plain rule even when the rule has no cards', () => {
+		const b = parseBoard([FM, '## To do', '', '---', '', '### Backlog', '', '- B', ''].join('\n'));
+		expect(sectionsOf(b).map((s) => s.key.kind)).toEqual(['none', 'named']);
 	});
 
 	it('always offers the sectionless group, even when no card is in it', () => {
@@ -277,14 +273,15 @@ describe('sections: a `---` inside a named section (§1.5)', () => {
 	].join('\n');
 	const nested = (): Board => parseBoard(NESTED);
 
-	it('keeps its cards in the named section, and only a leading `---` apart', () => {
+	it('keeps its cards in the named section and leading cards in the sectionless group', () => {
 		const b = nested();
-		expect(sectionsOf(b).map((s) => s.key.kind)).toEqual(['none', 'anon', 'named', 'named']);
+		expect(sectionsOf(b).map((s) => s.key.kind)).toEqual(['none', 'named', 'named']);
+		expect(titles(b, sectionsOf(b)[0]!)).toEqual(['top']);
 		expect(titles(b, named(b, 'A'))).toEqual(['a1', 'n1', 'n2']);
 		// The section's dividers are the ones carrying its name.
 		expect(named(b, 'A').dividers).toEqual([{ stack: 0, item: 2 }]);
 		expect(sectionOf(b, { stack: 0, item: 7 })).toEqual({ kind: 'named', name: 'A' });
-		expect(sectionOf(b, { stack: 0, item: 1 })).toEqual({ kind: 'anon', ref: { stack: 0, item: 0 } });
+		expect(sectionOf(b, { stack: 0, item: 1 })).toEqual({ kind: 'none' });
 	});
 
 	it('gives a named group every `---` up to the next named divider', () => {
@@ -311,14 +308,14 @@ describe('sections: addressing', () => {
 		const b = board();
 		expect(sectionOf(b, { stack: 0, item: 0 })).toEqual({ kind: 'none' });
 		expect(sectionOf(b, { stack: 0, item: 2 })).toEqual({ kind: 'named', name: 'Backlog' });
-		expect(sectionOf(b, { stack: 1, item: 2 })).toEqual({ kind: 'anon', ref: { stack: 1, item: 1 } });
+		expect(sectionOf(b, { stack: 1, item: 2 })).toEqual({ kind: 'none' });
 	});
 
 	it('compares keys by kind, name and position', () => {
 		expect(sameKey({ kind: 'none' }, { kind: 'none' })).toBe(true);
 		expect(sameKey({ kind: 'named', name: 'a' }, { kind: 'named', name: 'b' })).toBe(false);
 		expect(
-			sameKey({ kind: 'anon', ref: { stack: 1, item: 3 } }, { kind: 'anon', ref: { stack: 1, item: 3 } }),
+			sameKey({ kind: 'stack', index: 1 }, { kind: 'stack', index: 1 }),
 		).toBe(true);
 		expect(sameKey({ kind: 'none' }, { kind: 'named', name: '' })).toBe(false);
 	});
@@ -333,10 +330,10 @@ describe('sections: addressing', () => {
 		expect(groupRange(stack, 4)).toEqual({ start: 5, end: 6 });
 	});
 
-	it('keys state by name, by the empty string, and not at all for anonymous', () => {
+	it('keys state by name and the empty string, with stack state stored separately', () => {
 		expect(stateKeyOf({ kind: 'none' })).toBe('');
 		expect(stateKeyOf({ kind: 'named', name: 'Backlog' })).toBe('Backlog');
-		expect(stateKeyOf({ kind: 'anon', ref: { stack: 0, item: 0 } })).toBeNull();
+		expect(stateKeyOf({ kind: 'stack', index: 0 })).toBeNull();
 	});
 
 	it('offers only named sections to the card menu', () => {
@@ -349,13 +346,6 @@ describe('sections: addressing', () => {
 		).toEqual(['Backlog', 'Review']);
 	});
 
-	it('never offers anonymous sections, including inside their own stack', () => {
-		const b = board();
-		const fromOtherStack = sectionMoveTargets(b, { stack: 0, item: 2 });
-		const fromAnonymousStack = sectionMoveTargets(b, { stack: 1, item: 2 });
-		expect(fromOtherStack.some((section) => section.key.kind === 'anon')).toBe(false);
-		expect(fromAnonymousStack.some((section) => section.key.kind === 'anon')).toBe(false);
-	});
 });
 
 describe('sections: sort', () => {

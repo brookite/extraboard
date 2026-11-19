@@ -144,12 +144,10 @@ export const ru: DeepPartial<typeof en> = {
 	list: {
 		addSection: 'Добавить секцию',
 		noSection: 'Без секции',
-		unnamedSection: 'Безымянная группа ({stack})',
 		sectionNamePlaceholder: 'Название секции',
 		moveUp: 'Переместить секцию выше',
 		moveDown: 'Переместить секцию ниже',
 		renameSection: 'Переименовать секцию',
-		nameSection: 'Назвать секцию',
 		removeSection: 'Убрать секцию',
 		moveToSection: 'Переместить в секцию',
 		addStack: 'Добавить стопку',

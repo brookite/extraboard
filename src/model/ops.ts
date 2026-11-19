@@ -18,6 +18,7 @@ import {
 	isNamedDivider,
 	namedDividerAbove,
 	sectionName,
+	sectionHeadEnd,
 	sectionOf,
 	sectionOrder,
 	type SectionKey,
@@ -746,8 +747,8 @@ export function moveGroup(board: Board, from: ItemRef, toStack: number, before: 
 // --- sections ---------------------------------------------------------------
 //
 // The list view's edits (list-view.md §4). A "section" is a divider read across
-// stacks: named sections merge, an unnamed one stands alone, and the cards
-// above a stack's first divider belong to no section at all. Every op here is
+// stacks: named sections merge, and cards above a stack's first named divider
+// belong to no section. Every op here is
 // expressed in those terms and lands on ordinary divider/card moves, so the
 // Kanban side sees nothing unusual in the file.
 
@@ -757,7 +758,7 @@ export function moveGroup(board: Board, from: ItemRef, toStack: number, before: 
  * when a card enters the section there.
  *
  * `atTop` makes it the **first** section: the divider lands before the first
- * stack's first divider, so the stack's sectionless cards stay sectionless and
+ * stack's first named divider, so its sectionless cards stay sectionless and
  * the first stack — which settles the order (§1.2) — reads it first. Otherwise
  * it is appended after every card, the last section.
  */
@@ -766,10 +767,7 @@ export function addSection(board: Board, name: string, atTop = false): Board {
 	const first = board.stacks[0];
 	if (!normalized || !first || sectionOrder(board).includes(normalized)) return board;
 	if (!atTop) return addDivider(board, 0, normalized);
-	// Before the first *named* divider, not the first divider: a new heading above
-	// a stack-level `---` would swallow that anonymous section (§1.5).
-	const lead = first.items.findIndex((item) => item.kind === 'divider' && isNamedDivider(item.divider));
-	return addDivider(board, 0, normalized, lead === -1 ? null : lead);
+	return addDivider(board, 0, normalized, sectionHeadEnd(first));
 }
 
 /**
@@ -818,8 +816,7 @@ function shifted(ref: ItemRef, stackIndex: number, at: number): ItemRef {
  * The item index a card lands on when it enters `key` in this stack: the top or
  * end of that section's group, as `atTop` says.
  *
- * Returns `null` when the section is not in this stack, which only happens for
- * an anonymous section: the caller creates named ones first.
+ * The caller creates a missing named section before looking up its position.
  */
 function sectionEntryIndex(
 	board: Board,
@@ -833,13 +830,8 @@ function sectionEntryIndex(
 	// inside one. Grouping by stack moves cards with `moveItem` instead
 	// (list-view.md §1.0), and every section op refuses the key outright.
 	if (key.kind === 'stack') return null;
-	if (key.kind === 'none') return atTop ? 0 : groupRange(stack, null).end;
-	const at =
-		key.kind === 'named'
-			? dividerIndex(stack, key.name)
-			: key.ref.stack === stackIndex && stack.items[key.ref.item]?.kind === 'divider'
-				? key.ref.item
-				: -1;
+	if (key.kind === 'none') return atTop ? 0 : sectionHeadEnd(stack);
+	const at = dividerIndex(stack, key.name);
 	if (at === -1) return null;
 	const range = groupRange(stack, at);
 	return atTop ? range.start : range.end;
