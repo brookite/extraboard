@@ -415,11 +415,11 @@ describe('views: list views', () => {
 		expect(serializeBoard(board)).not.toContain('groupBy');
 	});
 
-	it('reads and writes back a list grouped by stack', () => {
-		const board = parse({ views: [{ id: 'v1', name: 'L', type: 'list', groupBy: 'stack' }] });
+	it.each(['stack', 'tag'])('reads and writes back a list grouped by %s', (groupBy) => {
+		const board = parse({ views: [{ id: 'v1', name: 'L', type: 'list', groupBy }] });
 		const view = board.config.views[0]!;
-		expect(view.type === 'list' && view.groupBy).toBe('stack');
-		expect(serializeBoard(board)).toContain('"groupBy":"stack"');
+		expect(view.type === 'list' && view.groupBy).toBe(groupBy);
+		expect(serializeBoard(board)).toContain(`"groupBy":"${groupBy}"`);
 	});
 
 	it('preserves no grouping across saves and changes back to the section default', () => {

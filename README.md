@@ -43,8 +43,9 @@ with its own file format, not a fork.
   direction. Date filters support the last/next N minutes, hours, days, weeks
   or calendar months, plus Yesterday, Today, This week, Next week, This month
   and Next month presets that move with the clock and respect your week start.
-  Group the list by sections (the default), by stacks, or choose **No grouping**
-  for one flat list with stack and section move badges beside each card's menu.
+  Group the list by sections (the default), stacks, or tags, or choose **No grouping**
+  for one flat list. Tag and flat lists show both stack and section move badges.
+  A card with several tags appears in each matching group.
   Only named dividers create sections.
 - **Daily and weekly digests:** a board can show the cards of the day or the
   week in a window at a chosen time — with last period's completed cards in a

@@ -203,6 +203,9 @@ const FLOATING =
 export function CardEditor({ config, card, target, api, settings, onClose, initialProperty }: Props) {
 	const showRaw = settings.showRawPropertyTokens;
 	const rootRef = useRef<HTMLDivElement>(null);
+	const editText = cardEditText(card, config, showRaw);
+	// A tag-only draft opens ready for text on either side of its tags.
+	const value = !card.title && card.tags.length > 0 ? ` ${editText} ` : editText;
 	const save = (text: string): void => {
 		// The op processes the raw text itself; this only reports what a card
 		// could not keep, so a silent removal never surprises the user (§3.2).
@@ -302,7 +305,7 @@ export function CardEditor({ config, card, target, api, settings, onClose, initi
 		<div class="eb-card-editor" ref={rootRef} onClick={(e) => e.stopPropagation()}>
 			<RichField
 				app={api.app}
-				value={cardEditText(card, config, showRaw)}
+				value={value}
 				placeholder={showRaw ? t('cardEditor.placeholderRaw') : t('cardEditor.placeholder')}
 				scope={rootRef}
 				onReady={(mounted) => {

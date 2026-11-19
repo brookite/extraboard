@@ -3265,7 +3265,7 @@ body.is-mobile .eb-add-stack-button {
 	border: none;
 }
 
-.eb-list[data-group-by="none"] .eb-section-compose {
+.eb-list:is([data-group-by="none"], [data-group-by="tag"]) .eb-section-compose {
 	flex-wrap: wrap;
 }
 
@@ -3603,7 +3603,7 @@ body.is-mobile .eb-card-stack {
 	border-radius: 0 0 6px 6px;
 }
 
-.is-phone .eb-list[data-group-by="none"] .eb-list-row > .eb-list-stack {
+.is-phone .eb-list:is([data-group-by="none"], [data-group-by="tag"]) .eb-list-row > .eb-list-stack {
 	border-radius: 0;
 }
 

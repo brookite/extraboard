@@ -196,9 +196,9 @@ export function toListControls(v: unknown): ListControls {
 	return v === 'fixed' || v === 'session' ? v : 'dynamic';
 }
 
-/** Anything but `stack` groups by section, the default (list-view.md §1.0). */
+/** Unknown values use section grouping (list-view.md §1.0). */
 export function toListGroupBy(v: unknown): ListGroupBy {
-	return v === 'stack' || v === 'none' ? v : 'section';
+	return v === 'stack' || v === 'tag' || v === 'none' ? v : 'section';
 }
 
 /** A tag list: strings only, `#` stripped, blanks and duplicates dropped. */

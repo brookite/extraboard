@@ -28,7 +28,7 @@ export type ListControls = 'dynamic' | 'fixed' | 'session';
  * across every stack, the stacks themselves, or one ungrouped list. Location
  * badges show whichever axes the group does not already name.
  */
-export type ListGroupBy = 'section' | 'stack' | 'none';
+export type ListGroupBy = 'section' | 'stack' | 'tag' | 'none';
 
 /**
  * Display state of one list section (list-view.md §5), keyed in `sections` by

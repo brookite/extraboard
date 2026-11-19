@@ -142,6 +142,7 @@ export const en = {
 	// The list view (M13). Spec: docs/specs/list-view.md.
 	list: {
 		addSection: 'Add section',
+		noTags: 'No tags',
 		noSection: 'No section',
 		sectionNamePlaceholder: 'Section name',
 		moveUp: 'Move section up',
@@ -157,8 +158,10 @@ export const en = {
 			label: 'Group by',
 			section: 'Sections',
 			stack: 'Stacks',
+			tag: 'Tags',
 			chipSection: 'Sections',
 			chipStack: 'Stacks',
+			chipTag: 'Tags',
 			none: 'No grouping',
 			desc: 'What the list gathers its cards into.',
 		},
@@ -388,7 +391,7 @@ export const en = {
 			kanban: 'Kanban',
 			list: 'List',
 			sortedBy: 'sorted by {name}',
-			groupByDesc: 'Group by sections or stacks, or show all cards in one list.',
+			groupByDesc: 'Group by sections, stacks, or tags, or show all cards in one list.',
 			controls: {
 				label: 'Section controls',
 				desc: 'Where each section\u2019s sort and filter live.',

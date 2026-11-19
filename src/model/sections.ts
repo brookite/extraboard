@@ -14,6 +14,7 @@ import type { Board, Card, Divider, ListGroupBy, Stack } from './types';
 export type SectionKey =
 	| { kind: 'none' }
 	| { kind: 'named'; name: string }
+	| { kind: 'tag'; tag: string | null }
 	/**
 	 * A whole stack read as one group — what a list grouped by stack shows
 	 * (list-view.md §1.0). It is not a divider, so no op that writes one accepts
@@ -39,6 +40,7 @@ export interface Section {
 export function sameKey(a: SectionKey, b: SectionKey): boolean {
 	if (a.kind !== b.kind) return false;
 	if (a.kind === 'named' && b.kind === 'named') return a.name === b.name;
+	if (a.kind === 'tag' && b.kind === 'tag') return a.tag === b.tag;
 	if (a.kind === 'stack' && b.kind === 'stack') return a.index === b.index;
 	return true;
 }
@@ -69,7 +71,7 @@ export function namedDividerAbove(stack: Stack, index: number): number {
 /**
  * The key under which a section's display state is stored in the view
  * definition (list-view.md §5): the empty string for the sectionless group, the
- * name for a named section, or `null` for a stack whose state is on the stack.
+ * name for a named section, or `null` for stack and tag groups.
  */
 export function stateKeyOf(key: SectionKey): string | null {
 	if (key.kind === 'none') return '';
@@ -145,7 +147,34 @@ export function groupsOf(board: Board, groupBy: ListGroupBy): Section[] {
 			)),
 		}];
 	}
+	if (groupBy === 'tag') return tagGroupsOf(board);
 	return groupBy === 'stack' ? stackGroupsOf(board) : sectionsOf(board);
+}
+
+/** Each card appears once for each of its explicit tags, or under No tags. */
+function tagGroupsOf(board: Board): Section[] {
+	const groups = new Map<string, Section>();
+	const untagged: Section = {
+		key: { kind: 'tag', tag: null }, name: '', dividers: [], cards: [], movable: false,
+	};
+	board.stacks.forEach((stack, s) => {
+		stack.items.forEach((entry, item) => {
+			if (entry.kind !== 'card') return;
+			const ref = { stack: s, item };
+			if (entry.card.tags.length === 0) untagged.cards.push(ref);
+			for (const tag of new Set(entry.card.tags)) {
+				let group = groups.get(tag);
+				if (!group) {
+					group = { key: { kind: 'tag', tag }, name: tag, dividers: [], cards: [], movable: false };
+					groups.set(tag, group);
+				}
+				group.cards.push(ref);
+			}
+		});
+	});
+	const sorted = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+	if (untagged.cards.length > 0 || sorted.length === 0) sorted.push(untagged);
+	return sorted;
 }
 
 /** Named sections in list order — what a move is expressed against (§4.1). */

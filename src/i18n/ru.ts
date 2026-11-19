@@ -143,6 +143,7 @@ export const ru: DeepPartial<typeof en> = {
 	// Списочный вид (M13). Спека: docs/specs/list-view.md.
 	list: {
 		addSection: 'Добавить секцию',
+		noTags: 'Без тегов',
 		noSection: 'Без секции',
 		sectionNamePlaceholder: 'Название секции',
 		moveUp: 'Переместить секцию выше',
@@ -158,8 +159,10 @@ export const ru: DeepPartial<typeof en> = {
 			label: 'Группировка',
 			section: 'По секциям',
 			stack: 'По стопкам',
+			tag: 'По тегам',
 			chipSection: 'Секции',
 			chipStack: 'Стопки',
+			chipTag: 'Теги',
 			none: 'Без группировки',
 			desc: 'Во что список собирает карточки.',
 		},
@@ -384,7 +387,7 @@ export const ru: DeepPartial<typeof en> = {
 			kanban: 'Канбан',
 			list: 'Список',
 			sortedBy: 'сортировка по {name}',
-			groupByDesc: 'Группировать по секциям или стопкам либо показать все карточки одним списком.',
+			groupByDesc: 'Группировать по секциям, стопкам или тегам либо показать все карточки одним списком.',
 			controls: {
 				label: 'Настройки секций',
 				desc: 'Где живут сортировка и фильтр каждой секции.',

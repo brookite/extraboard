@@ -826,10 +826,8 @@ function sectionEntryIndex(
 ): number | null {
 	const stack = board.stacks[stackIndex];
 	if (!stack) return null;
-	// A stack group is not a section: it is the whole stack, so it names no place
-	// inside one. Grouping by stack moves cards with `moveItem` instead
-	// (list-view.md §1.0), and every section op refuses the key outright.
-	if (key.kind === 'stack') return null;
+	// Only section keys name an insertion point inside a stack.
+	if (key.kind === 'stack' || key.kind === 'tag') return null;
 	if (key.kind === 'none') return atTop ? 0 : sectionHeadEnd(stack);
 	const at = dividerIndex(stack, key.name);
 	if (at === -1) return null;
@@ -902,6 +900,7 @@ export function moveCardToSection(
 	before: ItemRef | null = null,
 	atTop = false,
 ): Board {
+	if (key.kind === 'tag') return board;
 	const entry = board.stacks[from.stack]?.items[from.item];
 	if (entry?.kind !== 'card' || !board.stacks[toStack]) return board;
 

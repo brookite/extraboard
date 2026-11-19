@@ -1,4 +1,4 @@
-// The list view: the board read across its stacks, grouped into sections.
+// The list view: one board read by sections, stacks, tags, or as a flat list.
 // Spec: docs/specs/list-view.md.
 //
 // This component owns three things the sections themselves cannot: the section
@@ -6,7 +6,7 @@
 // (§3.4), and the mapping from a dropped row back to an `ItemRef`.
 
 import { Menu } from 'obsidian';
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { countConditions, filterCards, isEmptyFilter, type FilterNode } from '../model/filter';
 import * as ops from '../model/ops';
 import {
@@ -39,6 +39,13 @@ import { resolveWeekStart } from '../i18n/dates';
 
 type ListDef = Extract<ViewDef, { type: 'list' }>;
 
+const GROUPING = {
+	section: { icon: 'heading', chip: 'list.groupBy.chipSection' },
+	stack: { icon: 'square-kanban', chip: 'list.groupBy.chipStack' },
+	tag: { icon: 'tag', chip: 'list.groupBy.chipTag' },
+	none: { icon: 'list', chip: 'list.groupBy.none' },
+} as const satisfies Record<ListGroupBy, { icon: string; chip: string }>;
+
 interface Props {
 	board: Board;
 	view: ListDef;
@@ -66,6 +73,7 @@ function sessionKey(section: Section): string {
 	const key = section.key;
 	if (key.kind === 'none') return 'none';
 	if (key.kind === 'named') return `named:${key.name}`;
+	if (key.kind === 'tag') return `tag:${key.tag ?? ''}`;
 	return `stack:${String(key.index)}`;
 }
 
@@ -84,13 +92,14 @@ export function ListView({ board, view, api, settings }: Props) {
 	// visible until the **next** edit lands, whatever the section's filter says.
 	// A brand-new card carries no tags, so a filtered section would otherwise
 	// hide it the instant it appeared and strand an empty card in the file.
-	const [pending, setPending] = useState<ops.ItemRef | null>(null);
+	const [pendingRef, setPending] = useState<ops.ItemRef | null>(null);
 	/** The board as it looked right after that insert; the next one clears it. */
 	const pendingBoard = useRef<Board | null>(null);
+	const pending = pendingBoard.current === board ? pendingRef : null;
 
 	useEffect(() => {
-		if (pending && pendingBoard.current !== board) setPending(null);
-	}, [board, pending]);
+		if (pendingRef && pendingBoard.current !== board) setPending(null);
+	}, [board, pendingRef]);
 
 	const locked = view.controls === 'fixed';
 	const persist = view.controls !== 'session';
@@ -101,15 +110,17 @@ export function ListView({ board, view, api, settings }: Props) {
 	const groupBy = persist ? view.groupBy : (session.groupBy ?? view.groupBy);
 	const byStack = groupBy === 'stack';
 	const ungrouped = groupBy === 'none';
+	const byTag = groupBy === 'tag';
 	/** What the list draws: the board read across its dividers, or along its
 	 * stacks (§1.0). Everything below is expressed against these groups. */
-	const sections = groupsOf(board, groupBy);
+	const sections = useMemo(() => groupsOf(board, groupBy), [board, groupBy]);
 	// Recurrences and moving date filters consume the minute clock.
 	// `@stack` / `@section` read the card's place, indexed only if asked for.
 	const now = useNow();
+	const where = useMemo(() => placesOf(board), [board]);
 	const ctx = {
 		config: board.config, today: now.date, minutes: now.minutes,
-		weekStart: resolveWeekStart(settings.weekStart), where: placesOf(board),
+		weekStart: resolveWeekStart(settings.weekStart), where,
 	};
 
 	/** Section collapse follows the view's persistence mode (§5). */
@@ -121,7 +132,9 @@ export function ListView({ board, view, api, settings }: Props) {
 		}
 		const key = stateKeyOf(section.key);
 		const stored = key === null ? undefined : view.sections?.[key];
-		const collapsed = persist ? stored?.collapsed === true : session.collapsed[sessionKey(section)] === true;
+		const collapsed = persist && key !== null
+			? stored?.collapsed === true
+			: session.collapsed[sessionKey(section)] === true;
 		return { collapsed };
 	};
 
@@ -160,11 +173,11 @@ export function ListView({ board, view, api, settings }: Props) {
 
 	const pickGroupBy = (event: MouseEvent): void => {
 		showDropdownMenu(event, (menu) => {
-			for (const value of ['section', 'stack', 'none'] as const) {
+			for (const value of ['section', 'stack', 'tag', 'none'] as const) {
 				menu.addItem((item) =>
 					item
 						.setTitle(t(`list.groupBy.${value}`))
-						.setIcon(value === 'stack' ? 'square-kanban' : value === 'none' ? 'list' : 'heading')
+						.setIcon(GROUPING[value].icon)
 						.setChecked(value === groupBy)
 						.onClick(() => setGroupBy(value)),
 				);
@@ -219,14 +232,17 @@ export function ListView({ board, view, api, settings }: Props) {
 		// A stack group's start is the stack's own top, the head of its sectionless
 		// cards, whatever section the composer is pointed at (§4.4).
 		const key: SectionKey =
-			section.key.kind === 'stack' || ungrouped
-				? atTop
+			section.key.kind === 'stack' || section.key.kind === 'tag' || ungrouped
+				? atTop && section.key.kind !== 'tag'
 					? { kind: 'none' }
 					: (composerSections[sessionKey(section)] ?? { kind: 'none' })
 				: section.key;
+		const tag = section.key.kind === 'tag' ? section.key.tag : null;
 		let inserted: ops.ItemRef | null = null;
 		api.update((b) => {
-			const result = ops.addCardToSectionAt(b, stack, key, '', atTop ?? entryTop(b, stack, key));
+			const result = ops.addCardToSectionAt(
+				b, stack, key, tag === null ? '' : `#${tag}`, atTop ?? entryTop(b, stack, key),
+			);
 			inserted = result.ref;
 			return result.board;
 		});
@@ -251,6 +267,7 @@ export function ListView({ board, view, api, settings }: Props) {
 	 * stack**; when there is none, the card lands at the end of its group.
 	 */
 	const onDrop = (info: DropInfo): void => {
+		if (byTag) return;
 		const from = drawn[info.fromList]?.[info.fromIndex];
 		const target = sections[info.toList];
 		if (!from || !target) return;
@@ -491,8 +508,8 @@ export function ListView({ board, view, api, settings }: Props) {
 					title={locked ? t('list.controlsFixed') : t('list.groupBy.label')}
 					onClick={pickGroupBy}
 				>
-					<Icon name={byStack ? 'square-kanban' : ungrouped ? 'list' : 'heading'} class="eb-button-icon" />
-					<span>{ungrouped ? t('list.groupBy.none') : byStack ? t('list.groupBy.chipStack') : t('list.groupBy.chipSection')}</span>
+					<Icon name={GROUPING[groupBy].icon} class="eb-button-icon" />
+					<span>{t(GROUPING[groupBy].chip)}</span>
 				</button>
 			</div>
 			{board.stacks.length === 0 ? <div class="eb-list-empty">{t('list.emptyBoard')}</div> : null}
@@ -504,6 +521,7 @@ export function ListView({ board, view, api, settings }: Props) {
 						key={ungrouped ? `ungrouped:${sorts?.length ? 'sorted' : 'document'}` : sessionKey(section)}
 						board={board}
 						section={section}
+						where={where}
 						ungrouped={ungrouped}
 						index={index}
 						config={board.config}
@@ -534,7 +552,7 @@ export function ListView({ board, view, api, settings }: Props) {
 					/>
 				);
 			})}
-			{ungrouped ? null : <div class="eb-list-add-section">
+			{ungrouped || byTag ? null : <div class="eb-list-add-section">
 				{byStack ? (
 					// The list's own end of the board's "Add stack" column
 					// (kanban-view.md §6.3): grouped by stack, a new group is a stack.

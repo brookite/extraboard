@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SectionGroup, type SectionProps } from '../src/view/components/Section';
 import { CardTile } from '../src/view/components/Card';
-import { groupsOf } from '../src/model/sections';
+import { groupsOf, placesOf } from '../src/model/sections';
+import { setCardText } from '../src/model/ops';
 import { parseBoard } from '../src/model/parse';
+import type { Board, Card } from '../src/model/types';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { boardHead } from './boardFile';
 
@@ -25,12 +27,11 @@ function nodes(value: unknown): Node[] {
 	return [node, ...nodes(node.props.children)];
 }
 
-function setup(ungrouped = true) {
-	let board = parseBoard(`${boardHead()}\n## To do\n\n### Work\n\n- Task\n\n## Done\n`);
-	const section = groupsOf(board, ungrouped ? 'none' : 'section')[ungrouped ? 0 : 1]!;
+function renderGroup(initial: Board, section: SectionProps['section'], ungrouped = false) {
+	let board = initial;
 	const onSectionPick = vi.fn();
 	const props: SectionProps = {
-		board, section, ungrouped, index: 0, config: board.config, rows: section.cards,
+		board, section, where: placesOf(board), ungrouped, index: 0, config: board.config, rows: section.cards,
 		state: { collapsed: true }, ordered: true, settings: DEFAULT_SETTINGS,
 		api: { update: (mutate) => { board = mutate(board); } } as SectionProps['api'],
 		composerStack: 0, onComposerStack: vi.fn(), composerSection: { kind: 'none' },
@@ -39,6 +40,12 @@ function setup(ungrouped = true) {
 		canMoveUp: false, canMoveDown: false,
 	};
 	return { rendered: nodes(SectionGroup(props)), board: () => board, props };
+}
+
+function setup(ungrouped = true) {
+	const board = parseBoard(`${boardHead()}\n## To do\n\n### Work\n\n- Task\n\n## Done\n`);
+	const section = groupsOf(board, ungrouped ? 'none' : 'section')[ungrouped ? 0 : 1]!;
+	return renderGroup(board, section, ungrouped);
 }
 
 describe('ungrouped list rendering', () => {
@@ -75,5 +82,43 @@ describe('ungrouped list rendering', () => {
 		expect(rendered.find((node) => node.props.class === 'eb-section-body')?.props.hidden).toBe(true);
 		const tile = rendered.find((node) => node.type === CardTile)!;
 		expect(tile.props.sectionLabel).toBeUndefined();
+	});
+});
+
+describe('tag group rendering', () => {
+	const board = () => parseBoard(
+		`${boardHead()}\n## To do\n\n### Work\n\n- Draft #a #b\n- Untagged\n`,
+	);
+	const tagTiles = (b: Board) => groupsOf(b, 'tag').map((group) => ({
+		tag: group.name,
+		tiles: renderGroup(b, group).rendered.filter((node) => node.type === CardTile),
+	}));
+
+	it('renders one shared card in every tag and keeps both location badges', () => {
+		const groups = tagTiles(board());
+		expect(groups.map(({ tag }) => tag)).toEqual(['a', 'b', '']);
+		const a = groups[0]!.tiles[0]!.props;
+		const b = groups[1]!.tiles[0]!.props;
+		expect(a.card).toBe(b.card);
+		expect(a).toMatchObject({ stackLabel: 'To do', sectionLabel: 'Work' });
+		expect(b).toMatchObject({ stackLabel: 'To do', sectionLabel: 'Work' });
+		expect(groups[2]!.tiles[0]!.props.card).toMatchObject({ title: 'Untagged' });
+	});
+
+	it('refreshes repeated rows and changes group membership after saving a card', () => {
+		const before = board();
+		const ref = groupsOf(before, 'tag')[0]!.cards[0]!;
+		const revised = setCardText(before, ref, 'Revised #a #b');
+		expect(tagTiles(revised).slice(0, 2).map(({ tiles }) => (tiles[0]!.props.card as Card).title))
+			.toEqual(['Revised', 'Revised']);
+
+		const retagged = setCardText(revised, ref, 'Retagged #a #c');
+		expect(tagTiles(retagged).map(({ tag, tiles }) => [tag, (tiles[0]!.props.card as Card).title]))
+			.toEqual([['a', 'Retagged'], ['c', 'Retagged'], ['', 'Untagged']]);
+
+		const untagged = setCardText(retagged, ref, 'No longer tagged');
+		expect(tagTiles(untagged).map(({ tag, tiles }) => [
+			tag, tiles.map((tile) => (tile.props.card as Card).title),
+		])).toEqual([['', ['No longer tagged', 'Untagged']]]);
 	});
 });

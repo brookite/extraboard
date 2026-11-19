@@ -12,9 +12,10 @@
 import { Menu } from 'obsidian';
 import { useRef, useState } from 'preact/hooks';
 import * as ops from '../../model/ops';
-import { sameKey, sectionName, sectionsOf, type Section, type SectionKey } from '../../model/sections';
+import { sameKey, sectionsOf, type Section, type SectionKey } from '../../model/sections';
 import { isNestedRule, isStackBoundary } from '../../model/sectionView';
-import type { Board, BoardConfig, SectionState, ViewDisplay } from '../../model/types';
+import type { CardPlace } from '../../model/fieldValue';
+import type { Board, BoardConfig, Card, SectionState, ViewDisplay } from '../../model/types';
 import { archiveOpts, type ExtraboardSettings } from '../../settings';
 import { editStack } from '../../ui/StackModal';
 import type { BoardApi } from '../api';
@@ -30,6 +31,7 @@ import { isDoubleTap } from '../../util/gesture';
 export interface SectionProps {
 	board: Board;
 	section: Section;
+	where: (card: Card) => CardPlace | undefined;
 	/** One headerless list, with both location badges on each card. */
 	ungrouped?: boolean;
 	/** Position in the rendered group list — the drag protocol's coordinate. */
@@ -144,27 +146,9 @@ function stackLabel(board: Board, index: number): string {
 /** A section's label as every picker writes it. */
 function sectionKeyLabel(board: Board, key: SectionKey): string {
 	if (key.kind === 'named') return key.name;
+	if (key.kind === 'tag') return key.tag === null ? t('list.noTags') : `#${key.tag}`;
 	if (key.kind === 'stack') return stackLabel(board, key.index);
 	return t('list.noSection');
-}
-
-/**
- * The section each item of one stack sits in, by index — one pass down the
- * stack rather than a walk back up from every row (m10-perf.md §2). Only the
- * stack-grouped reading needs it, since only there does a group hold cards from
- * several sections.
- */
-function sectionsInStack(board: Board, stackIndex: number): SectionKey[] {
-	const stack = board.stacks[stackIndex];
-	if (!stack) return [];
-	let current: SectionKey = { kind: 'none' };
-	return stack.items.map((entry) => {
-		if (entry.kind === 'divider') {
-			const name = sectionName(entry.divider.name);
-			if (name) current = { kind: 'named', name };
-		}
-		return current;
-	});
 }
 
 /** The sections a card can be moved into from a picker: the named ones and none. */
@@ -179,6 +163,7 @@ export function SectionGroup(props: SectionProps) {
 	const {
 		board,
 		section,
+		where,
 		ungrouped = false,
 		index,
 		config,
@@ -213,19 +198,18 @@ export function SectionGroup(props: SectionProps) {
 	/** The stack this group *is*, when the list is grouped by stack (§1.0). */
 	const stackIndex = key.kind === 'stack' ? key.index : null;
 	const byStack = stackIndex !== null;
+	const byTag = key.kind === 'tag';
+	const showBothLocations = ungrouped || byTag;
 	const stack = stackIndex === null ? undefined : board.stacks[stackIndex];
-	/** Which section each row of this stack belongs to — the row badges (§1.0). */
-	const rowSections = byStack && stackIndex !== null ? sectionsInStack(board, stackIndex) : [];
-	const allRowSections = ungrouped ? board.stacks.map((_, i) => sectionsInStack(board, i)) : [];
 
 	// Rows move within and between groups; a sorted group shows the order the
 	// user asked for, not the file's, so it accepts drops but not positions.
-	useSortable(bodyRef, { group: 'eb-list-rows', draggable: '.eb-list-row', sort: ordered }, onDrop);
+	useSortable(bodyRef, { group: 'eb-list-rows', draggable: '.eb-list-row', sort: ordered, disabled: byTag }, onDrop);
 
 	const setCollapsed = (value: boolean): void => onState({ collapsed: value });
 
 	/** Renaming is offered wherever there is a name in the file to change. */
-	const renameable = byStack || key.kind !== 'none';
+	const renameable = byStack || named;
 
 	// The header name carries the divider row's two gestures (mobile.md §8): one
 	// tap collapses or expands the group, a second one within the window puts it
@@ -404,7 +388,9 @@ export function SectionGroup(props: SectionProps) {
 	};
 
 	/** A row's badge: the stack it came from, or the section it sits in (§1.0). */
-	const rowBadge = (ref: ops.ItemRef, axis: 'stack' | 'section' = byStack ? 'section' : 'stack') => {
+	const rowBadge = (
+		ref: ops.ItemRef, here: SectionKey, axis: 'stack' | 'section' = byStack ? 'section' : 'stack',
+	) => {
 		if (axis === 'stack') {
 			return (
 				<MoveBadge
@@ -424,7 +410,6 @@ export function SectionGroup(props: SectionProps) {
 				/>
 			);
 		}
-		const here = (ungrouped ? allRowSections[ref.stack]?.[ref.item] : rowSections[ref.item]) ?? { kind: 'none' };
 		return (
 			<MoveBadge
 				label={sectionKeyLabel(board, here)}
@@ -552,6 +537,8 @@ export function SectionGroup(props: SectionProps) {
 					const rowStack = board.stacks[ref.stack];
 					const entry = rowStack?.items[ref.item];
 					if (!rowStack || entry?.kind !== 'card') return [];
+					const name = byStack || showBothLocations ? where(entry.card)?.section : undefined;
+					const here: SectionKey = name ? { kind: 'named', name } : { kind: 'none' };
 					const row = (
 						<div
 							class="eb-list-row"
@@ -572,20 +559,20 @@ export function SectionGroup(props: SectionProps) {
 								menuExtra={menuExtra}
 								stackLabel={
 									byStack
-										? sectionKeyLabel(board, rowSections[ref.item] ?? { kind: 'none' })
+										? sectionKeyLabel(board, here)
 										: rowStack.name || t('modal.archive.untitled')
 								}
 								onStackPick={onStackPick}
-								sectionLabel={ungrouped ? sectionKeyLabel(board, allRowSections[ref.stack]?.[ref.item] ?? { kind: 'none' }) : undefined}
-								onSectionPick={ungrouped ? onSectionPick : undefined}
+								sectionLabel={showBothLocations ? sectionKeyLabel(board, here) : undefined}
+								onSectionPick={showBothLocations ? onSectionPick : undefined}
 								forceEdit={pending?.stack === ref.stack && pending.item === ref.item}
 								display={display}
 							/>
 							{/* Keep the move control outside CardTile's read/edit
 							    switch: on phones CSS joins both into one visual card,
 							    while editing never replaces or hides this footer. */}
-							{rowBadge(ref)}
-							{ungrouped ? rowBadge(ref, 'section') : null}
+							{rowBadge(ref, here)}
+							{showBothLocations ? rowBadge(ref, here, 'section') : null}
 						</div>
 					);
 					const out = [row];
@@ -603,7 +590,7 @@ export function SectionGroup(props: SectionProps) {
 					// Only meaningful when the groups are sections: there a drag between
 					// rows of different stacks cannot carry the card across, while a
 					// stack group's rows are all in one stack already.
-					if (ungrouped || byStack || !isStackBoundary(rows, i, ordered)) return out;
+					if (showBothLocations || byStack || !isStackBoundary(rows, i, ordered)) return out;
 					out.unshift(
 						<div
 							class="eb-list-stack-boundary"
@@ -626,7 +613,7 @@ export function SectionGroup(props: SectionProps) {
 					    joins (§4.2) — the one decision a list group has to make that a
 					    Kanban column does not. */}
 					{composerBadge()}
-					{ungrouped ? composerBadge('section') : null}
+					{showBothLocations ? composerBadge('section') : null}
 				</div>
 			)}
 		</div>
